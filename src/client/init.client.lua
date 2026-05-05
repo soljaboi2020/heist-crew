@@ -1,15 +1,21 @@
 --[[
     HEIST CREW — Client Bootstrap
     ────────────────────────────────────────────────
-    This runs on each player's device (their phone/PC/console).
-    Handles UI, input, camera, and visual effects.
+    Runs on each player's device. Mounts UI, listens for server events,
+    handles input + camera + visual effects.
 
-    Right now it just confirms the client is alive.
+    Phase 1 wiring:
+      ✅ CashHud  — green cash counter in the top-right corner
 --]]
 
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
+local CashHud = require(script.CashHud)
+
 print("══════════════════════════════════════════")
 print(string.format("[HEIST CREW] Client online ✅ — playing as %s", localPlayer.Name))
 print("══════════════════════════════════════════")
+
+-- Mount the cash HUD (top-right green counter)
+CashHud:start()

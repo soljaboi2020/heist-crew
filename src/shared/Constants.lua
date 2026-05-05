@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "0.0.1"
+Constants.VERSION      = "0.1.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Crew settings ─────
