@@ -18,6 +18,9 @@
 ## 📅 Date Created
 - **2026-05-05** — Project scaffolded. Smoke-test phase ("Hello world" Rojo → Studio sync).
 
+## 👤 Malachi's Roblox account
+- **Username:** `Soljaboi1919` (confirmed 2026-05-05 via Studio Output: `[HEIST CREW] Soljaboi1919 joined the crew 💼`)
+
 ## 🗂️ Folder Structure
 
 ```
@@ -108,13 +111,15 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
 
 ## 🎯 Active Tasks / TODO
 
-### Phase 0 — Smoke test (we are here 🟢)
+### Phase 0 — Smoke test ✅ DONE 2026-05-05
 - [x] Scaffold project structure
 - [x] Write Rojo config
 - [x] Write server + client + shared bootstrap files
 - [x] Initialize git + push to GitHub
-- [ ] Malachi clones on gaming PC + runs `rojo serve`
-- [ ] Malachi connects Studio's Rojo plugin → hits Play → confirms "[HEIST CREW] Server online ✅" in Output
+- [x] Malachi clones on gaming PC + runs `rojo serve`
+- [x] Malachi connects Studio's Rojo plugin → hits Play → confirms "[HEIST CREW] Server online ✅" in Output
+
+### Phase 1 — Core framework (we are here 🟢)
 
 ### Phase 1 — Core framework
 - [ ] `PlayerDataService.lua` — DataStore wrapper for cash, level, owned gear, completed heists
@@ -181,6 +186,7 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
 
 ## 📅 Change Log
 - **2026-05-05** — Project created. Rojo config + bootstrap scripts + Constants module written. Smoke test phase started. Initial commit pushed to GitHub.
+- **2026-05-05** — **🎉 PHASE 0 SMOKE TEST PASSED.** Malachi cloned the repo on his gaming PC via GitHub Desktop, ran `rojo serve` from VS Code's integrated terminal, connected the Rojo plugin in Studio, and hit Play. All 3 print statements (Server online / Player joined / Client online) appeared in the Output window. Confirmed Roblox username: `Soljaboi1919`. Full pipeline (laptop → GitHub → gaming PC → Rojo → Studio) verified working. Phase 1 (core framework) starts next.
 
 ## 📑 Reference docs
 *(none yet — will add as project grows)*
