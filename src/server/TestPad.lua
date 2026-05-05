@@ -24,14 +24,20 @@
 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EconomyService = require(script.Parent.EconomyService)
+local Constants = require(ReplicatedStorage.Shared.Constants)
 
 local TestPad = {}
 
 local PAD_PAYOUT = 50
 local PAD_COOLDOWN = 1.0
-local PAD_POSITION = Vector3.new(20, 0.5, 0)
+local PAD_POSITION = Vector3.new(
+    Constants.WORLD.TEST_PAD_POSITION.x,
+    Constants.WORLD.TEST_PAD_POSITION.y,
+    Constants.WORLD.TEST_PAD_POSITION.z
+)
 
 local cooldowns = {}  -- [userId] = lastTouchTime
 

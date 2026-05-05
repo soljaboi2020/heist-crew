@@ -204,6 +204,20 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
   - **`init.server.lua`** wires it all together: `HeistBuilder:build()` → `GuardService:spawnPatrols(callbacks)` → `HeistService:init(refs, GuardService, EconomyService)` → `TestPad:spawn()`.
   - **`init.client.lua`** mounts `Notifications` + `HeistHud` alongside `CashHud`.
   - **Pending verification** — Malachi needs to pull, hit F5, walk to mansion (~150 studs north), sneak past guards (yellow vision cones), hold E on vault, escape to getaway car within 90s. Stealth run = $3,000 total payout.
+- **2026-05-05** — **🎨 v0.3.0 — POLISHED LOBBY + ATMOSPHERE.** Malachi flagged that the mansion was too far + the world looked empty (just a ring on a baseplate). Massive HeistBuilder rewrite to make the game LOOK like a popular Roblox game:
+  - **Lighting overhaul** — cinematic dusk skybox (ClockTime 19.5, 3000 stars), Atmosphere haze, Bloom effect, ColorCorrection (warm tint), fog from 200→800 studs.
+  - **Ambient music** — looping Sound at Workspace level w/ rbxassetid free track.
+  - **Lobby plaza** at spawn — 28-stud-radius circular marble plaza, gold neon ring border, center pedestal w/ floating "💰 HEIST CREW" sign + subtitle "Crack the vault. Escape the guards. Get paid.", 4 lamp posts (with PointLights) at compass points, glowing green SpawnLocation pad.
+  - **Tutorial billboard** — wooden board angled toward spawn w/ SurfaceGui showing "📋 HOW TO HEIST" + 5-step instructions.
+  - **Boss NPC** — block-character in navy suit + gold tie + black fedora, speech bubble: "Crack that vault, kid. Don't get caught."
+  - **Decorative trees** — 9 trees scattered around plaza edge (wood trunks + green grass-material leaf balls).
+  - **Path** — 8-wide stone walkway from lobby to mansion entrance with gold neon edge strips + 2 lamp posts at midpoint.
+  - **Mansion repositioned** — moved from z=-160 → z=-55 (much closer), shrunk from 60×40 → 44×36 (more focused). Added: 4 corner cylinder pillars w/ gold neon caps, marble floor, red carpet runner from entrance to vault, slate roof w/ gold trim, 4 interior PointLights, 3 wall paintings.
+  - **Vault upgraded** — added 3 colored gem balls (ruby/emerald/sapphire) stacked on top.
+  - **Getaway car restyled** — added roof cabin, glass windshield, 4 cylinder wheels, 2 Neon headlights w/ PointLights.
+  - **Sound effects** — vault crack click on success, looping alarm wail when alarm fires, triumphant sting + cha-ching on heist complete, fail buzzer on caught.
+  - **Tuning** — vault crack time reduced 8s→6s (snappier), getaway timer 90s→60s, vault cooldown 30s→20s.
+  - **Constants reorg** — added `LOBBY_CENTER`, `LOBBY_RADIUS`, `TUTORIAL_BOARD_POS`, `BOSS_NPC_POS`, `PATH_START/END`, `SOUNDS` table, expanded `COLORS` with marble/carpet/grass/path tints.
 
 ## 📑 Reference docs
 *(none yet — will add as project grows)*

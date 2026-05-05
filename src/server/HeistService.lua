@@ -21,11 +21,41 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local HeistService = {}
+
+-- Sound helpers
+local activeAlarmSound = nil
+local function playOneShot(soundId, volume)
+    local s = Instance.new("Sound")
+    s.SoundId = soundId
+    s.Volume = volume or 0.6
+    s.Parent = Workspace
+    s:Play()
+    s.Ended:Connect(function() s:Destroy() end)
+    task.delay(10, function() if s and s.Parent then s:Destroy() end end)
+end
+local function startAlarmLoop()
+    if activeAlarmSound then activeAlarmSound:Stop(); activeAlarmSound:Destroy() end
+    activeAlarmSound = Instance.new("Sound")
+    activeAlarmSound.Name = "AlarmSound"
+    activeAlarmSound.SoundId = Constants.SOUNDS.ALARM
+    activeAlarmSound.Volume = 0.7
+    activeAlarmSound.Looped = true
+    activeAlarmSound.Parent = Workspace
+    activeAlarmSound:Play()
+end
+local function stopAlarmLoop()
+    if activeAlarmSound then
+        activeAlarmSound:Stop()
+        activeAlarmSound:Destroy()
+        activeAlarmSound = nil
+    end
+end
 
 local refs = nil
 local GuardService = nil
@@ -193,6 +223,10 @@ function HeistService:onVaultCracked(player)
     notifyAll(string.format("🚨 ALARM! %s cracked the vault!", player.Name), "red", 4)
     EconomyService:addCash(player, Constants.HEIST_PAYOUT_VAULT, "Vault cracked")
 
+    -- 🔊 Sound: vault cracked + alarm wail
+    playOneShot(Constants.SOUNDS.VAULT_CRACK, 0.8)
+    startAlarmLoop()
+
     -- Activate alarm
     for _, p in ipairs(Players:GetPlayers()) do
         alarmRemote:FireClient(p, true)
@@ -229,6 +263,11 @@ function HeistService:onHeistComplete(player)
         notifyAll(string.format("💰 %s escaped with the loot!", player.Name), "green", 5)
     end
 
+    -- 🔊 Sound: triumph + cha-ching
+    stopAlarmLoop()
+    playOneShot(Constants.SOUNDS.HEIST_WIN, 0.8)
+    playOneShot(Constants.SOUNDS.CASH_CHA_CHING, 0.7)
+
     broadcastState("COMPLETE", {player = player.Name})
 
     HeistService:resetHeist()
@@ -237,6 +276,10 @@ end
 function HeistService:onHeistFailed(player, reason)
     if session.state == "IDLE" or session.state == "COMPLETE" or session.state == "FAILED" then return end
     session.state = "FAILED"
+
+    -- 🔊 Sound: fail buzzer
+    stopAlarmLoop()
+    playOneShot(Constants.SOUNDS.HEIST_FAIL, 0.7)
 
     notifyAll(string.format("❌ Heist failed: %s", reason or "Caught!"), "red", 4)
     broadcastState("FAILED", {player = player.Name, reason = reason})
@@ -265,6 +308,7 @@ function HeistService:resetHeist()
     for _, p in ipairs(Players:GetPlayers()) do
         alarmRemote:FireClient(p, false)
     end
+    stopAlarmLoop()
     GuardService:reset()
 
     -- Re-enable IDLE state after cooldown
