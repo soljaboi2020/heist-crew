@@ -1,0 +1,44 @@
+{
+  "name": "HeistCrew",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "FilteringEnabled": true
+      }
+    },
+
+    "HttpService": {
+      "$properties": {
+        "HttpEnabled": true
+      }
+    },
+
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}

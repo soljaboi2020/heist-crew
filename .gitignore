@@ -1,0 +1,33 @@
+# ────────────────────────────────────────────────
+#  HEIST CREW — git ignore
+# ────────────────────────────────────────────────
+
+# Roblox place files (binary — generated locally, not version-controlled)
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.rbxl.lock
+*.rbxlx.lock
+
+# Rojo build artifacts
+sourcemap.json
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Local secrets (we won't commit env files)
+.env
+.env.*
+!.env.example
