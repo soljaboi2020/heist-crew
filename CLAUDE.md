@@ -119,24 +119,29 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
 - [x] Malachi clones on gaming PC + runs `rojo serve`
 - [x] Malachi connects Studio's Rojo plugin → hits Play → confirms "[HEIST CREW] Server online ✅" in Output
 
-### Phase 1 — Core framework (we are here 🟢)
+### Phase 1 — Core framework ✅ DONE 2026-05-05
+- [x] `PlayerDataService.lua` — DataStore wrapper for cash, level, owned gear, completed heists
+- [x] `Remotes.lua` — central RemoteEvent / RemoteFunction registry
+- [x] First spawn-and-greet flow (player joins → spawns in lobby with $100 starting cash visible on HUD)
 
-### Phase 1 — Core framework
-- [ ] `PlayerDataService.lua` — DataStore wrapper for cash, level, owned gear, completed heists
-- [ ] `Remotes.lua` — central RemoteEvent / RemoteFunction registry
-- [ ] First spawn-and-greet flow (player joins → spawns in lobby with $100 starting cash visible on HUD)
-
-### Phase 2 — First heist (the "small mansion")
-- [ ] Procedural mansion generator (rooms tagged: `entrance`, `hallway`, `vault_room`, `escape_window`)
-- [ ] One AI guard with patrol path + line-of-sight detection
-- [ ] Lockpicking mini-game (the dial-tolerance system from Constants)
-- [ ] Cash bag pickup → escape window → payout split
+### Phase 2 — First playable heist ✅ SHIPPED 2026-05-05 (we are here 🟢 — pending in-Studio verification)
+- [x] Procedural mansion (60×40 stud building, walls + roof + door + signs)
+- [x] Vault (gold DiamondPlate cube with ProximityPrompt, hold E for 8 sec)
+- [x] Two patrolling AI guards (block-character build, vision cones, raycast LOS)
+- [x] Getaway car (activates green/Neon when alarm fires, Touched = win)
+- [x] State machine: IDLE → CRACKING → ESCAPING → COMPLETE/FAILED
+- [x] Alarm system (red flashing border + screen-wide pulse)
+- [x] Toast notifications (top-center sliding messages, color-coded)
+- [x] Heist HUD (vault progress bar + state banner + countdown)
+- [x] Stealth bonus payout (+$500 if escape without being spotted)
 
 ### Phase 3 — Multi-heist + economy
 - [ ] 5 heist locations: small mansion, big mansion, bank, casino, museum
 - [ ] Tool catalog: lockpick, EMP, silenced pistol, drill, thermal scope
 - [ ] Shop UI for spending cash on tools
 - [ ] Crew lobby — match with friends, ready-up, vote on heist
+- [ ] Multiplayer crew system (multiple players sharing one heist instance)
+- [ ] Lockpicking mini-game (the dial-tolerance system from Constants) — currently replaced with hold-E-on-vault, will revisit
 
 ### Phase 4 — Monetization
 - [ ] Gamepass: VIP Crew (cosmetic vault, +10% payout)
@@ -187,6 +192,18 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
 ## 📅 Change Log
 - **2026-05-05** — Project created. Rojo config + bootstrap scripts + Constants module written. Smoke test phase started. Initial commit pushed to GitHub.
 - **2026-05-05** — **🎉 PHASE 0 SMOKE TEST PASSED.** Malachi cloned the repo on his gaming PC via GitHub Desktop, ran `rojo serve` from VS Code's integrated terminal, connected the Rojo plugin in Studio, and hit Play. All 3 print statements (Server online / Player joined / Client online) appeared in the Output window. Confirmed Roblox username: `Soljaboi1919`. Full pipeline (laptop → GitHub → gaming PC → Rojo → Studio) verified working. Phase 1 (core framework) starts next.
+- **2026-05-05** — **🎉 PHASE 1 SHIPPED + VERIFIED.** Pushed commit `c78c39f`: 5 new modules (Remotes, PlayerDataService, EconomyService, TestPad, CashHud) + bumped version to 0.1.0. Malachi pulled via GitHub Desktop, Rojo hot-reloaded, hit Play in Studio. Verified: green cash HUD appears top-right showing $100, glowing green pad spawned at (20, 0, 0), stepping on pad triggered 3 successful touches (100→150→200→250), HUD bounce animation fired on each, EconomyService server-side prints confirmed. Full gameplay loop (touch → server → DataStore → remote → HUD animation) verified end-to-end. Ready for Phase 2 (first heist room).
+- **2026-05-05** — **🎉 PHASE 2 MEGA-PUSH — FULL PLAYABLE HEIST.** Bumped version to 0.2.0. Per Malachi's request "add everything to make playable," shipped one giant push containing:
+  - **`HeistBuilder.lua`** — procedural mansion (60×40 floor, 4 walls split around 12-stud doorway, translucent roof, "🏛 MANSION HEIST" sign), gold DiamondPlate vault with PointLight, dark metal getaway car (body + roof + 4 wheels), decorative green Neon spawn ring, mansion centered at (0, 0, -160), vault at (0, 5, -185), getaway at (0, 2, -70).
+  - **`GuardService.lua`** — 2 patrolling guards (block-character: body + head + hat + SpotLight vision cone). 90° FOV cone check via dot-product, line-of-sight via raycast, 35-stud vision range. PATROL state walks waypoint A↔B; CHASE state activates on alarm and beelines to last-known player position. Touched event = caught.
+  - **`HeistService.lua`** — state machine (IDLE / CRACKING / ESCAPING / COMPLETE / FAILED). Vault uses ProximityPrompt with `HoldDuration=8`, `KeyCode=E`. On full hold: pays $1500, fires alarm to all clients, activates getaway car (green Neon glow), starts 90s escape timer. Getaway car Touched = $1000 escape + $500 stealth bonus if not spotted. Caught/spotted while CRACKING/ESCAPING = fail + teleport back to spawn. After 30s cooldown, vault re-arms.
+  - **`Notifications.lua`** (client) — top-center sliding toast system. Color map (green/red/gold/white) feeds UIStroke + label color. Tweens in from above, auto-fades after duration.
+  - **`HeistHud.lua`** (client) — three UI elements: (1) full-screen alarm border with 4 red bars + "🚨 ALARM TRIGGERED" text pulsing via sine wave, (2) vault progress bar bottom-center with gold fill + "🔧 CRACKING... X%" label, (3) state banner top-center with live ESCAPE countdown.
+  - **`Constants.lua`** updated with Guard AI / Vault / Heist Payout / World coordinate / Color sections.
+  - **`Remotes.lua`** added: `HeistState`, `VaultProgress`, `AlarmTriggered`, `Notify`.
+  - **`init.server.lua`** wires it all together: `HeistBuilder:build()` → `GuardService:spawnPatrols(callbacks)` → `HeistService:init(refs, GuardService, EconomyService)` → `TestPad:spawn()`.
+  - **`init.client.lua`** mounts `Notifications` + `HeistHud` alongside `CashHud`.
+  - **Pending verification** — Malachi needs to pull, hit F5, walk to mansion (~150 studs north), sneak past guards (yellow vision cones), hold E on vault, escape to getaway car within 90s. Stealth run = $3,000 total payout.
 
 ## 📑 Reference docs
 *(none yet — will add as project grows)*

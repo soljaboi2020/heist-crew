@@ -1,13 +1,11 @@
 --[[
     HEIST CREW — Remotes Registry
     ────────────────────────────────────────────────
-    Single source of truth for every RemoteEvent / RemoteFunction
-    in the game. Server creates them on startup, clients fetch them
-    by name (and wait for them to replicate).
+    Single source of truth for every RemoteEvent / RemoteFunction.
 
     Usage:
         local Remotes = require(ReplicatedStorage.Shared.Remotes)
-        local cashRemote = Remotes.getRemote("CashUpdated", "RemoteEvent")
+        local r = Remotes.getRemote(Remotes.NAMES.CashUpdated)
 --]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,9 +13,15 @@ local RunService = game:GetService("RunService")
 
 local Remotes = {}
 
--- Registry of remote names (so we don't typo strings everywhere)
 Remotes.NAMES = {
-    CashUpdated = "CashUpdated",  -- server → client: tells client their new cash balance
+    -- Server → Client
+    CashUpdated     = "CashUpdated",       -- (newCash:number)
+    HeistState      = "HeistState",        -- (state:string, payload:table)
+    VaultProgress   = "VaultProgress",     -- (progress:number 0-1)
+    AlarmTriggered  = "AlarmTriggered",    -- (active:boolean)
+    Notify          = "Notify",            -- ({text:string, color:string, duration:number})
+
+    -- Client → Server (none yet — using ProximityPrompt for vault interaction)
 }
 
 local function getRemotesFolder()
@@ -30,7 +34,6 @@ local function getRemotesFolder()
     return folder
 end
 
--- Server creates the remote if missing, client waits for it
 function Remotes.getRemote(name, classType)
     classType = classType or "RemoteEvent"
     local folder = getRemotesFolder()
