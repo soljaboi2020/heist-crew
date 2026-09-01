@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1500px; background:#0a0a0d; font-family:"Segoe UI",Arial,sans-serif; color:#fff; padding:34px; }
+
+  .hdr { display:flex; align-items:baseline; gap:16px; border-bottom:2px solid #C9A961; padding-bottom:12px; margin-bottom:8px; }
+  .hdr h1 { font-size:32px; letter-spacing:1px; }
+  .hdr .g { color:#C9A961; }
+  .hdr .note { margin-left:auto; font-size:13px; color:#777; }
+
+  .lbl { font-size:12px; letter-spacing:2.5px; color:#C9A961; text-transform:uppercase; margin:30px 0 4px 0; font-weight:700; }
+  .sub { font-size:13px; color:#8a8a92; margin-bottom:12px; }
+
+  .row { display:flex; gap:22px; }
+
+  /* ---------- generic screen frame ---------- */
+  .screen { border:2px solid #24242c; border-radius:10px; overflow:hidden; position:relative;
+            background:linear-gradient(#141420,#0c0c14); }
+
+  /* fake 3D dusk backdrop */
+  .world { position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% 88%, rgba(201,169,97,.16), transparent 70%),
+      linear-gradient(#1b2338 0%, #2b2a3d 34%, #4a3a3a 62%, #241d20 100%); }
+  .world::after { content:""; position:absolute; left:0; right:0; bottom:0; height:38%;
+      background:linear-gradient(transparent, rgba(0,0,0,.75)); }
+  .mansion { position:absolute; left:50%; transform:translateX(-50%); bottom:16%;
+      width:340px; height:150px; background:#191922; border:2px solid #0d0d12;
+      box-shadow:0 0 0 1px #2e2e3a; }
+  .mansion .roof { position:absolute; top:-26px; left:-18px; right:-18px; height:26px;
+      background:#111118; border-top:3px solid #C9A961; }
+  .mansion .win { position:absolute; width:26px; height:34px; background:#f2c46a;
+      box-shadow:0 0 18px rgba(242,196,106,.85); }
+  .ground { position:absolute; left:0; right:0; bottom:0; height:16%; background:#15151c; }
+
+  /* ---------- 1. ICON ---------- */
+  .icon { width:300px; height:300px; border-radius:20px; position:relative; overflow:hidden;
+          border:2px solid #2a2a34; flex:none; }
+  .icon .bg { position:absolute; inset:0;
+      background:radial-gradient(circle at 50% 34%, #3b3247, #16121c 68%, #0a080d); }
+  .icon .rays { position:absolute; inset:0; opacity:.5;
+      background:repeating-conic-gradient(from 0deg at 50% 38%, rgba(201,169,97,.30) 0deg 7deg, transparent 7deg 20deg); }
+  .icon .mask { position:absolute; top:52px; left:50%; transform:translateX(-50%);
+      width:132px; height:150px; }
+  .icon .money { position:absolute; bottom:0; left:0; right:0; height:98px;
+      background:linear-gradient(transparent, rgba(0,0,0,.9)); }
+  .icon .ttl { position:absolute; bottom:16px; left:0; right:0; text-align:center;
+      font-size:41px; font-weight:900; letter-spacing:-1px; font-style:italic;
+      color:#fff; text-shadow:0 0 20px rgba(201,169,97,.95), 0 5px 0 #000, 4px 4px 0 #7a5f22; }
+  .icon .kick { position:absolute; top:13px; left:50%; transform:translateX(-50%);
+      background:#d13030; color:#fff; font-size:14px; font-weight:800; letter-spacing:1.5px;
+      padding:4px 14px; border-radius:5px; box-shadow:0 3px 0 #7a1616; white-space:nowrap; }
+
+  .iconnote { flex:1; padding-left:6px; }
+  .iconnote h3 { font-size:18px; color:#C9A961; margin-bottom:10px; }
+  .iconnote li { font-size:14px; color:#b6b6c0; margin-bottom:9px; line-height:1.5; list-style:none;
+                 padding-left:18px; position:relative; }
+  .iconnote li:before { content:"▸"; position:absolute; left:0; color:#C9A961; }
+
+  /* ---------- 2. HEIST HUD ---------- */
+  .hud { width:952px; height:536px; }
+  .alarmborder { position:absolute; inset:0; border:9px solid rgba(210,44,44,.72);
+      box-shadow:inset 0 0 62px rgba(210,44,44,.45); pointer-events:none; }
+  .topbanner { position:absolute; top:20px; left:50%; transform:translateX(-50%); text-align:center; }
+  .topbanner .st { font-size:27px; font-weight:900; color:#ff4b4b; letter-spacing:3px;
+      text-shadow:0 0 22px rgba(255,60,60,.9); }
+  .topbanner .tm { font-size:53px; font-weight:900; color:#fff; letter-spacing:-1px; line-height:1;
+      text-shadow:0 3px 0 #000; }
+  .topbanner .tl { font-size:11px; letter-spacing:4px; color:#ffb0b0; margin-top:3px; }
+
+  .cash { position:absolute; top:18px; right:20px; background:rgba(8,8,12,.86);
+      border:2px solid #3fd07a; border-radius:11px; padding:9px 17px; text-align:right; }
+  .cash .n { font-size:31px; font-weight:900; color:#3fd07a; line-height:1; }
+  .cash .l { font-size:10px; letter-spacing:3px; color:#6f7f76; margin-top:3px; }
+
+  /* crew roster */
+  .crew { position:absolute; top:18px; left:20px; display:flex; flex-direction:column; gap:7px; }
+  .mate { display:flex; align-items:center; gap:9px; background:rgba(8,8,12,.82);
+      border-left:4px solid #C9A961; border-radius:0 8px 8px 0; padding:6px 13px 6px 9px; width:212px; }
+  .mate .av { width:27px; height:27px; border-radius:6px; background:#2c2c38; flex:none;
+      display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .mate .nm { font-size:13px; font-weight:700; }
+  .mate .rl { font-size:10px; letter-spacing:1.5px; color:#C9A961; }
+  .mate.down { border-left-color:#d13030; opacity:.62; }
+  .mate.down .rl { color:#ff6b6b; }
+
+  /* objective */
+  .obj { position:absolute; left:20px; bottom:118px; background:rgba(8,8,12,.82);
+      border-left:4px solid #3fd07a; border-radius:0 8px 8px 0; padding:9px 15px; }
+  .obj .h { font-size:10px; letter-spacing:3px; color:#6f7f76; margin-bottom:4px; }
+  .obj .t { font-size:16px; font-weight:700; }
+
+  /* vault bar */
+  .vault { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); width:496px; text-align:center; }
+  .vault .cap { font-size:15px; font-weight:800; letter-spacing:2px; color:#C9A961; margin-bottom:8px; }
+  .vbar { height:23px; background:rgba(0,0,0,.72); border:2px solid #C9A961; border-radius:12px; overflow:hidden; }
+  .vfill { height:100%; width:68%; border-radius:9px;
+      background:linear-gradient(90deg,#8a6d28,#C9A961 55%,#f5dd9c); box-shadow:0 0 22px rgba(201,169,97,.85); }
+  .vault .hint { font-size:11px; color:#8a8a92; margin-top:7px; letter-spacing:1px; }
+
+  /* the decision prompt - the key mechanic */
+  .decide { position:absolute; right:20px; bottom:118px; width:246px;
+      background:rgba(10,8,4,.93); border:2px solid #C9A961; border-radius:11px; padding:13px; }
+  .decide .h { font-size:11px; letter-spacing:2.5px; color:#C9A961; margin-bottom:7px; font-weight:700; }
+  .decide .q { font-size:14px; line-height:1.45; margin-bottom:11px; color:#e2e2e8; }
+  .decide .btn { font-size:13px; font-weight:800; padding:8px; border-radius:7px; text-align:center; margin-bottom:6px; }
+  .b-safe { background:#1f7a4a; box-shadow:0 3px 0 #0f4028; }
+  .b-risk { background:#8f2020; box-shadow:0 3px 0 #4d0f0f; }
+
+  .toast { position:absolute; top:96px; left:50%; transform:translateX(-50%);
+      background:rgba(8,8,12,.92); border:2px solid #C9A961; border-radius:9px;
+      padding:8px 20px; font-size:14px; font-weight:700; color:#C9A961; }
+
+  /* ---------- 3. CREW SELECT ---------- */
+  .crewsel { width:735px; height:406px; }
+  .cs-ttl { position:absolute; top:22px; left:0; right:0; text-align:center;
+      font-size:22px; font-weight:900; letter-spacing:4px; color:#C9A961; }
+  .cs-sub { position:absolute; top:52px; left:0; right:0; text-align:center; font-size:12px; color:#8a8a92; letter-spacing:1px; }
+  .roles { position:absolute; top:88px; left:26px; right:26px; display:flex; gap:14px; }
+  .role { flex:1; background:rgba(10,10,16,.9); border:2px solid #2a2a34; border-radius:11px;
+      padding:14px 11px; text-align:center; }
+  .role.sel { border-color:#C9A961; box-shadow:0 0 26px rgba(201,169,97,.35); background:rgba(28,22,10,.9); }
+  .role .ic { font-size:32px; margin-bottom:8px; }
+  .role .n { font-size:15px; font-weight:900; letter-spacing:1.5px; margin-bottom:6px; }
+  .role.sel .n { color:#C9A961; }
+  .role .d { font-size:11px; color:#9a9aa4; line-height:1.45; min-height:46px; }
+  .role .tag { margin-top:9px; font-size:10px; letter-spacing:1px; color:#6f7f76;
+      border-top:1px solid #2a2a34; padding-top:7px; }
+  .ready { position:absolute; bottom:24px; left:50%; transform:translateX(-50%);
+      background:#C9A961; color:#12100a; font-size:16px; font-weight:900; letter-spacing:3px;
+      padding:11px 52px; border-radius:9px; box-shadow:0 4px 0 #7a5f22; }
+  .votes { position:absolute; bottom:24px; right:26px; font-size:11px; color:#8a8a92; letter-spacing:1px; }
+
+  /* ---------- 4. PAYOUT ---------- */
+  .payout { width:735px; height:406px; }
+  .po-h { position:absolute; top:26px; left:0; right:0; text-align:center; }
+  .po-h .k { font-size:13px; letter-spacing:5px; color:#3fd07a; }
+  .po-h .n { font-size:44px; font-weight:900; letter-spacing:-1px; margin-top:2px; }
+  .lines { position:absolute; top:118px; left:64px; right:64px; }
+  .line { display:flex; justify-content:space-between; align-items:center; padding:8px 0;
+      border-bottom:1px solid #1e1e28; font-size:15px; }
+  .line .k { color:#9a9aa4; }
+  .line .v { font-weight:800; color:#3fd07a; }
+  .line.bonus .v { color:#C9A961; }
+  .line.tot { border-bottom:none; border-top:2px solid #C9A961; margin-top:8px; padding-top:13px; font-size:21px; }
+  .line.tot .k { color:#fff; font-weight:800; letter-spacing:1px; }
+  .line.tot .v { color:#C9A961; font-size:31px; }
+  .rank { position:absolute; bottom:22px; left:64px; font-size:12px; color:#8a8a92; letter-spacing:1px; }
+  .again { position:absolute; bottom:18px; right:64px; background:#1f7a4a; font-size:14px;
+      font-weight:900; letter-spacing:2px; padding:10px 30px; border-radius:8px; box-shadow:0 4px 0 #0f4028; }
+
+  .foot { margin-top:30px; padding-top:14px; border-top:1px solid #24242c; font-size:12px; color:#6a6a74; line-height:1.6; }
+
+  .i { width:1em; height:1em; vertical-align:-.13em; fill:none; stroke:currentColor;
+       stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  .role .ic .i { width:34px; height:34px; color:#C9A961; stroke-width:1.7; }
+  .mate .av .i { width:16px; height:16px; color:#C9A961; }
+  .mate.down .av .i { color:#ff6b6b; }
+</style>
+</head>
+<body>
+
+<svg style="display:none">
+  <symbol id="i-hack" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0116 0v2"/><rect x="2.5" y="14" width="4" height="6" rx="1.6"/><rect x="17.5" y="14" width="4" height="6" rx="1.6"/></symbol>
+  <symbol id="i-musc" viewBox="0 0 24 24"><path d="M7 9v6M17 9v6M4.5 10.5v3M19.5 10.5v3M7 12h10"/></symbol>
+  <symbol id="i-look" viewBox="0 0 24 24"><path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-driv" viewBox="0 0 24 24"><path d="M3 15v-3l2-4.5a2 2 0 011.8-1.2h10.4A2 2 0 0119 7.5L21 12v3"/><path d="M3 15h18v2.5h-3V15M6 17.5V15"/><circle cx="7" cy="15.5" r="1.4"/><circle cx="17" cy="15.5" r="1.4"/></symbol>
+  <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M9 3L6.5 9 12 21M15 3l2.5 6L12 21"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M15.5 3a5.5 5.5 0 00-4.9 8L3 18.6 5.4 21l7.6-7.6a5.5 5.5 0 102.5-10.4z"/></symbol>
+  <symbol id="i-alarm" viewBox="0 0 24 24"><path d="M18 15V10a6 6 0 10-12 0v5l-2 3h16z"/><path d="M10 21h4"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.7 1.2 6.6L12 17.7 6.1 20.8l1.2-6.6L2.5 9.5l6.6-.9z"/></symbol>
+  <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 2s5 5.3 5 10a5 5 0 01-10 0c0-1.6.6-3 1.4-4.2.3 1.4 1.1 2.3 2.1 2.3 1 0 1.5-1 1.5-2.6C12 5.6 12 2 12 2z"/></symbol>
+  <symbol id="i-crew" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 19a6.5 6.5 0 0113 0"/><path d="M16 5.4a3.2 3.2 0 010 5.2M17.5 19a6.5 6.5 0 00-2-4.7"/></symbol>
+</svg>
+
+<div class="hdr">
+  <h1>HEIST <span class="g">CREW</span></h1>
+  <div style="font-size:14px;color:#8a8a92;">visual direction &mdash; target look for v1.0</div>
+  <div class="note">mockup only &middot; not a render of the actual Studio build</div>
+</div>
+
+<!-- ============ 1. ICON ============ -->
+<div class="lbl">1 &nbsp;/&nbsp; Game icon</div>
+<div class="sub">The single highest-leverage asset in the whole project. This is what decides whether anyone ever clicks.</div>
+<div class="row">
+  <div class="icon">
+    <div class="bg"></div><div class="rays"></div>
+    <div class="kick">4 PLAYER CO-OP</div>
+    <svg class="mask" viewBox="0 0 132 150">
+      <path d="M66 6 C104 6 122 30 122 62 C122 104 96 140 66 146 C36 140 10 104 10 62 C10 30 28 6 66 6 Z"
+            fill="#f4f0e6" stroke="#C9A961" stroke-width="3"/>
+      <ellipse cx="43" cy="62" rx="15" ry="19" fill="#12121a"/>
+      <ellipse cx="89" cy="62" rx="15" ry="19" fill="#12121a"/>
+      <path d="M44 100 Q66 116 88 100" stroke="#12121a" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M66 12 L66 40" stroke="#C9A961" stroke-width="3"/>
+    </svg>
+    <div class="money"></div>
+    <div class="ttl">HEIST CREW</div>
+  </div>
+  <div class="iconnote">
+    <h3>Why it's built this way</h3>
+    <ul>
+      <li><b>One shape, readable at 64px.</b> The mask silhouette survives being shrunk to a phone thumbnail. Detailed art turns to mush at that size, which is where most indie Roblox icons die.</li>
+      <li><b>Gold on near-black.</b> Roblox's browse grid is a wall of bright saturated cartoon icons. Going dark and expensive-looking is how you stand out in a row of them, and it matches the lobby palette already in HeistBuilder.</li>
+      <li><b>The red "4 PLAYER CO-OP" flag.</b> Co-op is the actual differentiator, so it goes on the icon, not in the description nobody reads.</li>
+      <li><b>Heavy italic title with a hard drop shadow.</b> Chunky bold type is the Roblox house style. This borrows the readability without the childish look.</li>
+      <li><b>Thumbnails are a separate job.</b> The icon is the square. The wide thumbnails are where you show four characters mid-escape with the vault open. Those get made from real in-game screenshots once the build is worth screenshotting.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ 2. HUD ============ -->
+<div class="lbl">2 &nbsp;/&nbsp; In-heist HUD &mdash; the money shot</div>
+<div class="sub">This is the screen people see in a TikTok clip. Everything on it is either a number going up, a timer going down, or a decision.</div>
+<div class="screen hud">
+  <div class="world">
+    <div class="mansion">
+      <div class="roof"></div>
+      <div class="win" style="left:34px;top:34px"></div>
+      <div class="win" style="left:96px;top:34px"></div>
+      <div class="win" style="right:96px;top:34px"></div>
+      <div class="win" style="right:34px;top:34px"></div>
+    </div>
+    <div class="ground"></div>
+  </div>
+  <div class="alarmborder"></div>
+
+  <div class="crew">
+    <div class="mate"><div class="av"><svg class="i"><use href="#i-hack"/></svg></div><div><div class="nm">Soljaboi1919</div><div class="rl">HACKER</div></div></div>
+    <div class="mate"><div class="av"><svg class="i"><use href="#i-musc"/></svg></div><div><div class="nm">jaydn_x</div><div class="rl">MUSCLE &middot; 2 BAGS</div></div></div>
+    <div class="mate"><div class="av"><svg class="i"><use href="#i-look"/></svg></div><div><div class="nm">rico2k</div><div class="rl">LOOKOUT</div></div></div>
+    <div class="mate down"><div class="av"><svg class="i"><use href="#i-driv"/></svg></div><div><div class="nm">mika_</div><div class="rl">DOWN &middot; REVIVE</div></div></div>
+  </div>
+
+  <div class="topbanner">
+    <div class="st"><svg class="i"><use href="#i-alarm"/></svg> ALARM TRIGGERED</div>
+    <div class="tm">0:47</div>
+    <div class="tl">UNTIL LOCKDOWN</div>
+  </div>
+
+  <div class="cash">
+    <div class="n">$4,250</div>
+    <div class="l">CARRIED</div>
+  </div>
+
+  <div class="toast"><svg class="i"><use href="#i-gem"/></svg> rico2k found the safe deposit room</div>
+
+  <div class="obj">
+    <div class="h">OBJECTIVE</div>
+    <div class="t">Get the bags to the van</div>
+  </div>
+
+  <div class="decide">
+    <div class="h">PUSH YOUR LUCK</div>
+    <div class="q">The manager's office is still locked. Worth about <b style="color:#C9A961">$3,000</b>.</div>
+    <div class="btn b-safe">LEAVE NOW &nbsp;·&nbsp; keep $4,250</div>
+    <div class="btn b-risk">GO DEEPER &nbsp;·&nbsp; guards +50%</div>
+  </div>
+
+  <div class="vault">
+    <div class="cap"><svg class="i"><use href="#i-wrench"/></svg> CRACKING VAULT &mdash; 68%</div>
+    <div class="vbar"><div class="vfill"></div></div>
+    <div class="hint">hold E &nbsp;·&nbsp; moving cancels the crack</div>
+  </div>
+</div>
+
+<!-- ============ 3 + 4 ============ -->
+<div class="lbl">3 &nbsp;/&nbsp; Crew select &nbsp;&nbsp;&amp;&nbsp;&nbsp; 4 &nbsp;/&nbsp; Payout</div>
+<div class="sub">Roles are what turn four solo players into a crew. The payout screen is what makes them hit play again.</div>
+<div class="row">
+
+  <div class="screen crewsel">
+    <div class="world"></div>
+    <div class="cs-ttl">PICK YOUR ROLE</div>
+    <div class="cs-sub">MANSION &middot; NORMAL &middot; 3 / 4 CREW READY</div>
+    <div class="roles">
+      <div class="role sel">
+        <div class="ic"><svg class="i"><use href="#i-hack"/></svg></div><div class="n">HACKER</div>
+        <div class="d">Loops the cameras. Only one who can open electronic locks.</div>
+        <div class="tag">YOU</div>
+      </div>
+      <div class="role">
+        <div class="ic"><svg class="i"><use href="#i-musc"/></svg></div><div class="n">MUSCLE</div>
+        <div class="d">Carries 3 loot bags instead of 1. Moves slower while loaded.</div>
+        <div class="tag">jaydn_x</div>
+      </div>
+      <div class="role">
+        <div class="ic"><svg class="i"><use href="#i-look"/></svg></div><div class="n">LOOKOUT</div>
+        <div class="d">Sees guard vision cones through walls. Marks patrols for the crew.</div>
+        <div class="tag">rico2k</div>
+      </div>
+      <div class="role">
+        <div class="ic"><svg class="i"><use href="#i-driv"/></svg></div><div class="n">DRIVER</div>
+        <div class="d">Starts the van early. Cuts the escape timer for everyone.</div>
+        <div class="tag" style="color:#C9A961">OPEN SLOT</div>
+      </div>
+    </div>
+    <div class="ready">READY</div>
+    <div class="votes">next heist vote &middot; 0:12</div>
+  </div>
+
+  <div class="screen payout">
+    <div class="world"></div>
+    <div class="po-h">
+      <div class="k">HEIST COMPLETE</div>
+      <div class="n">MANSION</div>
+    </div>
+    <div class="lines">
+      <div class="line"><span class="k">Vault</span><span class="v">$1,500</span></div>
+      <div class="line"><span class="k">Loot bags carried out &nbsp;×3</span><span class="v">$2,750</span></div>
+      <div class="line bonus"><span class="k"><svg class="i"><use href="#i-star"/></svg> Never spotted</span><span class="v">+$500</span></div>
+      <div class="line bonus"><span class="k"><svg class="i"><use href="#i-fire"/></svg> Daily streak &nbsp;day 4</span><span class="v">+$400</span></div>
+      <div class="line bonus"><span class="k"><svg class="i"><use href="#i-crew"/></svg> Full crew of 4</span><span class="v">+$300</span></div>
+      <div class="line tot"><span class="k">TOTAL</span><span class="v">$5,450</span></div>
+    </div>
+    <div class="rank">CREW RANK 7 &nbsp;·&nbsp; $2,550 to rank 8</div>
+    <div class="again">RUN IT BACK</div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <b style="color:#C9A961">What this is:</b> a direction sketch, not a screenshot. The UI panels are drawn to scale and translate straight into Luau ScreenGui code. The 3D backdrop behind them is a stand-in, not a render of what HeistBuilder currently produces.<br>
+  <b style="color:#C9A961">Palette:</b> obsidian #0A0A0D &middot; champagne gold #C9A961 &middot; money green #3FD07A &middot; alarm red #D22C2C. Same gold as the lobby already uses in Constants.lua, so nothing has to be re-themed.
+</div>
+
+</body>
+</html>
