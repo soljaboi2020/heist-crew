@@ -1,8 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
   * { margin:0; padding:0; box-sizing:border-box; }
 
   /* Roblox-native fonts: Enum.Font.LuckiestGuy / Enum.Font.FredokaOne */
@@ -227,11 +223,15 @@
   .foot { margin-top:28px; padding-top:14px; border-top:5px solid #1A0F2E; font-size:13px;
       color:#a99bd4; line-height:1.65; }
   .foot b { color:#FFC93C; }
-</style>
-</head>
-<body>
 
-<svg style="display:none">
+body{width:512px;height:512px;padding:0;background:none;overflow:hidden}
+.icon{width:512px;height:512px;border-radius:0;border:none}
+.icon .head{top:90px;transform:translateX(-50%) scale(1.62);transform-origin:top center}
+.icon .ttl{bottom:20px} .icon .ttl .a{font-size:64px;-webkit-text-stroke:13px #1A0F2E}
+.icon .ttl .b{font-size:83px;-webkit-text-stroke:14px #1A0F2E}
+.icon .flag{top:22px;font-size:27px;padding:8px 24px;border-width:6px;border-radius:15px;box-shadow:0 8px 0 #8E0F0F}
+.icon .cash{width:74px;height:48px;border-width:6px;border-radius:8px}
+</style></head><body><svg style="display:none">
   <symbol id="i-hack" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0116 0v2"/><rect x="2.5" y="13.5" width="4.5" height="7" rx="2"/><rect x="17" y="13.5" width="4.5" height="7" rx="2"/></symbol>
   <symbol id="i-musc" viewBox="0 0 24 24"><path d="M7 8.5v7M17 8.5v7M4 10.5v3M20 10.5v3M7 12h10"/></symbol>
   <symbol id="i-look" viewBox="0 0 24 24"><path d="M2 12s4-6.5 10-6.5S22 12 22 12s-4 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
@@ -244,19 +244,7 @@
   <symbol id="i-shop" viewBox="0 0 24 24"><path d="M3 8h18l-1.5 12h-15z"/><path d="M8 8V6a4 4 0 018 0v2"/></symbol>
   <symbol id="i-code" viewBox="0 0 24 24"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></symbol>
   <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M3 13.5h18M12 9v12"/><path d="M12 9S9.5 4 7 5.4 9 9 12 9zM12 9s2.5-5 5-3.6S15 9 12 9z"/></symbol>
-</svg>
-
-<div class="hdr">
-  <h1 class="disp out4">HEIST CREW</h1>
-  <div class="t">visual direction &mdash; target look for v1.0</div>
-  <div class="n">mockup only &middot; not a render of the Studio build</div>
-</div>
-
-<!-- ============ 1 ============ -->
-<div class="lbl disp">1 / GAME ICON</div>
-<div class="sub">The highest-leverage asset in the project. This is what decides whether anyone ever clicks it.</div>
-<div class="row">
-  <div class="icon">
+</svg><div class="icon">
     <div class="bg"></div><div class="rays"></div>
     <div class="cash" style="left:16px;bottom:96px;transform:rotate(-18deg)"></div>
     <div class="cash" style="left:46px;bottom:74px;transform:rotate(11deg)"></div>
@@ -274,147 +262,4 @@
     </svg>
     <div class="flag out3">4-PLAYER CO-OP</div>
     <div class="ttl"><span class="a">HEIST</span><span class="b">CREW</span></div>
-  </div>
-  <div class="note">
-    <h3>What changed and why</h3>
-    <ul>
-      <li><b>Bright, not moody.</b> The last version was dark navy and champagne gold, which is a banking app palette. Roblox's browse grid is saturated orange, purple and yellow, and a dark tile just reads as broken or unfinished there.</li>
-      <li><b>A face, big and centered.</b> Nearly every top Roblox icon is a character head filling the frame. Faces out-click objects and logos, and the blocky head instantly says "this is Roblox" before anyone reads a word.</li>
-      <li><b>Sunburst rays and floating cash.</b> Standard visual grammar for the money-and-progression genre. It signals the loop without needing text.</li>
-      <li><b>Fat black outlines on everything.</b> This is the single most Roblox thing you can do. In Studio it's <b>UIStroke</b> on frames and text, and it's why these icons still read at 64px on a phone.</li>
-      <li><b>Luckiest Guy for the title.</b> Actual built-in Roblox font (<b>Enum.Font.LuckiestGuy</b>), so this mockup is reproducible exactly, no custom font upload needed.</li>
-      <li><b>Two-line stacked title.</b> Lets the letters get roughly 40% bigger than one line in the same square.</li>
-    </ul>
-  </div>
-</div>
-
-<!-- ============ 2 ============ -->
-<div class="lbl disp">2 / IN-HEIST HUD &mdash; the money shot</div>
-<div class="sub">The screen a TikTok clip actually shows. Everything on it is a number going up, a timer going down, or a decision.</div>
-<div class="screen hud">
-  <div class="world">
-    <div class="star" style="left:8%;top:12%"></div><div class="star" style="left:22%;top:7%"></div>
-    <div class="star" style="left:34%;top:18%"></div><div class="star" style="left:63%;top:9%"></div>
-    <div class="star" style="left:78%;top:20%"></div><div class="star" style="left:90%;top:11%"></div>
-    <div class="moon"></div>
-    <div class="hill"></div>
-    <div class="mans">
-      <div class="roof"></div>
-      <div class="w" style="left:30px;top:26px"></div><div class="w" style="left:96px;top:26px"></div>
-      <div class="w" style="right:96px;top:26px"></div><div class="w" style="right:30px;top:26px"></div>
-      <div class="door"></div>
-    </div>
-  </div>
-  <div class="alarmbar"></div>
-
-  <div class="crew">
-    <div class="mate"><div class="av"><svg fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round"><use href="#i-hack"/></svg></div>
-      <div style="flex:1"><div class="nm">Soljaboi1919</div><div class="rl">HACKER</div><div class="hp"><i style="width:100%"></i></div></div></div>
-    <div class="mate"><div class="av"><svg fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round"><use href="#i-musc"/></svg></div>
-      <div style="flex:1"><div class="nm">jaydn_x</div><div class="rl">MUSCLE &middot; 3 BAGS</div><div class="hp"><i style="width:72%"></i></div></div></div>
-    <div class="mate"><div class="av"><svg fill="none" stroke="#FFC93C" stroke-width="2" stroke-linecap="round"><use href="#i-look"/></svg></div>
-      <div style="flex:1"><div class="nm">rico2k</div><div class="rl">LOOKOUT</div><div class="hp"><i style="width:88%"></i></div></div></div>
-    <div class="mate down"><div class="av"><svg fill="none" stroke="#FF8A8A" stroke-width="2" stroke-linecap="round"><use href="#i-driv"/></svg></div>
-      <div style="flex:1"><div class="nm">mika_</div><div class="rl">DOWN &middot; HOLD E</div><div class="hp"><i style="width:18%"></i></div></div></div>
-  </div>
-
-  <div class="rail">
-    <div class="rbtn b-gold"><svg class="ci" fill="none" stroke="#3A2200" stroke-width="2.2" stroke-linecap="round"><use href="#i-shop"/></svg><div class="cl">SHOP</div></div>
-    <div class="rbtn b-blue"><svg class="ci" fill="none" stroke="#04314B" stroke-width="2.2" stroke-linecap="round"><use href="#i-code"/></svg><div class="cl">CODES</div><div class="dot">2</div></div>
-    <div class="rbtn b-green"><svg class="ci" fill="none" stroke="#0B3D19" stroke-width="2.2" stroke-linecap="round"><use href="#i-gift"/></svg><div class="cl">DAILY</div><div class="dot">!</div></div>
-  </div>
-
-  <div class="cashbox"><div class="n">$4,250</div><div class="plus">+</div></div>
-  <div class="x2 out3">2X CASH WEEKEND</div>
-
-  <div class="top">
-    <div class="a">ALARM TRIGGERED</div>
-    <div class="t">0:47</div>
-    <div class="tbar"><i></i></div>
-    <div class="c">UNTIL LOCKDOWN</div>
-  </div>
-
-  <div class="toast"><svg fill="none" stroke="#04314B" stroke-width="2" stroke-linejoin="round"><use href="#i-gem"/></svg> rico2k found the safe deposit room!</div>
-
-  <div class="obj"><div class="h">OBJECTIVE</div><div class="t">Get the bags to the van</div></div>
-
-  <div class="luck">
-    <div class="h">PUSH YOUR LUCK?</div>
-    <div class="q">Manager's office is still locked. Worth about <b>$3,000</b>.</div>
-    <div class="btn b-green">CASH OUT<small>keep your $4,250</small></div>
-    <div class="btn b-red" style="margin-bottom:0">GO DEEPER<small>guards get 50% faster</small></div>
-  </div>
-
-  <div class="vault">
-    <div class="cap"><svg fill="none" stroke="#FFC93C" stroke-width="2" stroke-linejoin="round"><use href="#i-drill"/></svg> CRACKING VAULT &mdash; 68%</div>
-    <div class="vbar"><i></i></div>
-    <div class="k">hold <span class="key">E</span> &nbsp;&middot;&nbsp; moving cancels the crack</div>
-  </div>
-</div>
-
-<!-- ============ 3 + 4 ============ -->
-<div class="lbl disp">3 / CREW SELECT &nbsp;&nbsp;&amp;&nbsp;&nbsp; 4 / PAYOUT</div>
-<div class="sub">Roles turn four solo players into a crew. The payout screen is what makes them hit play again.</div>
-<div class="row">
-
-  <div class="screen cs">
-    <div class="world"><div class="hill"></div></div>
-    <div class="ttl">PICK YOUR ROLE</div>
-    <div class="bar">MANSION &nbsp;&middot;&nbsp; NORMAL &nbsp;&middot;&nbsp; 3 / 4 CREW READY</div>
-    <div class="roles">
-      <div class="role sel">
-        <div class="ic"><svg fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><use href="#i-hack"/></svg></div>
-        <div class="n">HACKER</div>
-        <div class="d">Loops the cameras. Only one who can open electronic locks.</div>
-        <div class="tag">YOU</div>
-      </div>
-      <div class="role">
-        <div class="ic"><svg fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><use href="#i-musc"/></svg></div>
-        <div class="n">MUSCLE</div>
-        <div class="d">Carries 3 loot bags instead of 1. Moves slower when loaded up.</div>
-        <div class="tag">jaydn_x</div>
-      </div>
-      <div class="role">
-        <div class="ic"><svg fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><use href="#i-look"/></svg></div>
-        <div class="n">LOOKOUT</div>
-        <div class="d">Sees guard vision cones through walls. Marks patrols for the crew.</div>
-        <div class="tag">rico2k</div>
-      </div>
-      <div class="role">
-        <div class="ic"><svg fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><use href="#i-driv"/></svg></div>
-        <div class="n">DRIVER</div>
-        <div class="d">Starts the van early. Cuts the escape timer for the whole crew.</div>
-        <div class="tag open">OPEN SLOT</div>
-      </div>
-    </div>
-    <div class="btn b-green go">READY</div>
-    <div class="vt">next heist vote &middot; 0:12</div>
-  </div>
-
-  <div class="screen po">
-    <div class="world"><div class="hill"></div></div>
-    <div class="burst"></div>
-    <div class="k">HEIST COMPLETE</div>
-    <div class="big">MANSION</div>
-    <div class="lines">
-      <div class="ln"><span class="kk">Vault cracked</span><span class="v">$1,500</span></div>
-      <div class="ln"><span class="kk">Loot bags carried out &times;3</span><span class="v">$2,750</span></div>
-      <div class="ln b"><span class="kk"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><use href="#i-star"/></svg>Never spotted</span><span class="v">+$500</span></div>
-      <div class="ln b"><span class="kk"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><use href="#i-fire"/></svg>Daily streak &middot; day 4</span><span class="v">+$400</span></div>
-      <div class="ln b"><span class="kk"><svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><use href="#i-crew"/></svg>Full crew of 4</span><span class="v">+$300</span></div>
-    </div>
-    <div class="tot"><span class="k2">TOTAL</span><span class="v2">$5,450</span></div>
-    <div class="rk">CREW RANK 7 &nbsp;&middot;&nbsp; $2,550 to rank 8</div>
-    <div class="btn b-green rb">RUN IT BACK</div>
-  </div>
-
-</div>
-
-<div class="foot">
-  <b>What this is:</b> a direction sketch, not a screenshot. Every panel maps to real Studio instances &mdash; Frame + UICorner + UIStroke + UIGradient, TextLabel with UIStroke for the outlined type. The 3D scene behind the panels is a stand-in, not a render of what HeistBuilder currently produces.<br>
-  <b>Palette:</b> ink #1A0F2E &middot; panel #3A2A66 &middot; gold #FFC93C &middot; cash green #3DDC5B &middot; alarm red #FF3B3B &middot; info blue #35B7FF. Three colors plus ink, one font family, per Roblox's own UI guidance.<br>
-  <b>Fonts:</b> Luckiest Guy for display, Fredoka One for body. Both ship with Roblox, so nothing has to be uploaded as a custom asset.
-</div>
-
-</body>
-</html>
+</div></body></html>
