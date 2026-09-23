@@ -2,13 +2,21 @@
 #  HEIST CREW — git ignore
 # ────────────────────────────────────────────────
 
-# Roblox place files (binary — generated locally, not version-controlled)
+# Roblox PLACE files (the whole game — binary, rebuilt by Rojo every session)
 *.rbxl
 *.rbxlx
-*.rbxm
-*.rbxmx
 *.rbxl.lock
 *.rbxlx.lock
+
+# Roblox MODEL files
+#   .rbxm  = BINARY model — can't be diffed or merged, keep it out
+#   .rbxmx = XML model — DO commit these. This is how hand-built art
+#            (room modules, props, furniture) gets into the repo:
+#            Studio → right-click the model → Save to File → .rbxmx → src/assets/
+#   Without the ! line below, git silently swallows every model Malachi builds
+#   and he doesn't find out until the work is gone. (Caught 2026-09-22.)
+*.rbxm
+!*.rbxmx
 
 # Rojo build artifacts
 sourcemap.json
