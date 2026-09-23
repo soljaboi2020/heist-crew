@@ -260,7 +260,13 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - ⏸️ **PENDING IN-STUDIO VERIFICATION** — solo path and a 2-player crew test.
 
 ## 📑 Reference docs
-*(none yet — will add as project grows)*
+- **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
+  The five rules that came out of the "doesn't look like a real Roblox game" screenshot
+  (neon is an accent never a surface · light comes from lights not floors · text on surfaces
+  or the screen, never floating · every part gets a real Material · bright lobby vs dark
+  mansion), Malachi's four reference games and what to take from each, the Track A (code) /
+  Track B (art) split, and the `.rbxmx` room-kit spec with attachment naming.
+- `docs/mockups/` — v1.0 vision board + game icon (2026-09-01). Design targets, not built.
 
 When sections of this file balloon past ~40 lines, split them into `docs/`:
 - `docs/HEIST_DESIGN.md` — detailed level design / loot tables / guard behaviors
