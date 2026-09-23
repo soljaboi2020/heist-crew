@@ -49,9 +49,13 @@ heist-crew/
 
 - **Language:** Luau (Roblox's Lua dialect)
 - **Engine:** Roblox Studio
-- **Sync tool:** [Rojo](https://rojo.space/) v7.6.1 (CLI + Studio plugin)
+- **Sync tool:** [Rojo](https://rojo.space/) **v7.7.0** (CLI + Studio plugin — both upgraded 2026-09-22;
+  the May install was 7.6.1 on a different machine)
 - **Version control:** Git + GitHub (`soljaboi2020/heist-crew`)
-- **Cross-machine workflow:** Laptop (Claude edits) → push to GitHub → Gaming PC (Studio) → pull → `rojo serve` → Studio Rojo plugin → Connect
+- **⚠️ WORKFLOW CHANGED 2026-09-22 — Studio now runs on the SAME machine as the repo.**
+  Malachi moved Studio onto the `D:\Projects` machine ("easier to send screenshots"), so there is
+  **no git pull step any more**: Claude writes a file, Rojo sees it instantly, Studio hot-reloads.
+  The old laptop→GitHub→gaming-PC route still works but is no longer the path being used.
 
 ## ▶️ How to run / preview
 
@@ -67,7 +71,7 @@ winget install Rojo.Rojo
 #    Or in Studio: Toolbox → Marketplace → Plugins → search "Rojo" → Get
 
 # 3. Clone the repo
-cd C:\Users\malac\Projects\source\personal
+cd D:\Projects\source\personal
 git clone https://github.com/soljaboi2020/heist-crew.git
 cd heist-crew
 ```
@@ -75,8 +79,8 @@ cd heist-crew
 **Daily workflow:**
 ```powershell
 # 1. Pull latest from GitHub (whenever Claude has pushed new code from the laptop)
-cd C:\Users\malac\Projects\source\personal\heist-crew
-git pull
+cd D:\Projects\source\personal\heist-crew
+git pull   # only needed if Studio is on a DIFFERENT machine
 
 # 2. Start Rojo server
 rojo serve
@@ -95,7 +99,7 @@ rojo serve
 
 ### On the **laptop** (where Claude edits):
 
-Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\malac\Projects\source\personal\heist-crew\` on Windows). After each meaningful change, Claude auto-commits + pushes to GitHub per Rule #6. Malachi just runs `git pull` on the gaming PC to receive the changes.
+Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Projects\source\personal\heist-crew\`** on Windows — ⚠️ `/src` = `D:\Projects`, **not** bare `D:\`). After each meaningful change, Claude auto-commits + pushes to GitHub per Rule #6. Malachi just runs `git pull` on the gaming PC to receive the changes.
 
 ## ✏️ How to edit / customize
 
@@ -140,7 +144,7 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
 - [ ] Tool catalog: lockpick, EMP, silenced pistol, drill, thermal scope
 - [ ] Shop UI for spending cash on tools
 - [ ] Crew lobby — match with friends, ready-up, vote on heist
-- [ ] Multiplayer crew system (multiple players sharing one heist instance)
+- [x] ~~Multiplayer crew system (multiple players sharing one heist instance)~~ ✅ **DONE 2026-09-22 (v0.4.0)**
 - [ ] Lockpicking mini-game (the dial-tolerance system from Constants) — currently replaced with hold-E-on-vault, will revisit
 
 ### Phase 4 — Monetization
@@ -218,6 +222,42 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is `C:\Users\mal
   - **Sound effects** — vault crack click on success, looping alarm wail when alarm fires, triumphant sting + cha-ching on heist complete, fail buzzer on caught.
   - **Tuning** — vault crack time reduced 8s→6s (snappier), getaway timer 90s→60s, vault cooldown 30s→20s.
   - **Constants reorg** — added `LOBBY_CENTER`, `LOBBY_RADIUS`, `TUTORIAL_BOARD_POS`, `BOSS_NPC_POS`, `PATH_START/END`, `SOUNDS` table, expanded `COLORS` with marble/carpet/grass/path tints.
+
+## 📅 Change Log (continued)
+- **2026-09-01** — **🎨 VISUAL DIRECTION FOR v1.0** (commits `b584bd0`, `364800e`) — *this was never
+  logged here at the time and the doc read as if nothing happened after May.* Produced
+  `docs/mockups/vision-board.png` + `icon-512.png`: the game icon (masked character, "4-PLAYER
+  CO-OP" banner, orange sunburst — deliberately Roblox-native rather than the first attempt's
+  generic-app look), the in-heist HUD (alarm timer, cash counter, cracking bar, objective strip),
+  a **crew-select screen with four roles — Hacker / Muscle / Driver / Lookout** — and a payout
+  breakdown screen. ⚠️ **These are design targets, not implemented.** The roles in particular do
+  not exist in code.
+- **2026-09-22** — **🤝 v0.4.0 — CO-OP REWRITE (the game now matches its own icon).**
+  Found that `HeistService` tracked a single `session.activePlayer`: only the vault-cracker was
+  paid, and `if player ~= session.activePlayer then return end` on the getaway car meant nobody
+  else could even finish. Three friends in a server would have watched one person play. Rewritten
+  to a shared crew run:
+  - `session.crew` maps each Player → `{escaped, out}`. Everyone on the server joins the crew the
+    moment the vault pops.
+  - **Any** player can crack the vault; a second player touching it is told who's already on it.
+  - **Every** crew member escapes individually at the car and is paid individually.
+  - **Getting caught is now personal, not team-wide** — one player going down no longer fails the
+    run for the whole crew. They're teleported to the lobby with no payout; everyone else runs on.
+  - **Being spotted no longer instantly fails the heist.** It costs the crew its stealth bonus and
+    pulls the guards in early. (It used to be an instant team wipe, which in co-op would be
+    miserable.)
+  - Cracker going down mid-crack resets the crack but leaves the vault armed for a teammate.
+  - Run resolves when all crew have escaped or been taken out, or the 60s timer expires
+    (stragglers get "left behind"). `PlayerRemoving` drops leavers so a quitter can't stall it.
+  - Vault progress now broadcasts to the **whole crew**, not just the cracker.
+  - New `HEIST_PAYOUT_CRACKER_BONUS = 750`. Per-escapee payout unchanged at $2,500, or $3,000
+    clean — so a **solo run pays exactly what it did before** and co-op adds upside.
+  - Client contract deliberately untouched (`stateName` + `payload.escapeSeconds`), so
+    `HeistHud.lua` needed no changes.
+  - Both changed files verified to parse with a real Lua parser before handing over. Compound
+    `+=` assignments were rewritten as plain assignment purely so an off-the-shelf parser could
+    check them — Luau supports `+=` fine.
+  - ⏸️ **PENDING IN-STUDIO VERIFICATION** — solo path and a 2-player crew test.
 
 ## 📑 Reference docs
 *(none yet — will add as project grows)*

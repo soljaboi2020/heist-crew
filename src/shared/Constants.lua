@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "0.3.0"
+Constants.VERSION      = "0.4.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Crew settings ─────
@@ -44,9 +44,14 @@ Constants.GETAWAY_TIMER     = 60
 Constants.CASH_SPLIT_EQUAL  = true
 
 -- ───── Heist payouts ─────
-Constants.HEIST_PAYOUT_VAULT   = 1500   -- cracking the vault
-Constants.HEIST_PAYOUT_ESCAPE  = 1000   -- escaping with the loot
-Constants.HEIST_PAYOUT_STEALTH_BONUS = 500  -- bonus if no guard ever spotted you
+-- v0.4.0 co-op note: VAULT + ESCAPE + STEALTH are paid to EACH crew member who
+-- reaches the getaway car, so a clean solo run still totals $3,000 exactly as it
+-- did before. CRACKER_BONUS is the only per-person extra — it goes to whoever
+-- actually held E on the vault, so there's a reason to volunteer for the risky job.
+Constants.HEIST_PAYOUT_VAULT   = 1500   -- loot share, per escapee
+Constants.HEIST_PAYOUT_ESCAPE  = 1000   -- escaping with the loot, per escapee
+Constants.HEIST_PAYOUT_STEALTH_BONUS = 500  -- bonus if no guard ever spotted the crew
+Constants.HEIST_PAYOUT_CRACKER_BONUS = 750  -- to the player who cracked the vault
 
 -- ───── World layout (Vector3-friendly tables — convert with Vector3.new) ─────
 -- v0.3.0: completely re-laid-out. Mansion is now CLOSE to spawn (~30 studs),

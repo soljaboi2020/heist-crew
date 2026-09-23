@@ -3,13 +3,28 @@
     ────────────────────────────────────────────────
     The brain of the heist. Owns the state machine:
 
-        IDLE  → vault is locked, no heist in progress
-        CRACKING → a player is holding E on the vault
-        ESCAPING → vault cracked, alarm active, escape zone live
-        COMPLETE → player touched the getaway car (payout)
-        FAILED → guard caught the player (no payout)
+        IDLE     → vault is locked, no heist in progress
+        CRACKING → someone is holding E on the vault
+        ESCAPING → vault cracked, alarm active, the whole crew is running
+        COMPLETE → the run resolved (everyone escaped, got caught, or timed out)
+        FAILED   → nobody made it out
 
-    Wires up the vault ProximityPrompt and the getaway car Touched event.
+    ─── v0.4.0 — CO-OP REWRITE ───────────────────────
+    This used to track a single `activePlayer`: only the person who cracked the
+    vault could get paid, and only they could finish at the getaway car. Everyone
+    else on the server was a spectator. The game's whole pitch is 4-player co-op,
+    so that is now a shared crew run:
+
+      • ANY player can crack the vault. The cracker gets a bonus for doing it.
+      • When the vault pops, EVERY player on the server joins the crew.
+      • EVERY crew member escapes individually by reaching the getaway car,
+        and each one gets paid.
+      • Getting caught is PERSONAL, not team-wide. One player going down no
+        longer fails the run for everyone — the rest keep going.
+      • Being spotted no longer instantly fails the heist. It costs the crew
+        its stealth bonus and brings the guards down early.
+      • The run resolves when every crew member has either escaped or been
+        taken out, or when the escape timer expires.
 
     PUBLIC API:
         HeistService:init(refs, GuardService, EconomyService)
@@ -67,15 +82,20 @@ local alarmRemote     = Remotes.getRemote(Remotes.NAMES.AlarmTriggered, "RemoteE
 local notifyRemote    = Remotes.getRemote(Remotes.NAMES.Notify, "RemoteEvent")
 
 -- ──────────────────────────────────────────────
--- Heist session state
+-- Heist session state (crew-wide)
 -- ──────────────────────────────────────────────
+-- session.crew maps Player -> { escaped = bool, out = bool }
+--   escaped : reached the getaway car and got paid
+--   out     : caught by a guard, no payout, run continues without them
 local session = {
     state = "IDLE",
-    activePlayer = nil,
+    cracker = nil,          -- who actually cracked it (earns the bonus)
+    crew = {},
     crackProgress = 0,
     crackingThread = nil,
-    spottedDuringHeist = false,
-    cooldownEnds = 0,  -- os.clock() when vault becomes crackable again
+    escapeThread = nil,
+    spotted = false,        -- crew-wide: kills the stealth bonus for EVERYONE
+    cooldownEnds = 0,
 }
 
 -- ──────────────────────────────────────────────
@@ -99,6 +119,33 @@ local function broadcastState(stateName, payload)
     end
 end
 
+-- Push vault progress to the whole crew, not just the cracker, so everyone
+-- can watch the bar fill and knows when to get ready to run.
+local function broadcastProgress(progress)
+    for _, p in ipairs(Players:GetPlayers()) do
+        progressRemote:FireClient(p, progress)
+    end
+end
+
+-- How many crew are still in play (not escaped, not taken out)?
+local function activeCrewCount()
+    local n = 0
+    for _, entry in pairs(session.crew) do
+        if not entry.escaped and not entry.out then n = n + 1 end
+    end
+    return n
+end
+
+local function crewTally()
+    local escaped, caught, total = 0, 0, 0
+    for _, entry in pairs(session.crew) do
+        total = total + 1
+        if entry.escaped then escaped = escaped + 1 end
+        if entry.out then caught = caught + 1 end
+    end
+    return escaped, caught, total
+end
+
 local function setVaultColor(color)
     if refs and refs.vault then refs.vault.Color = color end
 end
@@ -119,6 +166,13 @@ local function setGetawayActive(active)
             refs.getawayLabel.TextColor3 = Color3.fromRGB(120, 120, 120)
             refs.getawayLabel.Text = "🚗 GETAWAY"
         end
+    end
+end
+
+local function sendToLobby(player)
+    if player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then hrp.CFrame = CFrame.new(0, 10, 0) end
     end
 end
 
@@ -148,8 +202,14 @@ local function setupVaultPrompt()
         end
     end)
 
-    -- Send progress updates while holding
     prompt.PromptButtonHoldBegan:Connect(function(player)
+        -- Somebody else is already working the vault — don't stomp their crack.
+        if session.state == "CRACKING" then
+            if session.cracker and session.cracker ~= player then
+                notifyOne(player, "🔧 " .. session.cracker.Name .. " is already on the vault — cover them!", "gold", 2)
+            end
+            return
+        end
         if session.state ~= "IDLE" then return end
         if os.clock() < session.cooldownEnds then
             notifyOne(player, "Vault on cooldown — wait " .. math.ceil(session.cooldownEnds - os.clock()) .. "s", "red", 2)
@@ -157,33 +217,38 @@ local function setupVaultPrompt()
         end
 
         session.state = "CRACKING"
-        session.activePlayer = player
-        session.spottedDuringHeist = false
+        session.cracker = player
+        session.spotted = false
 
         notifyOne(player, "🔧 Cracking the vault...", "gold", 3)
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= player then
+                notifyOne(p, "🔧 " .. player.Name .. " is cracking the vault — get ready to run!", "gold", 3)
+            end
+        end
 
-        -- Tick progress to all clients while held
         session.crackingThread = task.spawn(function()
             local startTime = os.clock()
             while session.state == "CRACKING" do
                 local elapsed = os.clock() - startTime
                 local progress = math.min(1, elapsed / Constants.VAULT_CRACK_TIME)
-                progressRemote:FireClient(player, progress)
+                broadcastProgress(progress)
                 task.wait(0.1)
             end
         end)
     end)
 
     prompt.PromptButtonHoldEnded:Connect(function(player)
-        if session.state == "CRACKING" then
+        -- Only the person actually cracking can interrupt the crack.
+        if session.state == "CRACKING" and session.cracker == player then
             session.state = "IDLE"
-            session.activePlayer = nil
+            session.cracker = nil
             if session.crackingThread then
                 task.cancel(session.crackingThread)
                 session.crackingThread = nil
             end
-            progressRemote:FireClient(player, 0)
-            notifyOne(player, "Vault crack interrupted", "red", 2)
+            broadcastProgress(0)
+            notifyAll("Vault crack interrupted", "red", 2)
         end
     end)
 
@@ -197,7 +262,7 @@ local function setupVaultPrompt()
 end
 
 -- ──────────────────────────────────────────────
--- Getaway car: only active when ESCAPING
+-- Getaway car: any crew member can escape through it
 -- ──────────────────────────────────────────────
 local function setupGetaway()
     refs.getawayCar.Touched:Connect(function(hit)
@@ -206,8 +271,7 @@ local function setupGetaway()
         if not char then return end
         local player = Players:GetPlayerFromCharacter(char)
         if not player then return end
-        if player ~= session.activePlayer then return end
-        HeistService:onHeistComplete(player)
+        HeistService:onPlayerEscaped(player)
     end)
 end
 
@@ -219,9 +283,24 @@ function HeistService:onVaultCracked(player)
     session.state = "ESCAPING"
     if session.crackingThread then task.cancel(session.crackingThread); session.crackingThread = nil end
 
-    progressRemote:FireClient(player, 1)
-    notifyAll(string.format("🚨 ALARM! %s cracked the vault!", player.Name), "red", 4)
-    EconomyService:addCash(player, Constants.HEIST_PAYOUT_VAULT, "Vault cracked")
+    -- Everyone on the server is now on the hook. This is the crew.
+    session.crew = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        session.crew[p] = {escaped = false, out = false}
+    end
+
+    broadcastProgress(1)
+
+    local _, _, crewSize = crewTally()
+    if crewSize > 1 then
+        notifyAll(string.format("🚨 ALARM! %s cracked it — %d-person crew, GO!", player.Name, crewSize), "red", 4)
+    else
+        notifyAll(string.format("🚨 ALARM! %s cracked the vault!", player.Name), "red", 4)
+    end
+
+    -- Cracking bonus goes to whoever did the work
+    EconomyService:addCash(player, Constants.HEIST_PAYOUT_CRACKER_BONUS, "Cracked the vault")
+    notifyOne(player, string.format("🔓 +$%d cracker bonus", Constants.HEIST_PAYOUT_CRACKER_BONUS), "gold", 3)
 
     -- 🔊 Sound: vault cracked + alarm wail
     playOneShot(Constants.SOUNDS.VAULT_CRACK, 0.8)
@@ -235,15 +314,14 @@ function HeistService:onVaultCracked(player)
     setGetawayActive(true)
     GuardService:setAlarmActive(true, player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position or nil)
 
-    broadcastState("ESCAPING", {player = player.Name, escapeSeconds = Constants.GETAWAY_TIMER})
+    broadcastState("ESCAPING", {player = player.Name, escapeSeconds = Constants.GETAWAY_TIMER, crewSize = crewSize})
 
-    -- Escape timer
-    task.spawn(function()
+    -- Escape timer — anyone still inside when it expires is left behind
+    session.escapeThread = task.spawn(function()
         local startTime = os.clock()
         while session.state == "ESCAPING" do
-            local elapsed = os.clock() - startTime
-            if elapsed >= Constants.GETAWAY_TIMER then
-                HeistService:onHeistFailed(player, "Ran out of time!")
+            if os.clock() - startTime >= Constants.GETAWAY_TIMER then
+                HeistService:onTimerExpired()
                 return
             end
             task.wait(0.5)
@@ -251,58 +329,93 @@ function HeistService:onVaultCracked(player)
     end)
 end
 
-function HeistService:onHeistComplete(player)
+-- One crew member reached the car. Pay them and check if the run is done.
+function HeistService:onPlayerEscaped(player)
     if session.state ~= "ESCAPING" then return end
-    session.state = "COMPLETE"
+    local entry = session.crew[player]
+    if not entry then return end          -- wasn't part of this run
+    if entry.escaped or entry.out then return end  -- already resolved
 
-    EconomyService:addCash(player, Constants.HEIST_PAYOUT_ESCAPE, "Heist escape")
-    if not session.spottedDuringHeist then
+    entry.escaped = true
+
+    local payout = Constants.HEIST_PAYOUT_VAULT + Constants.HEIST_PAYOUT_ESCAPE
+    EconomyService:addCash(player, payout, "Heist escape")
+
+    if not session.spotted then
         EconomyService:addCash(player, Constants.HEIST_PAYOUT_STEALTH_BONUS, "Stealth bonus")
-        notifyAll(string.format("🥷 %s pulled off a CLEAN HEIST!", player.Name), "green", 5)
+        payout = payout + Constants.HEIST_PAYOUT_STEALTH_BONUS
+        notifyOne(player, string.format("🥷 CLEAN GETAWAY — +$%d", payout), "green", 5)
     else
-        notifyAll(string.format("💰 %s escaped with the loot!", player.Name), "green", 5)
+        notifyOne(player, string.format("💰 You got out — +$%d", payout), "green", 5)
     end
 
-    -- 🔊 Sound: triumph + cha-ching
-    stopAlarmLoop()
-    playOneShot(Constants.SOUNDS.HEIST_WIN, 0.8)
-    playOneShot(Constants.SOUNDS.CASH_CHA_CHING, 0.7)
+    local escaped, _, total = crewTally()
+    if total > 1 then
+        notifyAll(string.format("🚗 %s made it out (%d/%d)", player.Name, escaped, total), "green", 3)
+    end
 
-    broadcastState("COMPLETE", {player = player.Name})
-
-    HeistService:resetHeist()
+    if activeCrewCount() == 0 then
+        HeistService:finishHeist()
+    end
 end
 
-function HeistService:onHeistFailed(player, reason)
-    if session.state == "IDLE" or session.state == "COMPLETE" or session.state == "FAILED" then return end
-    session.state = "FAILED"
+-- Timer ran out. Anyone still inside is left behind.
+function HeistService:onTimerExpired()
+    if session.state ~= "ESCAPING" then return end
 
-    -- 🔊 Sound: fail buzzer
-    stopAlarmLoop()
-    playOneShot(Constants.SOUNDS.HEIST_FAIL, 0.7)
-
-    notifyAll(string.format("❌ Heist failed: %s", reason or "Caught!"), "red", 4)
-    broadcastState("FAILED", {player = player.Name, reason = reason})
-
-    -- Teleport player back to spawn
-    if player and player.Character then
-        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = CFrame.new(0, 10, 0)
+    for p, entry in pairs(session.crew) do
+        if not entry.escaped and not entry.out then
+            entry.out = true
+            notifyOne(p, "⏰ Left behind — the car took off without you.", "red", 4)
+            sendToLobby(p)
         end
     end
 
+    HeistService:finishHeist()
+end
+
+-- Resolve the run and report how the crew did.
+function HeistService:finishHeist()
+    if session.state ~= "ESCAPING" then return end
+
+    local escaped, caught, total = crewTally()
+    session.state = (escaped > 0) and "COMPLETE" or "FAILED"
+
+    stopAlarmLoop()
+    if escaped > 0 then
+        playOneShot(Constants.SOUNDS.HEIST_WIN, 0.8)
+        playOneShot(Constants.SOUNDS.CASH_CHA_CHING, 0.7)
+        if total > 1 then
+            if escaped == total then
+                notifyAll(string.format("🏆 FULL CREW OUT — all %d escaped!", total), "green", 5)
+            else
+                notifyAll(string.format("💰 Heist done — %d of %d got away.", escaped, total), "gold", 5)
+            end
+        end
+    else
+        playOneShot(Constants.SOUNDS.HEIST_FAIL, 0.7)
+        notifyAll("❌ Heist failed — nobody made it out.", "red", 4)
+    end
+
+    broadcastState(session.state, {escaped = escaped, caught = caught, crewSize = total})
     HeistService:resetHeist()
 end
 
 function HeistService:resetHeist()
+    if session.escapeThread then
+        task.cancel(session.escapeThread)
+        session.escapeThread = nil
+    end
+
     -- Cool down before vault is crackable again
     session.cooldownEnds = os.clock() + Constants.VAULT_RESET_COOLDOWN
-    session.activePlayer = nil
-    session.spottedDuringHeist = false
+    session.cracker = nil
+    session.crew = {}
+    session.spotted = false
 
     setVaultColor(Color3.fromRGB(234, 179, 8))  -- Restore gold color
     setGetawayActive(false)
+    broadcastProgress(0)
 
     -- Clear alarm
     for _, p in ipairs(Players:GetPlayers()) do
@@ -313,11 +426,9 @@ function HeistService:resetHeist()
 
     -- Re-enable IDLE state after cooldown
     task.delay(Constants.VAULT_RESET_COOLDOWN, function()
-        if session.state ~= "IDLE" then
-            session.state = "IDLE"
-            broadcastState("IDLE", {})
-            notifyAll(string.format("🔓 Vault re-armed — ready for the next crew!"), "gold", 3)
-        end
+        session.state = "IDLE"
+        broadcastState("IDLE", {})
+        notifyAll("🔓 Vault re-armed — ready for the next crew!", "gold", 3)
     end)
 
     session.state = "IDLE"
@@ -329,29 +440,61 @@ end
 -- ──────────────────────────────────────────────
 function HeistService:onPlayerSpotted(player, guard)
     if session.state == "CRACKING" then
-        -- Spotted while cracking = instant fail
-        HeistService:onHeistFailed(player, "Spotted by " .. guard.name .. "!")
+        -- Used to be an instant team-wide fail. Now it costs the crew its
+        -- stealth bonus and brings the guards early — the run continues.
+        if not session.spotted then
+            session.spotted = true
+            notifyAll(string.format("👀 %s got spotted by %s — stealth bonus gone!", player.Name, guard.name), "red", 4)
+            GuardService:setAlarmActive(true, player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position or nil)
+        end
+
     elseif session.state == "ESCAPING" then
-        -- Already in escape — guard tries to chase
-        session.spottedDuringHeist = true
+        session.spotted = true
+
     elseif session.state == "IDLE" then
-        -- Pre-heist sneaking — give a warning, don't fail
         notifyOne(player, "👀 A guard saw you — back off!", "red", 2)
     end
 end
 
 function HeistService:onPlayerCaught(player, guard)
     if session.state == "ESCAPING" or session.state == "CRACKING" then
-        HeistService:onHeistFailed(player, "Caught by " .. guard.name)
-    elseif session.state == "IDLE" then
-        -- Pre-heist contact — just push them back
-        notifyOne(player, "👮 Get out of the mansion!", "red", 2)
-        if player.Character then
-            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = CFrame.new(0, 10, 0)
+        session.spotted = true
+
+        -- If the cracker goes down mid-crack, the crack dies but the vault
+        -- stays armed — someone else on the crew can pick it back up.
+        if session.state == "CRACKING" then
+            if session.crackingThread then
+                task.cancel(session.crackingThread)
+                session.crackingThread = nil
+            end
+            session.state = "IDLE"
+            session.cracker = nil
+            broadcastProgress(0)
+            notifyAll(string.format("👮 %s got caught by %s — vault's still there!", player.Name, guard.name), "red", 4)
+            playOneShot(Constants.SOUNDS.HEIST_FAIL, 0.5)
+            sendToLobby(player)
+            return
+        end
+
+        -- Caught while escaping: that player is out, the rest keep running.
+        local entry = session.crew[player]
+        if entry and not entry.escaped and not entry.out then
+            entry.out = true
+            notifyOne(player, "👮 Caught by " .. guard.name .. " — no payout.", "red", 4)
+            local _, _, total = crewTally()
+            if total > 1 then
+                notifyAll(string.format("👮 %s got taken down!", player.Name), "red", 3)
+            end
+            sendToLobby(player)
+
+            if activeCrewCount() == 0 then
+                HeistService:finishHeist()
             end
         end
+
+    elseif session.state == "IDLE" then
+        notifyOne(player, "👮 Get out of the mansion!", "red", 2)
+        sendToLobby(player)
     end
 end
 
@@ -368,7 +511,27 @@ function HeistService:init(worldRefs, guardSvc, economySvc)
     setVaultColor(Color3.fromRGB(234, 179, 8))
     setGetawayActive(false)
 
-    print("[HeistService] Ready — IDLE state, vault armed")
+    -- A player leaving mid-run shouldn't stall the heist waiting on them.
+    Players.PlayerRemoving:Connect(function(player)
+        local entry = session.crew[player]
+        if entry and not entry.escaped and not entry.out then
+            entry.out = true
+            if session.state == "ESCAPING" and activeCrewCount() == 0 then
+                HeistService:finishHeist()
+            end
+        end
+        if session.cracker == player and session.state == "CRACKING" then
+            if session.crackingThread then
+                task.cancel(session.crackingThread)
+                session.crackingThread = nil
+            end
+            session.state = "IDLE"
+            session.cracker = nil
+            broadcastProgress(0)
+        end
+    end)
+
+    print("[HeistService] Ready — IDLE state, vault armed (co-op crew mode)")
 end
 
 return HeistService
