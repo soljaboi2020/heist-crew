@@ -139,19 +139,23 @@ function HeistBuilder:_setupLighting()
     atmo.Haze = 1.5
     atmo.Parent = Lighting
 
-    -- Bloom (cinematic glow)
+    -- Bloom — v0.5.0: was Intensity 0.5 / Threshold 0.9, which caught every gold
+    -- surface in the level and smeared the whole frame yellow. Now it only blooms
+    -- things that are genuinely brighter than white, so it reads as a glow on the
+    -- lamps and the vault instead of a haze over everything.
     local bloom = Instance.new("BloomEffect")
-    bloom.Intensity = 0.5
-    bloom.Size = 24
-    bloom.Threshold = 0.9
+    bloom.Intensity = 0.15
+    bloom.Size = 18
+    bloom.Threshold = 1.1
     bloom.Parent = Lighting
 
-    -- Color correction (slight teal/orange grade)
+    -- Color correction — pulled the saturation boost back. Combined with the gold
+    -- palette it was pushing everything toward the same yellow.
     local cc = Instance.new("ColorCorrectionEffect")
-    cc.Brightness = 0
-    cc.Contrast = 0.15
-    cc.Saturation = 0.1
-    cc.TintColor = Color3.fromRGB(255, 245, 230)
+    cc.Brightness = 0.02
+    cc.Contrast = 0.12
+    cc.Saturation = -0.02
+    cc.TintColor = Color3.fromRGB(255, 248, 240)
     cc.Parent = Lighting
 
     print("[HeistBuilder] Lighting + skybox + atmosphere applied 🌅")
@@ -206,26 +210,45 @@ function HeistBuilder:_setupGround(folder)
     plaza.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.25, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
     plaza.Parent = folder
 
-    -- Gold ring border on plaza edge
-    local ring = makePart({
-        Name = "PlazaRing",
-        Size = Vector3.new(0.6, W.LOBBY_RADIUS * 2, W.LOBBY_RADIUS * 2),
-        Color = rgb(C.GOLD),
-        Material = Enum.Material.Neon,
-        Shape = Enum.PartType.Cylinder,
-    })
-    ring.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.55, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
-    ring.Parent = folder
+    -- ── Gold trim ring ──────────────────────────────────────────────
+    -- v0.5.0 REWRITE. This used to be a 56-stud-wide SOLID Neon cylinder with the
+    -- marble inner disc sitting at the SAME top height (0.85). Two problems:
+    -- the discs z-fought, and a neon surface that size is fully emissive, so it
+    -- lit the whole scene yellow and flattened everything. (Visible in Malachi's
+    -- 2026-09-22 screenshot — the entire plaza read as one glowing blob.)
+    --
+    -- Now it's an actual ring: 64 small Metal segments laid around the edge.
+    -- Metal, not Neon — it catches the lamp light and reads as inlaid brass
+    -- instead of emitting its own. No overlap, so nothing z-fights.
+    local SEGMENTS = 64
+    local trimRadius = W.LOBBY_RADIUS - 1.2
+    local segLength = (2 * math.pi * trimRadius) / SEGMENTS + 0.15  -- slight overlap closes the seams
+    for i = 1, SEGMENTS do
+        local angle = (i / SEGMENTS) * math.pi * 2
+        local seg = makePart({
+            Name = "PlazaTrim_" .. i,
+            Size = Vector3.new(segLength, 0.22, 1.1),
+            Color = rgb(C.GOLD_DEEP),
+            Material = Enum.Material.Metal,
+        })
+        seg.CFrame = CFrame.new(
+            W.LOBBY_CENTER.x + math.cos(angle) * trimRadius,
+            0.58,
+            W.LOBBY_CENTER.z + math.sin(angle) * trimRadius
+        ) * CFrame.Angles(0, -angle, 0)
+        seg.Parent = folder
+    end
 
-    -- Inner darker plaza disc on top of the ring (so ring shows as a border)
+    -- Darker inlay disc in the middle of the plaza. Sits BELOW the trim height so
+    -- the two never share a plane.
     local inner = makePart({
         Name = "PlazaInner",
-        Size = Vector3.new(0.3, (W.LOBBY_RADIUS - 1.5) * 2, (W.LOBBY_RADIUS - 1.5) * 2),
-        Color = rgb(C.MARBLE_WHITE),
+        Size = Vector3.new(0.3, (W.LOBBY_RADIUS - 3) * 2, (W.LOBBY_RADIUS - 3) * 2),
+        Color = Color3.fromRGB(196, 190, 178),
         Material = Enum.Material.Marble,
         Shape = Enum.PartType.Cylinder,
     })
-    inner.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.7, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
+    inner.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.52, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
     inner.Parent = folder
 end
 
@@ -243,35 +266,50 @@ function HeistBuilder:_buildLobby(folder)
     })
     pedestal.Parent = folder
 
-    -- Top neon block
+    -- Brass cap. Was Neon — one more emissive surface feeding the yellow wash.
     local pedestalCap = makePart({
         Name = "PedestalCap",
         Size = Vector3.new(7, 0.5, 7),
         Position = Vector3.new(W.LOBBY_CENTER.x, 6.5, W.LOBBY_CENTER.z),
-        Color = rgb(C.GOLD),
-        Material = Enum.Material.Neon,
+        Color = rgb(C.GOLD_DEEP),
+        Material = Enum.Material.Metal,
     })
     pedestalCap.Parent = folder
 
-    -- "HEIST CREW" billboard floating above pedestal
-    billboardText(pedestalCap, "💰 HEIST CREW 💰", rgb(C.GOLD), 600, 6)
+    -- ── Signage ─────────────────────────────────────────────────────
+    -- v0.5.0: the two floating BillboardGuis that used to live here ("💰 HEIST
+    -- CREW 💰" at 600px and the subtitle) are GONE. Between them, the mansion
+    -- sign, the vault sign and the boss bubble, Malachi's screenshot had five
+    -- pieces of text hovering in midair at once, overlapping each other.
+    -- Jailbreak / Flood Escape 2 / Steal a Brainrot all put text on SURFACES and
+    -- keep the rest on the screen HUD, so that's what this does now: the title
+    -- is printed on the pedestal itself, on all four faces so it reads from any
+    -- approach angle.
+    for _, face in ipairs({Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right}) do
+        local sg = Instance.new("SurfaceGui", pedestal)
+        sg.Face = face
+        sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        sg.PixelsPerStud = 50
+        sg.LightInfluence = 0.25
 
-    -- Subtitle
-    local subAttach = Instance.new("Attachment", pedestalCap)
-    subAttach.Position = Vector3.new(0, 3, 0)
-    local subBb = Instance.new("BillboardGui", subAttach)
-    subBb.Size = UDim2.new(0, 480, 0, 50)
-    subBb.AlwaysOnTop = true
-    subBb.LightInfluence = 0
-    local subLabel = Instance.new("TextLabel", subBb)
-    subLabel.Size = UDim2.new(1, 0, 1, 0)
-    subLabel.BackgroundTransparency = 1
-    subLabel.Text = "Crack the vault. Escape the guards. Get paid."
-    subLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    subLabel.Font = Enum.Font.GothamBold
-    subLabel.TextScaled = true
-    subLabel.TextStrokeTransparency = 0
-    subLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        local title = Instance.new("TextLabel", sg)
+        title.Size = UDim2.new(1, 0, 0.42, 0)
+        title.Position = UDim2.new(0, 0, 0.16, 0)
+        title.BackgroundTransparency = 1
+        title.Text = "HEIST CREW"
+        title.TextColor3 = rgb(C.GOLD)
+        title.Font = Enum.Font.GothamBlack
+        title.TextScaled = true
+
+        local sub = Instance.new("TextLabel", sg)
+        sub.Size = UDim2.new(0.86, 0, 0.16, 0)
+        sub.Position = UDim2.new(0.07, 0, 0.58, 0)
+        sub.BackgroundTransparency = 1
+        sub.Text = "CRACK IT. RUN. GET PAID."
+        sub.TextColor3 = Color3.fromRGB(225, 220, 210)
+        sub.Font = Enum.Font.GothamMedium
+        sub.TextScaled = true
+    end
 
     -- 4 lamp posts at compass points around plaza
     local lampOffsets = {
@@ -299,10 +337,15 @@ function HeistBuilder:_buildLobby(folder)
             Shape = Enum.PartType.Ball,
         })
         bulb.Parent = folder
+        -- v0.5.0: was Brightness 3 / Range 25 on four lamps at once, which flooded
+        -- the plaza and killed every shadow. Dimmer and tighter gives pools of
+        -- light with dark between them — the thing that makes Cheese Escape and
+        -- Jailbreak's night side read as lit rather than washed out.
         local light = Instance.new("PointLight", bulb)
-        light.Brightness = 3
-        light.Range = 25
-        light.Color = Color3.fromRGB(255, 220, 150)
+        light.Brightness = 1.4
+        light.Range = 17
+        light.Color = Color3.fromRGB(255, 214, 160)
+        light.Shadows = true
     end
 
     -- Tutorial billboard ("How to Play")
@@ -495,13 +538,17 @@ function HeistBuilder:_buildPath(folder)
     })
     path.Parent = folder
 
+    -- Path edging. v0.5.0: these were full-length GOLD NEON strips running the
+    -- whole walkway — two more big emissive surfaces in the same frame as the
+    -- plaza. Now they're brass kerb stones, and the glow comes from the path
+    -- lamps instead. Light should come from light sources, not from the floor.
     for _, xOffset in ipairs({-4.2, 4.2}) do
         local edge = makePart({
             Name = "PathEdge",
-            Size = Vector3.new(0.4, 0.5, length),
-            Position = Vector3.new(xOffset, 0.5, centerZ),
-            Color = rgb(C.GOLD),
-            Material = Enum.Material.Neon,
+            Size = Vector3.new(0.5, 0.35, length),
+            Position = Vector3.new(xOffset, 0.45, centerZ),
+            Color = rgb(C.GOLD_DEEP),
+            Material = Enum.Material.Metal,
         })
         edge.Parent = folder
     end

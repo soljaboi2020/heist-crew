@@ -32,7 +32,7 @@ local HeistService      = require(script.HeistService)
 
 print("══════════════════════════════════════════")
 print("[HEIST CREW] Server online ✅")
-print(string.format("[HEIST CREW] Version %s — Co-op Crew Heist", Constants.VERSION))
+print(string.format("[HEIST CREW] Version %s — Co-op Crew + Art Pass 1", Constants.VERSION))
 print("══════════════════════════════════════════")
 
 -- 1. Build the world (mansion, vault, getaway car, spawn ring)
