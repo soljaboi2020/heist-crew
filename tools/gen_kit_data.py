@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gen_palette.py — regenerate src/shared/KenneyPalette.lua from the furniture kit.
+gen_kit_data.py — regenerate src/shared/KenneyKit.lua from the three CC0 packs.
 
 WHY
     Kenney's furniture-kit ships no texture images. It colours models with named
@@ -9,14 +9,17 @@ WHY
 
     This parses all 140 .mtl files for their real Kd values, and COUNTS FACES per
     material in the matching .obj so the "dominant" material is measured rather
-    than assumed. Output is a Lua table the placement code uses to tint each
-    imported MeshPart back to its intended colour.
+    than assumed. The dungeon and factory kits don't need that — they ship
+    texture atlases and import coloured.
 
-    The dungeon and factory kits don't need this — they ship texture atlases.
+    It ALSO measures every model's .obj bounding box and converts to studs. The
+    kits are not at a common scale — dungeon and factory are 1 unit = 1 m, the
+    furniture kit is a miniature at 1 unit ~= 1.9 m — so there is no single
+    multiplier and the sizes have to be per-model.
 
 USAGE
     python3 tools/fetch_packs.py      # packs must be on disk first
-    python3 tools/gen_palette.py
+    python3 tools/gen_kit_data.py
 """
 import collections
 import glob
@@ -26,7 +29,7 @@ import sys
 BASE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                     "src", "assets", "_kenney", "kenney_furniture-kit", "Models", "OBJ format")
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   "src", "shared", "KenneyPalette.lua")
+                   "src", "shared", "KenneyKit.lua")
 
 # 'lamp' -> Neon is deliberate: a bulb is the small emissive accent Neon is for.
 ROBLOX_MAT = {
