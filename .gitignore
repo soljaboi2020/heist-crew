@@ -39,3 +39,6 @@ desktop.ini
 .env
 .env.*
 !.env.example
+
+# Downloaded CC0 art packs — 68MB / 2485 files, re-fetch with tools/fetch_packs.py
+src/assets/_kenney/
