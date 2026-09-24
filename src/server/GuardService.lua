@@ -2,14 +2,14 @@
     HEIST CREW — GuardService
     ────────────────────────────────────────────────
     Spawns + animates patrolling guards. Each guard:
-      1. Tweens between two waypoints on a loop (PATROL state)
+      1. Walks between two waypoints on a loop (PATROL state)
       2. Scans for players in a 90° forward cone using raycasts
       3. If a player is spotted: alarm fires + all guards CHASE
       4. If a guard touches a player: heist FAILS
 
-    Guards are NOT real Roblox Humanoids — they're just animated parts.
-    This keeps the AI simple and lets us reskin them later (or swap to
-    real R15 humanoids when we want to).
+    2026-09-24: guards are now REAL R15 avatars (official Roblox police
+    outfit) that walk with animations and use pathfinding — built by
+    NpcFactory. They used to be an anchored brick + cube head on a tween.
 
     PUBLIC API:
         GuardService:spawnPatrols(callbacks)
@@ -22,10 +22,11 @@
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local NpcFactory = require(script.Parent.NpcFactory)
 
 local GuardService = {}
 
@@ -37,135 +38,134 @@ local callbacks = {
 }
 
 -- ──────────────────────────────────────────────
--- Build a single guard model (block-character)
+-- Build a single guard (a real R15 avatar — see NpcFactory)
 -- ──────────────────────────────────────────────
+local GUARD_SPEC = {
+    outfitId = 320998366,   -- official Roblox "Police Officer Nash" (bundle 349)
+    bodyColors = {          -- used only if the outfit ever fails to load
+        head  = Color3.fromRGB(204, 142, 105),
+        torso = Color3.fromRGB(27, 42, 53),
+        arms  = Color3.fromRGB(27, 42, 53),
+        legs  = Color3.fromRGB(17, 17, 17),
+    },
+}
+
 local function buildGuardModel(name, position)
-    local model = Instance.new("Model")
-    model.Name = name
+    local spec = table.clone(GUARD_SPEC)
+    spec.name = name
+    local model, humanoid, root = NpcFactory.build(spec)
+    if not model then return nil end
 
-    -- Body (the Touched listener attaches here)
-    local body = Instance.new("Part")
-    body.Name = "Body"
-    body.Size = Vector3.new(2.5, 5, 1.5)
-    body.Position = position
-    body.Anchored = true
-    body.TopSurface = Enum.SurfaceType.Smooth
-    body.BottomSurface = Enum.SurfaceType.Smooth
-    body.Material = Enum.Material.Plastic
-    body.Color = Color3.fromRGB(15, 15, 15)
-    body.Parent = model
-
-    -- Head
-    local head = Instance.new("Part")
-    head.Name = "Head"
-    head.Size = Vector3.new(1.6, 1.6, 1.6)
-    head.Anchored = true
-    head.CanCollide = false
-    head.Material = Enum.Material.Plastic
-    head.Color = Color3.fromRGB(220, 180, 140)
-    head.Parent = model
-
-    -- Hat (formal — like a security guard cap)
-    local hat = Instance.new("Part")
-    hat.Name = "Hat"
-    hat.Size = Vector3.new(2, 0.7, 2)
-    hat.Anchored = true
-    hat.CanCollide = false
-    hat.Material = Enum.Material.SmoothPlastic
-    hat.Color = Color3.fromRGB(15, 15, 15)
-    hat.Parent = model
-
-    -- Vision cone (a SpotLight on the head, plus a translucent yellow cone)
+    -- Vision cone: a SpotLight on the head. In the dark mansion (Future
+    -- lighting) this throws a visible pool on the floor — that IS the stealth game.
+    local head = model:FindFirstChild("Head") or root
     local vision = Instance.new("SpotLight")
-    vision.Brightness = 4
+    vision.Brightness = 5
     vision.Range = Constants.GUARD_VISION_RANGE
     vision.Angle = Constants.GUARD_VISION_FOV_DEGREES
     vision.Color = Color3.fromRGB(255, 220, 100)
     vision.Face = Enum.NormalId.Front
+    vision.Shadows = true
     vision.Parent = head
 
-    model.PrimaryPart = body
-    return model, body, head, hat
-end
-
--- Position the head + hat relative to the body
-local function syncGuardParts(guard)
-    local bp = guard.body.Position
-    guard.head.Position = bp + Vector3.new(0, 3.3, 0)
-    guard.hat.Position  = bp + Vector3.new(0, 4.3, 0)
-    -- Match orientation (face the same direction the body is facing)
-    guard.head.CFrame = CFrame.new(guard.head.Position) * (guard.body.CFrame - guard.body.Position)
-    guard.hat.CFrame  = CFrame.new(guard.hat.Position)  * (guard.body.CFrame - guard.body.Position)
+    model:PivotTo(CFrame.new(position + Vector3.new(0, 2, 0)))
+    return model, humanoid, root, head
 end
 
 -- ──────────────────────────────────────────────
 -- Spawn a single guard with a patrol path
 -- ──────────────────────────────────────────────
-local function spawnGuard(name, waypointA, waypointB, body, head, hat, model)
+local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, head)
     local guard = {
         name = name,
         model = model,
-        body = body,
+        humanoid = humanoid,
+        body = root,        -- kept for anything that still reads guard.body
+        root = root,
         head = head,
-        hat = hat,
         waypointA = waypointA,
         waypointB = waypointB,
-        currentTween = nil,
-        alerted = false,
+        nextWaypoint = waypointB,
         alarmActive = false,
         cooldown = 0,
+        gen = 0,            -- bumped whenever orders change, cancels the current walk
     }
 
-    -- Touched listener: if a player walks into the guard, FAIL
-    body.Touched:Connect(function(hit)
+    -- Touching ANY part of the guard (arms, legs, hat) = caught
+    local function onTouched(hit)
         local character = hit:FindFirstAncestorOfClass("Model")
-        if not character then return end
+        if not character or character == model then return end
         local player = Players:GetPlayerFromCharacter(character)
         if not player then return end
         if guard.cooldown > 0 then return end
         guard.cooldown = 2  -- prevent multi-fire
         callbacks.onPlayerCaught(player, guard)
-    end)
+    end
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then part.Touched:Connect(onTouched) end
+    end
 
     return guard
 end
 
 -- ──────────────────────────────────────────────
--- Animate a guard's patrol movement
+-- Movement: walk (pathfinding, so guards go AROUND walls instead of through
+-- them like the old tweened bricks did). Returns when arrived, when orders
+-- change (guard.gen bumped), or after a timeout.
 -- ──────────────────────────────────────────────
-local function startPatrol(guard)
-    if guard.currentTween then guard.currentTween:Cancel() end
+local function flatDist(a, b)
+    return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
 
-    -- Distance / speed → time
-    local from = guard.body.Position
-    local to = guard.alarmActive and (guard._chaseTarget or guard.waypointA) or guard.waypointB
-    if not guard.alarmActive then
-        -- Toggle waypoints back and forth
-        if (guard.body.Position - guard.waypointA).Magnitude < 3 then
-            to = guard.waypointB
-        else
-            to = guard.waypointA
-        end
+local function walkTo(guard, target, gen)
+    local hum, root = guard.humanoid, guard.root
+    local points = { target }
+
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2, AgentHeight = 6, AgentCanJump = false,
+    })
+    local ok = pcall(function() path:ComputeAsync(root.Position, target) end)
+    if ok and path.Status == Enum.PathStatus.Success then
+        points = {}
+        for _, wp in ipairs(path:GetWaypoints()) do table.insert(points, wp.Position) end
     end
 
-    local distance = (from - to).Magnitude
-    local speed = guard.alarmActive and Constants.GUARD_CHASE_SPEED or Constants.GUARD_PATROL_SPEED
-    local duration = math.max(0.5, distance / speed)
+    for _, point in ipairs(points) do
+        local deadline = os.clock() + (flatDist(root.Position, point) / math.max(hum.WalkSpeed, 1)) + 3
+        local lastIssue = 0
+        while flatDist(root.Position, point) > 2 do
+            if guard.gen ~= gen or not guards[guard.name] then return false end
+            if os.clock() > deadline then return false end
+            -- Humanoid:MoveTo silently gives up after 8s, so keep re-issuing it
+            if os.clock() - lastIssue > 2 then
+                hum:MoveTo(point)
+                lastIssue = os.clock()
+            end
+            task.wait(0.1)
+        end
+    end
+    return true
+end
 
-    -- Compute facing direction
-    local lookCFrame = CFrame.new(from, to)
-
-    local tween = TweenService:Create(guard.body, TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {
-        CFrame = CFrame.new(to) * (lookCFrame - lookCFrame.Position),
-    })
-    guard.currentTween = tween
-    tween:Play()
-
-    tween.Completed:Connect(function(state)
-        if state == Enum.PlaybackState.Completed and guards[guard.name] then
-            -- Tiny pause then start the next leg
-            task.wait(0.5)
-            startPatrol(guard)
+local function runBrain(guard)
+    task.spawn(function()
+        while guards[guard.name] do
+            local gen = guard.gen
+            if guard.alarmActive then
+                guard.humanoid.WalkSpeed = Constants.GUARD_CHASE_SPEED
+                walkTo(guard, guard._chaseTarget or guard.waypointA, gen)
+                -- Reached the last-known spot: stand and look around until orders change
+                while guard.gen == gen and guards[guard.name] do task.wait(0.2) end
+            else
+                guard.humanoid.WalkSpeed = Constants.GUARD_PATROL_SPEED
+                local target = guard.nextWaypoint
+                if walkTo(guard, target, gen) then
+                    guard.nextWaypoint = (target == guard.waypointA) and guard.waypointB or guard.waypointA
+                    -- Pause at the end of each leg, like a real patrol
+                    local t = os.clock() + 1.5
+                    while os.clock() < t and guard.gen == gen do task.wait(0.1) end
+                end
+            end
         end
     end)
 end
@@ -177,7 +177,7 @@ local function checkVision(guard)
     if guard.alarmActive then return end  -- already chasing, no need to "spot"
 
     local headPos = guard.head.Position
-    local lookVector = guard.body.CFrame.LookVector
+    local lookVector = guard.root.CFrame.LookVector
 
     local closestPlayer = nil
     local closestDist = math.huge
@@ -247,18 +247,26 @@ function GuardService:spawnPatrols(cb)
     guardFolder.Name = "Guards"
     guardFolder.Parent = Workspace
 
+    local spawned = 0
     for _, cfg in ipairs(guardConfigs) do
-        local model, body, head, hat = buildGuardModel(cfg.name, cfg.spawn)
-        model.Parent = guardFolder
-        local guard = spawnGuard(cfg.name, cfg.waypointA, cfg.waypointB, body, head, hat, model)
-        guards[cfg.name] = guard
-        startPatrol(guard)
+        local model, humanoid, root, head = buildGuardModel(cfg.name, cfg.spawn)
+        if model then
+            model.Parent = guardFolder
+            -- Server owns the physics so the guard can't be flung/lagged by a client
+            pcall(function() root:SetNetworkOwner(nil) end)
+            NpcFactory.animate(humanoid)
+            local guard = spawnGuard(cfg.name, cfg.waypointA, cfg.waypointB, model, humanoid, root, head)
+            guards[cfg.name] = guard
+            runBrain(guard)
+            spawned = spawned + 1
+        else
+            warn("[GuardService] could not build", cfg.name)
+        end
     end
 
-    -- Heartbeat: scan vision + sync head/hat positions every frame
+    -- Heartbeat: tick catch cooldowns + scan vision
     RunService.Heartbeat:Connect(function(dt)
         for _, guard in pairs(guards) do
-            syncGuardParts(guard)
             if guard.cooldown > 0 then
                 guard.cooldown = math.max(0, guard.cooldown - dt)
             end
@@ -275,7 +283,7 @@ function GuardService:spawnPatrols(cb)
         end
     end)
 
-    print("[GuardService] Spawned", #guardConfigs, "guards")
+    print("[GuardService] Spawned", spawned, "guards")
 end
 
 function GuardService:setAlarmActive(active, chaseTarget)
@@ -283,8 +291,7 @@ function GuardService:setAlarmActive(active, chaseTarget)
     for _, guard in pairs(guards) do
         guard.alarmActive = active
         guard._chaseTarget = chaseTarget
-        if guard.currentTween then guard.currentTween:Cancel() end
-        startPatrol(guard)
+        guard.gen = guard.gen + 1   -- interrupts whatever walk is in progress
     end
     print(string.format("[GuardService] Alarm %s", active and "ACTIVE 🚨" or "cleared ✅"))
 end

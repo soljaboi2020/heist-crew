@@ -69,6 +69,11 @@ Gets it from "clearly unfinished" to "looks deliberate". Maybe 60–70% of the w
 
 - [x] **Lobby pass 1** — killed the neon plaza + path strips, removed floating labels, rebalanced
       bloom/saturation/lamps (v0.5.0, commit `1b4effd`)
+- [x] **Real NPCs + Future lighting** (v0.6.0, 2026-09-24) — guards are the official Roblox
+      "Police Officer Nash" Rthro outfit walking with animations + pathfinding; Boss is an R15
+      avatar in a suit + fedora (`NpcFactory.lua`). `Lighting.Technology = Future` via
+      `default.project.json`. Last Neon surfaces (pillar caps, roof trim, spawn pad) → Metal;
+      mansion Ambient dropped so interior lamps + guard flashlights do the lighting.
 - [ ] Mansion exterior — real materials, window openings, framed doorway, steps, roof trim
 - [ ] Mansion interior — drop the light level hard, lamp pools, make the guard cones matter
 - [ ] Layout spacing — the mansion moved from z=-160 to z=-55 in May and overcorrected; there's

@@ -32,6 +32,12 @@
       }
     },
 
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future"
+      }
+    },
+
     "HttpService": {
       "$properties": {
         "HttpEnabled": true

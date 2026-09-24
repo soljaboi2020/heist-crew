@@ -259,6 +259,29 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     check them — Luau supports `+=` fine.
   - ⏸️ **PENDING IN-STUDIO VERIFICATION** — solo path and a 2-player crew test.
 
+- **2026-09-24** — **👮 v0.6.0 — REAL NPCs + FUTURE LIGHTING** (Malachi: *"it looks like shit and
+  blocky"* → pitched 5 fixes, he said go; did #1 + #2 first).
+  - New **`src/server/NpcFactory.lua`** — builds real R15 avatars via
+    `Players:CreateHumanoidModelFromDescription`, plays Roblox's stock R15 idle/walk/run anims
+    (507766666 / 507777826 / 507767714) on the server Animator. Fallback chain: catalog look →
+    plain R15 in body colours → nil. Hides name tags/health bars (art rule #3).
+  - **Guards** = official Roblox outfit **320998366 "Police Officer Nash"** (bundle 349, Rthro).
+    Movement rewritten from anchored-brick tweens to `Humanoid:MoveTo` + **PathfindingService**
+    (old guards slid *through walls* when chasing). Order changes bump `guard.gen` to cancel the
+    current walk. Touching **any** guard part = caught. Vision logic unchanged (now reads
+    `guard.root`); SpotLight has `Shadows = true`. `guard.body` kept as an alias.
+  - **Boss** = R15 avatar, shirt 6554200369 + pants 6555797786 (TIX "Grey Suit w/ Black Vest",
+    third-party — if it's ever deleted the fallback kicks in) + hat 168167624 "Fedora and Shades".
+    Speech bubble now `MaxDistance 40`, not AlwaysOnTop.
+  - **`default.project.json` sets `Lighting.Technology = "Future"`** (not settable from script).
+    Ambient 50,55,75 → 22,24,34 so the mansion interior goes dark; interior lamps dimmer + shadows.
+  - Neon → Metal on pillar caps, the 49×41 roof-trim slab, and the spawn pad.
+  - All 3 changed .lua files pass `luau-compile` (official Luau release binary, in /tmp — not kept).
+  - ⏸️ **PENDING IN-STUDIO CHECK** — guards spawn + walk, boss stands idle, interior is dark.
+  - **Next up (approved list):** #3 mansion rebuild (windows, framed door, rooms) · #4 Kenney
+    models — needs a Roblox **Open Cloud API key** from Malachi so Claude can bulk-upload the FBX
+    files (unverified until tried) · #5 screen HUD replacing the floating "MANSION HEIST" sign.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

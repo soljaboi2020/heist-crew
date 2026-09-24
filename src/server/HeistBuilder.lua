@@ -52,6 +52,7 @@ local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local NpcFactory = require(script.Parent.NpcFactory)
 
 local HeistBuilder = {}
 
@@ -101,10 +102,17 @@ function HeistBuilder:_setupLighting()
     Lighting.ClockTime = 19.5  -- Just after sunset
     Lighting.GeographicLatitude = 41
     Lighting.Brightness = 1.5
-    Lighting.Ambient = Color3.fromRGB(50, 55, 75)
+    -- 2026-09-24: Ambient is what reaches places the sky can't (under the
+    -- mansion roof). Pulled way down so the interior is dark and the lamps +
+    -- guard flashlights do the lighting. OutdoorAmbient keeps the lobby bright.
+    -- Lighting.Technology = Future is set in default.project.json (it can't be
+    -- set from a script).
+    Lighting.Ambient = Color3.fromRGB(22, 24, 34)
     Lighting.OutdoorAmbient = Color3.fromRGB(85, 90, 110)
     Lighting.ExposureCompensation = 0.2
     Lighting.GlobalShadows = true
+    Lighting.EnvironmentDiffuseScale = 0.4
+    Lighting.EnvironmentSpecularScale = 0.6
     Lighting.FogColor = Color3.fromRGB(35, 40, 60)
     Lighting.FogStart = 200
     Lighting.FogEnd = 800
@@ -403,57 +411,39 @@ end
 -- ──────────────────────────────────────────────
 function HeistBuilder:_buildBoss(folder)
     local pos = v3(W.BOSS_NPC_POS)
-    local bossModel = Instance.new("Model")
-    bossModel.Name = "Boss_NPC"
+
+    -- 2026-09-24: a real R15 avatar in a suit + fedora (NpcFactory), standing
+    -- with an idle animation. Used to be a navy brick with a neon tie.
+    local bossModel, humanoid, root = NpcFactory.build({
+        name = "Boss_NPC",
+        shirt = 6554200369,     -- "Grey Suit w/ Black Vest [+]"
+        pants = 6555797786,     -- "Grey Suit w/ Black Vest [-]"
+        hats = { 168167624 },   -- "Fedora and Shades" (Roblox)
+        bodyColors = {
+            head  = Color3.fromRGB(180, 140, 100),
+            torso = Color3.fromRGB(20, 25, 50),
+            arms  = Color3.fromRGB(20, 25, 50),
+            legs  = Color3.fromRGB(15, 15, 20),
+        },
+    })
+    if not bossModel then
+        warn("[HeistBuilder] Boss NPC failed to build — skipping")
+        return
+    end
+    root.Anchored = true    -- he stands still; anchoring stops players shoving him
+    bossModel:PivotTo(CFrame.new(pos + Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2, 0))
+        * CFrame.Angles(0, math.rad(180), 0))
     bossModel.Parent = folder
-
-    local body = makePart({
-        Name = "Body",
-        Size = Vector3.new(2.5, 5, 1.5),
-        Position = pos + Vector3.new(0, 2.5, 0),
-        Color = Color3.fromRGB(20, 25, 50),
-        Material = Enum.Material.Fabric,
-        Orientation = Vector3.new(0, 180, 0),
-    })
-    body.Parent = bossModel
-
-    local tie = makePart({
-        Name = "Tie",
-        Size = Vector3.new(0.4, 2, 0.1),
-        Position = pos + Vector3.new(0, 3.2, -0.78),
-        Color = rgb(C.GOLD),
-        Material = Enum.Material.Neon,
-    })
-    tie.Parent = bossModel
-
-    local head = makePart({
-        Name = "Head",
-        Size = Vector3.new(1.6, 1.6, 1.6),
-        Position = pos + Vector3.new(0, 5.8, 0),
-        Color = Color3.fromRGB(180, 140, 100),
-        Material = Enum.Material.Plastic,
-    })
-    head.CanCollide = false
-    head.Parent = bossModel
-
-    local hat = makePart({
-        Name = "Hat",
-        Size = Vector3.new(2.2, 0.5, 2.2),
-        Position = pos + Vector3.new(0, 6.9, 0),
-        Color = Color3.fromRGB(15, 15, 15),
-        Material = Enum.Material.Fabric,
-    })
-    hat.CanCollide = false
-    hat.Parent = bossModel
-
-    bossModel.PrimaryPart = body
+    NpcFactory.animate(humanoid)
+    local head = bossModel:FindFirstChild("Head") or root
 
     -- Speech bubble above his head
     local attach = Instance.new("Attachment", head)
-    attach.Position = Vector3.new(0, 2.8, 0)
+    attach.Position = Vector3.new(0, 3, 0)
     local bb = Instance.new("BillboardGui", attach)
     bb.Size = UDim2.new(0, 280, 0, 110)
-    bb.AlwaysOnTop = true
+    bb.MaxDistance = 40     -- only when you walk up to him, not across the map
+    bb.AlwaysOnTop = false
     bb.LightInfluence = 0
 
     local bg = Instance.new("Frame", bb)
@@ -697,7 +687,7 @@ function HeistBuilder:_buildMansion(folder)
             Name = "PillarCap_" .. i,
             Size = Vector3.new(0.5, 3.2, 3.2),
             Color = rgb(C.GOLD),
-            Material = Enum.Material.Neon,
+            Material = Enum.Material.Metal,   -- was Neon (art rule #1)
             Shape = Enum.PartType.Cylinder,
         })
         cap.CFrame = CFrame.new(p + Vector3.new(0, h + 1, 0)) * CFrame.Angles(0, 0, math.rad(90))
@@ -720,7 +710,7 @@ function HeistBuilder:_buildMansion(folder)
         Size = Vector3.new(hw * 2 + 5, 0.4, hd * 2 + 5),
         Position = Vector3.new(cx, h + 1.2, cz),
         Color = rgb(C.GOLD),
-        Material = Enum.Material.Neon,
+        Material = Enum.Material.Metal,   -- was Neon: a 49x41 glowing slab (art rule #1)
     })
     roofTrim.Parent = mansionFolder
 
@@ -745,8 +735,9 @@ function HeistBuilder:_buildMansion(folder)
         lightBulb.CanCollide = false
         lightBulb.Parent = mansionFolder
         local pl = Instance.new("PointLight", lightBulb)
-        pl.Brightness = 2
-        pl.Range = 18
+        pl.Brightness = 1.2
+        pl.Range = 14
+        pl.Shadows = true   -- Future lighting: pools of light, dark between them
         pl.Color = Color3.fromRGB(255, 220, 150)
     end
 
@@ -934,10 +925,10 @@ function HeistBuilder:build()
     spawn.Position = Vector3.new(W.SPAWN_POSITION.x, W.SPAWN_POSITION.y, W.SPAWN_POSITION.z)
     spawn.Size = Vector3.new(6, 1, 6)
     spawn.Color = rgb(C.GREEN_PRIMARY)
-    spawn.Material = Enum.Material.Neon
+    spawn.Material = Enum.Material.Metal   -- was see-through Neon (art rule #1)
     spawn.TopSurface = Enum.SurfaceType.Smooth
     spawn.BottomSurface = Enum.SurfaceType.Smooth
-    spawn.Transparency = 0.2
+    spawn.Transparency = 0
     spawn.Parent = heistFolder
 
     print("[HeistBuilder] World built ✨")
