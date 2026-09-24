@@ -68,7 +68,7 @@ function TestPad:spawn()
     local gui = Instance.new("SurfaceGui")
     gui.Face = Enum.NormalId.Front
     gui.LightInfluence = 0
-    gui.AlwaysOnTop = true
+    gui.AlwaysOnTop = false  -- was true: showed through walls (art rule #3)
     gui.PixelsPerStud = 50
     gui.Parent = sign
 

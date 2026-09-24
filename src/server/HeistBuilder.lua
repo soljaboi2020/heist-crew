@@ -75,22 +75,26 @@ local function makePart(props)
     return p
 end
 
-local function billboardText(parent, text, color, size, studsAbove)
-    local attach = Instance.new("Attachment", parent)
-    attach.Position = Vector3.new(0, studsAbove or 4, 0)
-    local bb = Instance.new("BillboardGui", attach)
-    bb.Size = UDim2.new(0, size or 300, 0, 80)
-    bb.AlwaysOnTop = true
-    bb.LightInfluence = 0
-    local label = Instance.new("TextLabel", bb)
-    label.Size = UDim2.new(1, 0, 1, 0)
+-- 2026-09-24: replaces billboardText(). Those were AlwaysOnTop BillboardGuis —
+-- giant floating words drawn over everything, visible through walls from
+-- across the map (art rule #3). This prints the text ON a face of a real part,
+-- like a painted sign, so it sits in the world and gets hidden by walls.
+local function signText(part, face, text, color, font)
+    local gui = Instance.new("SurfaceGui")
+    gui.Face = face
+    gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    gui.PixelsPerStud = 40
+    gui.LightInfluence = 0.3
+    gui.Parent = part
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.9, 0, 0.8, 0)
+    label.Position = UDim2.new(0.05, 0, 0.1, 0)
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = color or rgb(C.WHITE)
-    label.Font = Enum.Font.GothamBlack
+    label.Font = font or Enum.Font.GothamBlack
     label.TextScaled = true
-    label.TextStrokeTransparency = 0
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Parent = gui
     return label
 end
 
@@ -235,8 +239,11 @@ function HeistBuilder:_setupGround(folder)
         local angle = (i / SEGMENTS) * math.pi * 2
         local seg = makePart({
             Name = "PlazaTrim_" .. i,
-            Size = Vector3.new(segLength, 0.22, 1.1),
-            Color = rgb(C.GOLD_DEEP),
+            -- 2026-09-24 FIX: was (segLength, 0.22, 1.1). After the Y-rotation local X
+            -- points outward from the centre, so the long side was sticking out like
+            -- spokes (orange "planks" in Malachi's screenshot). Long side goes on Z.
+            Size = Vector3.new(1.1, 0.22, segLength),
+            Color = Color3.fromRGB(150, 116, 52),   -- aged brass, less orange
             Material = Enum.Material.Metal,
         })
         seg.CFrame = CFrame.new(
@@ -338,13 +345,23 @@ function HeistBuilder:_buildLobby(folder)
         pole.Parent = folder
         local bulb = makePart({
             Name = "LampBulb_" .. i,
-            Size = Vector3.new(1.5, 1.5, 1.5),
-            Position = pos + Vector3.new(0, 10.3, 0),
-            Color = rgb(C.GOLD),
+            Size = Vector3.new(0.9, 0.9, 0.9),
+            Position = pos + Vector3.new(0, 10.1, 0),
+            Color = Color3.fromRGB(255, 226, 170),   -- warm white, not flat yellow
             Material = Enum.Material.Neon,
             Shape = Enum.PartType.Ball,
         })
         bulb.Parent = folder
+        local shade = makePart({
+            Name = "LampShade_" .. i,
+            Size = Vector3.new(0.7, 2.2, 2.2),
+            Color = rgb(C.MARBLE_DARK),
+            Material = Enum.Material.Metal,
+            Shape = Enum.PartType.Cylinder,
+            CanCollide = false,
+        })
+        shade.CFrame = CFrame.new(pos + Vector3.new(0, 10.8, 0)) * CFrame.Angles(0, 0, math.rad(90))
+        shade.Parent = folder
         -- v0.5.0: was Brightness 3 / Range 25 on four lamps at once, which flooded
         -- the plaza and killed every shadow. Dimmer and tighter gives pools of
         -- light with dark between them — the thing that makes Cheese Escape and
@@ -555,16 +572,26 @@ function HeistBuilder:_buildPath(folder)
         pole.Parent = folder
         local bulb = makePart({
             Name = "PathLamp_Bulb",
-            Size = Vector3.new(1.2, 1.2, 1.2),
-            Position = pos + Vector3.new(0, 9.2, 0),
-            Color = rgb(C.GOLD),
+            Size = Vector3.new(0.8, 0.8, 0.8),
+            Position = pos + Vector3.new(0, 9.1, 0),
+            Color = Color3.fromRGB(255, 226, 170),
             Material = Enum.Material.Neon,
             Shape = Enum.PartType.Ball,
         })
         bulb.Parent = folder
+        local shade = makePart({
+            Name = "PathLamp_Shade",
+            Size = Vector3.new(0.6, 1.9, 1.9),
+            Color = rgb(C.MARBLE_DARK),
+            Material = Enum.Material.Metal,
+            Shape = Enum.PartType.Cylinder,
+            CanCollide = false,
+        })
+        shade.CFrame = CFrame.new(pos + Vector3.new(0, 9.7, 0)) * CFrame.Angles(0, 0, math.rad(90))
+        shade.Parent = folder
         local light = Instance.new("PointLight", bulb)
-        light.Brightness = 2.5
-        light.Range = 20
+        light.Brightness = 1.6
+        light.Range = 18
         light.Color = Color3.fromRGB(255, 220, 150)
     end
 end
@@ -715,7 +742,7 @@ function HeistBuilder:_buildMansion(folder)
     roofTrim.Parent = mansionFolder
 
     -- "MANSION" sign above the door
-    billboardText(archHeader, "🏛 MANSION HEIST", rgb(C.GOLD), 500, 4)
+    signText(archHeader, Enum.NormalId.Back, "MANSION", Color3.fromRGB(28, 22, 12), Enum.Font.Bodoni)
 
     -- Interior lights
     for _, lightPos in ipairs({
@@ -809,7 +836,7 @@ function HeistBuilder:_buildVault(folder)
         jewel.Parent = folder
     end
 
-    billboardText(vault, "💰 VAULT", rgb(C.GOLD), 350, 8)
+    signText(vault, Enum.NormalId.Back, "VAULT", Color3.fromRGB(40, 30, 10))
 
     return vault
 end
@@ -883,7 +910,21 @@ function HeistBuilder:_buildGetawayCar(folder)
         pl.Color = Color3.fromRGB(255, 240, 180)
     end
 
-    local label = billboardText(body, "🚗 GETAWAY", Color3.fromRGB(120, 120, 120), 350, 6)
+    local doorLabels = {
+        signText(body, Enum.NormalId.Left,  "GETAWAY", Color3.fromRGB(120, 120, 120)),
+        signText(body, Enum.NormalId.Right, "GETAWAY", Color3.fromRGB(120, 120, 120)),
+    }
+    -- HeistService writes label.Text / label.TextColor3 on alarm; fan it out to both doors
+    -- and drop the emoji (SurfaceGui text on a car door reads better without it).
+    local label = setmetatable({}, {
+        __index = doorLabels[1],
+        __newindex = function(_, key, value)
+            if key == "Text" and type(value) == "string" then
+                value = value:gsub("^%S*🚗%s*", "")
+            end
+            for _, l in ipairs(doorLabels) do l[key] = value end
+        end,
+    })
 
     return body, label
 end

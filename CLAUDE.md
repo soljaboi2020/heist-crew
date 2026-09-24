@@ -282,6 +282,16 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     models — needs a Roblox **Open Cloud API key** from Malachi so Claude can bulk-upload the FBX
     files (unverified until tried) · #5 screen HUD replacing the floating "MANSION HEIST" sign.
 
+- **2026-09-24 (pm)** — **v0.6.1 — fixes from Malachi's first v0.6.0 screenshot.** Boss avatar
+  confirmed rendering. Fixed: ① the 3 `AlwaysOnTop` BillboardGuis ("MANSION HEIST", "VAULT",
+  "GETAWAY") covering the screen from anywhere → new `signText()` prints them on a part face via
+  SurfaceGui (arch header, vault front, both car doors; car uses a proxy table so `HeistService`'s
+  `.Text`/`.TextColor3` writes still work unchanged) ② **plaza trim ring BUG** — segments sized
+  `(segLength, 0.22, 1.1)` but after the Y-rotation local X is radial, so they rendered as orange
+  spokes; now `(1.1, 0.22, segLength)`, colour toned to aged brass ③ lamp bulbs were 1.5-stud
+  flat-yellow neon blobs → 0.9-stud warm-white bulb under a dark metal shade (path lamps too)
+  ④ TestPad sign no longer AlwaysOnTop.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot
