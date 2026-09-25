@@ -503,6 +503,18 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     developer-product:read+write; PATCH with multipart `imageFile` sets the icon — no asset scope needed).
   - Malachi must set in Studio: Lighting.Technology = Future; Game Settings → Security → Studio API access ON.
 
+- **2026-09-25** — **v2.2 "GEAR THAT DOES STUFF"** (Malachi: cars that help, trails = speed, bags = more money,
+  Boss camera should show the real heist, everything must equip + work — verified by tester, 7 bugs fixed in v2.1).
+  - **Car TYPES** (CosmeticsService/VehicleService/PoliceService): Classic · Muscle $8k (+15%, nitro 7s) · Street
+    Racer $20k (+35%) · Armored $35k (bust 50% slower) · Monster $60k (+20%, bust 30% slower) · Tank $150k VIP
+    (−15%, bust 75% slower). All ≤5.46 wide (villa yard clears by ~0.07!). Crew car = most expensive equipped.
+    Base bust now **4.5 s** + bust-meter rounding bug fixed. Old paints migrated → Muscle (VIP gold → Racer).
+  - **Trails** = walk speed ×1.02..×1.12 (`TrailSpeedMult`, stacks with Fox Speed; crouch caps 8).
+  - **Bag tiers** = +10/20/35/50% per loaded bag + bigger model (Duffel/Sports/Pro/Gold day-7/Diamond VIP).
+  - **BriefingShots** (server) publishes per-job fly-through shots to `ReplicatedStorage.BriefingShots`;
+    BriefingUI matches each Boss line to a shot (breaker/keycard/lasers/vault/car/side/wide).
+  - `default.project.json`: Workspace.StreamingEnabled = false (far heist buildings must exist for the camera).
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

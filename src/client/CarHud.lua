@@ -10,6 +10,10 @@
       • NITRO   Driver role in the driver seat only: "SHIFT  NITRO" chip with
                 a cooldown fill (NitroUntil / NitroReadyAt vs server time).
                 LeftShift / ButtonL3 / on-screen touch button → Nitro remote.
+      • CAR     (v2.2) top-right: the car type + its power ("MONSTER TRUCK ·
+                +20% SPEED"), from the model's CarName / CarPerk attributes.
+                The nitro cooldown fill follows the model's NitroCooldown
+                (Muscle Car: 7 s).
 
     Also mirrors the driver's throttle/steer to the server on the "CarInput"
     remote (VehicleService prefers it over the replicated VehicleSeat values
@@ -103,6 +107,22 @@ function CarHud:_buildUi()
     })
     distLabel.Parent = panel
 
+    -- ── (v2.2) car type + power ──
+    local carName = UITheme.label({
+        Name = "CarName", Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 8),
+        Size = UDim2.fromOffset(125, 16), TextXAlignment = Enum.TextXAlignment.Right,
+        FontFace = UITheme.F.display, TextSize = 14, TextColor3 = T.gold,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+    })
+    carName.Parent = panel
+    local carPerk = UITheme.label({
+        Name = "CarPerk", Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 25),
+        Size = UDim2.fromOffset(125, 14), TextXAlignment = Enum.TextXAlignment.Right,
+        FontFace = UITheme.F.bold, TextSize = 12, TextColor3 = T.muted,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+    })
+    carPerk.Parent = panel
+
     -- ── speed ──
     local speed = UITheme.label({
         Name = "Speed", Text = "0", Position = UDim2.fromOffset(10, 40), Size = UDim2.fromOffset(112, 52),
@@ -171,6 +191,7 @@ function CarHud:_buildUi()
         panel = panel, arrow = arrow, dist = distLabel, speed = speed,
         chip = chip, chipStroke = chipStroke, chipFill = chipFill, chipLabel = chipLabel,
         bustRow = bustRow, bustFill = bustFill,
+        carName = carName, carPerk = carPerk,
     }
 end
 
@@ -319,6 +340,12 @@ function CarHud:_update()
         end
     end
     ui.arrow.TextColor3 = dist <= W.DROPOFF_RADIUS and T.money or T.info
+
+    -- (v2.2) car type
+    local cn = car:GetAttribute("CarName")
+    local cp = car:GetAttribute("CarPerk")
+    ui.carName.Text = type(cn) == "string" and string.upper(cn) or ""
+    ui.carPerk.Text = type(cp) == "string" and cp or ""
 
     -- bust meter
     local bust = math.clamp(num(car:GetAttribute("BustMeter")), 0, 1)

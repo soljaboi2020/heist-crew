@@ -16,6 +16,9 @@
           driver pulls away and nitro always escapes. A BustMeter (0..1) on the
           car model fills while a cruiser is within 10 studs AND the car is
           doing < 25; at 1 → onCarBusted(car), once.
+          v2.2: a full meter takes 4.5 s (was 3 s — first-timers got busted on
+          the marina turn), × 1 / car.bustMult for tough car types: Armored
+          Truck 0.5 (9 s), Monster Truck 0.7 (~6.4 s), Tank 0.25 (18 s).
 
       Cruisers are KINEMATIC like the getaway car (anchored, moved every
       Heartbeat) and use VehicleService.Kinematic for ground-follow and
@@ -71,7 +74,7 @@ local TUNE = {
     STUCK_TIME    = 2,
     BUST_RANGE    = 10,      -- gap between the two car bodies, studs
     BUST_MAX_CAR_SPEED = 25,
-    BUST_FILL     = 0.33,    -- per second
+    BUST_FILL     = 1 / 4.5, -- per second (v2.2: 4.5 s to a full bust, was 3 s) × car.bustMult
     BUST_DRAIN    = 0.25,
     TELEPORT_BACK = 45,
     COP_SPEED     = 17,
@@ -683,17 +686,27 @@ local function updateBust(car, dt: number)
             break
         end
     end
-    local meter = tonumber(car.model:GetAttribute("BustMeter")) or 0
+    -- (v2.2 fix) keep the TRUE meter on the car object. It used to be re-read from the
+    -- rounded attribute every frame, so each frame's fill was rounded to 0.005: at
+    -- 60 Hz a slow fill rounded to 0 forever and a normal one ran ~35% fast.
+    -- If someone else wrote the attribute (reset → 0), adopt their value.
+    local attr = tonumber(car.model:GetAttribute("BustMeter")) or 0
+    local meter = car._bustMeter
+    if meter == nil or car._bustShown ~= attr then meter = attr end
     -- (fix v1.1: an EMPTY car can't be busted — the driver may be out loading bags)
     if near and car:getSpeed() < TUNE.BUST_MAX_CAR_SPEED and #car:getOccupants() > 0 then
-        meter = meter + TUNE.BUST_FILL * dt
+        -- v2.2 car types: Armored / Monster / Tank fill slower (VehicleService car.bustMult)
+        local bm = tonumber(car.bustMult) or 1
+        meter = meter + TUNE.BUST_FILL * math.clamp(bm, 0.05, 2) * dt
     else
         meter = meter - TUNE.BUST_DRAIN * dt
     end
     meter = math.clamp(meter, 0, 1)
     -- round so we don't replicate a new float every frame for nothing
     local shown = math.floor(meter * 200 + 0.5) / 200
-    if car.model:GetAttribute("BustMeter") ~= shown then
+    car._bustMeter = meter
+    car._bustShown = shown
+    if attr ~= shown then
         car.model:SetAttribute("BustMeter", shown)
     end
     if meter >= 1 and not bustFired then

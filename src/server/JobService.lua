@@ -994,6 +994,24 @@ local function launch(players)
         if not ok then warn("[JobService] autoAssign:", err) end
     end
 
+    -- v2.2 (gear agent): the getaway car becomes the crew's best car type
+    -- (VehicleService:chooseForCrew → CosmeticsService:pickCrewCar); locked until the car resets
+    if S.vehicles and type(S.vehicles.chooseForCrew) == "function" then
+        local okC, carId = pcall(S.vehicles.chooseForCrew, S.vehicles, crewList)
+        local real = okC and S.vehicles:getCar()
+        if not okC then warn("[JobService] chooseForCrew:", carId)
+        elseif real and real.model then
+            if real.trunk then S.loot:attachTrunk(real.trunk) end   -- same Trunk part; re-arm to be safe
+            local cname, perk = real.model:GetAttribute("CarName"), real.model:GetAttribute("CarPerk")
+            if cname and carId ~= "CarClassic" then
+                for _, p in ipairs(crewList) do
+                    notify(p, string.format("Getaway car: %s%s", tostring(cname),
+                        (perk and perk ~= "") and ("  (" .. tostring(perk) .. ")") or ""), "gold", 4)
+                end
+            end
+        end
+    end
+
     local ok, err = pcall(function()
         -- v1.2 cut-scene: a copy of the getaway car rolls up the ramp in The Vault's
         -- garage bay while every client's camera watches, then fade → drop-in.
@@ -1371,10 +1389,15 @@ function JobService:init(deps)
             elseif kind == "load" then
                 local value = data.value or (S.loot.info and S.loot.info(data.kind).value) or 0
                 feel("load", value, data.pos)
+                -- v2.2 bag tiers: say where the extra came from ("Duffel Bag +$150")
+                local extra = ""
+                if (tonumber(data.bonus) or 0) > 0 then
+                    extra = string.format("  (%s +%s)", tostring(data.tierName or "bag"), UITheme.money(data.bonus))
+                end
                 if data.bot then
-                    notifyAll(string.format("%s (bot) put %s in the car  +%s", data.bot, data.kind, UITheme.money(value)), "green", 3)
+                    notifyAll(string.format("%s (bot) put %s in the car  +%s%s", data.bot, data.kind, UITheme.money(value), extra), "green", 3)
                 elseif player then
-                    notifyAll(string.format("%s put %s in the car  +%s", player.DisplayName, data.kind, UITheme.money(value)), "green", 3)
+                    notifyAll(string.format("%s put %s in the car  +%s%s", player.DisplayName, data.kind, UITheme.money(value), extra), "green", 3)
                 end
             end
             pushInfo()

@@ -10,6 +10,9 @@
       • COSMETICS (v2.0) — bag skins / car colors / trails. The item list and
                 the rules live in CosmeticsService; this just routes the actions
                 and ships the catalog to the client inside getState.
+                v2.2: they all DO something now — bag tiers (+cash per bag),
+                car types (speed / bust), trails (+walk speed). Every catalog
+                item carries power = {name, desc} for its shop card.
       (v2.0: the daily reward moved to DailyRewardService — you press CLAIM now.)
 
     Talks to the client through the ShopAction RemoteFunction:
@@ -175,9 +178,17 @@ function actions.buyGear(player, payload)
     if not Economy:spend(player, g.price, "Gear: " .. g.id) then return false, "Not enough cash" end
     d.gear[g.id] = true
     syncAttributes(player)
-    if g.id == "Sneakers" and not player:GetAttribute("CarryingLoot") then
-        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 18 * (tonumber(player:GetAttribute("SpeedMult")) or 1) end
+    if g.id == "Sneakers" then
+        -- v2.2: LootService owns the WalkSpeed maths (bag, Sneakers, Fox mask, trail)
+        local mod = script.Parent:FindFirstChild("LootService")
+        local okL, Loot = false, nil
+        if mod then okL, Loot = pcall(require, mod) end
+        if okL and type(Loot) == "table" and type(Loot.refreshWalkSpeed) == "function" then
+            pcall(Loot.refreshWalkSpeed, Loot, player)
+        elseif not player:GetAttribute("CarryingLoot") then
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 18 * (tonumber(player:GetAttribute("SpeedMult")) or 1) end
+        end
     end
     return true, g.name .. " unlocked"
 end

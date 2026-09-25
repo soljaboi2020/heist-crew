@@ -22,6 +22,13 @@
                  skin's colour + material (+ reflectance)
         cars   → ViewportFrame: a simple car body in the paint colour
         trails → a gradient streak in the trail's colours (rainbow for VIP)
+    v2.2 — GEAR THAT DOES STUFF: bag / car / trail cards show their power
+    like masks do (a coloured pill + one line, from catalog item.power):
+    green pill = more cash (bags), blue = speed (trails / fast cars), gold =
+    bust slower (tough cars). Car cards preview the REAL car type — a clone of
+    ReplicatedStorage.HC_CarPreviews[<id>] (VehicleService publishes one model
+    per type), falling back to the simple drawn car. Bag cards draw the bag at
+    its tier's size (item.scale) with a SIZE tag.
     CASH tab (Robux → cash packs): state.robuxPacks {id, name, cash, robux,
     available}; buying calls ShopAction("buyRobuxPack", {id}) and the SERVER
     opens the Roblox prompt. available == false → greyed "COMING SOON".
@@ -34,6 +41,7 @@
                    maskList = {{id, name, price, owned, equipped, ability = {id, name, desc}}}, maskPower,
                    robuxPacks = {{id, name, cash, robux, available}},
                    cosmetics = { catalog = {items}, owned = {ids}, equipped = {bag, car, trail} } }
+                   (v2.2 catalog items also carry power = {name, desc}, carType, scale, size …)
     Masks fall back to Constants.MASKS (assetId + ability) for anything the
     server's maskList doesn't carry. BAGS / CARS / TRAILS / CASH pages are
     built the first time the server sends their data.
@@ -72,9 +80,9 @@ local PIC_H = 118                 -- picture area on an item card
 local TABS = {
     { id = "gear",  label = "GEAR",   sub = "tools that make the job easier" },
     { id = "masks", label = "MASKS",  sub = "every mask = a different power" },
-    { id = "bag",   label = "BAGS",   sub = "the bag on your back" },      -- v2.0 cosmetics (page id = category)
-    { id = "car",   label = "CARS",   sub = "paint the getaway car" },
-    { id = "trail", label = "TRAILS", sub = "leave a streak behind you" },
+    { id = "bag",   label = "BAGS",   sub = "bigger bag = more cash per bag" },      -- v2.0 cosmetics (page id = category)
+    { id = "car",   label = "CARS",   sub = "the crew drives the best car anyone has on" },
+    { id = "trail", label = "TRAILS", sub = "every trail makes you faster" },
     { id = "cash",  label = "CASH",   sub = "cash packs for Robux" },
     { id = "codes", label = "CODES",  sub = "got a promo code?" },
     { id = "vip",   label = "VIP",    sub = "the VIP pass" },
@@ -388,12 +396,14 @@ local function part(props)
     return p
 end
 
--- a duffel bag (≈ 3 x 1.6 x 1.6 studs) in the skin's look
+-- a duffel bag (≈ 3 x 1.6 x 1.6 studs) in the skin's look, scaled to its tier (v2.2)
 local function bagModel(item)
+    local m = nil
+    local k = math.clamp(tonumber(item.scale) or 1, 0.5, 2)
     local col = c3(item.color, Color3.fromRGB(28, 30, 36))
     local mat = material(item.material, Enum.Material.Fabric)
     local refl = tonumber(item.reflectance) or 0
-    local m = Instance.new("Model")
+    m = Instance.new("Model")
     m.Name = "Bag"
     local body = part({ Name = "Body", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3, 1.6, 1.6),
         Color = col, Material = mat, Reflectance = refl, CFrame = CFrame.new(0, 0.8, 0) })
@@ -415,7 +425,27 @@ local function bagModel(item)
         part({ Name = "Cap", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, 1.3, 1.3), Color = trim,
             Material = mat, CFrame = CFrame.new(x, 0.8, 0) }).Parent = m
     end
+    if k ~= 1 then
+        pcall(function() m:ScaleTo(k) end)   -- scales about the pivot (the model's centre)
+        pcall(function() m:PivotTo(m:GetPivot() + Vector3.new(0, (k - 1) * 1.05, 0)) end)
+    end
     return m
+end
+
+-- (v2.2) the REAL car type for the card: a clone of VehicleService's preview
+-- model, framed by its bounding box. nil if the previews aren't there (yet).
+local function realCarPreview(pic, item)
+    local folder = ReplicatedStorage:FindFirstChild("HC_CarPreviews")
+    local src = folder and folder:FindFirstChild(tostring(item.id))
+    if not src then return nil end
+    local m = src:Clone()
+    local cf, size = m:GetBoundingBox()
+    local target = cf.Position
+    local fov = 38
+    local radius = size.Magnitude / 2
+    local dist = radius / math.tan(math.rad(fov / 2)) * 0.82
+    local dir = Vector3.new(-0.62, 0.42, -0.66).Unit    -- front-left, a little above (front = -Z)
+    return viewport(pic, m, target + dir * dist, target, fov)
 end
 
 -- a simple car (≈ 8 x 3 x 4) painted in the item's colour
@@ -867,7 +897,7 @@ function ShopUI:_buildVip()
 end
 
 -- ── BAGS / CARS / TRAILS / CASH pages (built when the server's data arrives) ──
-local COSMETIC_CATS = { bag = "Bag skins", car = "Car colors", trail = "Trails" }
+local COSMETIC_CATS = { bag = "Bags", car = "Cars", trail = "Trails" }
 
 function ShopUI:_buildPlaceholders()
     self._cosCards = {}
@@ -894,7 +924,7 @@ function ShopUI:_buildCosmetics(catalog)
         local page = self._pages[cat]
         if page and COSMETIC_CATS[cat] then
             if self._loading[cat] then self._loading[cat]:Destroy() end
-            grid(page, 4, 236)
+            grid(page, 4, 262)   -- (v2.2) same height as the mask cards: room for the power pill
             for i, item in ipairs(items) do
                 local color = c3(item.color, T.muted)
                 -- very dark / very light paints still need a visible rim
@@ -903,13 +933,36 @@ function ShopUI:_buildCosmetics(catalog)
                 if lum < 0.18 then rim = color:Lerp(T.line, 0.35) end
                 local ic = itemCard(page, i, rim)
                 if cat == "bag" then
+                    -- (v2.2) same camera for every tier, so bigger bags LOOK bigger
                     pcall(function()
-                        viewport(ic.pic, bagModel(item), Vector3.new(2.6, 2.6, 4.2), Vector3.new(0, 1.05, 0), 36)
+                        viewport(ic.pic, bagModel(item), Vector3.new(3.4, 3.4, 5.6), Vector3.new(0, 1.25, 0), 40)
                     end)
+                    if item.size then
+                        local sz = UITheme.label({ AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0, 8, 0, 8),
+                            Size = UDim2.fromOffset(0, 20), AutomaticSize = Enum.AutomaticSize.X,
+                            Text = "SIZE " .. tostring(item.size), FontFace = UITheme.F.display, TextSize = 12,
+                            TextColor3 = T.text, BackgroundColor3 = T.bgDeep, BackgroundTransparency = 0.25, ZIndex = 3 })
+                        UITheme.corner(sz, 10)
+                        UITheme.padding(sz, 8, 0)
+                        sz.Parent = ic.card
+                    end
                 elseif cat == "car" then
-                    pcall(function()
-                        viewport(ic.pic, carModel(item), Vector3.new(-8.5, 4.6, 8.5), Vector3.new(0, 1.4, 0), 40)
-                    end)
+                    local okReal, vf = pcall(realCarPreview, ic.pic, item)
+                    if not (okReal and vf) then
+                        pcall(function()
+                            viewport(ic.pic, carModel(item), Vector3.new(-8.5, 4.6, 8.5), Vector3.new(0, 1.4, 0), 40)
+                        end)
+                        -- the real previews may replicate a moment later: swap them in when they do
+                        task.spawn(function()
+                            local folder = ReplicatedStorage:WaitForChild("HC_CarPreviews", 30)
+                            local src = folder and folder:WaitForChild(tostring(item.id), 5)
+                            if src and ic.pic.Parent then
+                                local old = ic.pic:FindFirstChild("View")
+                                local ok2, vf2 = pcall(realCarPreview, ic.pic, item)
+                                if ok2 and vf2 and old then old:Destroy() end
+                            end
+                        end)
+                    end
                 else
                     trailPicture(ic.pic, item)
                 end
@@ -923,8 +976,21 @@ function ShopUI:_buildCosmetics(catalog)
                     tag.Parent = ic.card
                 end
                 ic.name.Text = string.upper(item.name or item.id)
-                setPill(ic, nil)
-                ic.desc.Text = item.blurb or ""
+                -- (v2.2) the power: pill + one line, like the masks
+                local pw = type(item.power) == "table" and item.power or nil
+                if pw and pw.name then
+                    local txt = string.upper(tostring(pw.name))
+                    local pc = rim
+                    if txt:find("CASH") then pc = T.money
+                    elseif txt:find("BUST") then pc = T.gold
+                    elseif txt:find("SPEED") then pc = T.info
+                    elseif (color.R * 0.3 + color.G * 0.59 + color.B * 0.11) < 0.35 then pc = T.muted end
+                    setPill(ic, txt, pc)
+                    ic.desc.Text = tostring(pw.desc or item.blurb or "")
+                else
+                    setPill(ic, nil)
+                    ic.desc.Text = item.blurb or ""
+                end
                 ic.ab.btn.Activated:Connect(function() self:_onCosmetic(item) end)
                 self._cosCards[item.id] = { ab = ic.ab, def = item }
             end
@@ -1045,11 +1111,11 @@ function ShopUI:_view()
     local mask = localPlayer:GetAttribute("Mask")
     if type(mask) ~= "string" or mask == "" then mask = s.mask end
     if mask then masks[mask] = true end
-    -- v2.0 cosmetics: server state + the live BagSkin / CarColor / Trail attributes
+    -- v2.0 cosmetics: server state + the live BagSkin / CarType / Trail attributes
     local sc = type(s.cosmetics) == "table" and s.cosmetics or {}
     local cos = { owned = toSet(sc.owned), equipped = {} }
     local eq = type(sc.equipped) == "table" and sc.equipped or {}
-    for cat, attr in pairs({ bag = "BagSkin", car = "CarColor", trail = "Trail" }) do
+    for cat, attr in pairs({ bag = "BagSkin", car = "CarType", trail = "Trail" }) do
         local a = localPlayer:GetAttribute(attr)
         cos.equipped[cat] = (type(a) == "string" and a ~= "") and a or eq[cat]
         if cos.equipped[cat] then cos.owned[cos.equipped[cat]] = true end
@@ -1479,7 +1545,7 @@ function ShopUI:start()
         if prompt.Name == "OpenShop" and player == localPlayer then self:open() end
     end)
 
-    for _, attr in ipairs({ "Cash", "Gear", "Mask", "VIP", "BagSkin", "CarColor", "Trail" }) do
+    for _, attr in ipairs({ "Cash", "Gear", "Mask", "VIP", "BagSkin", "CarType", "Trail" }) do
         localPlayer:GetAttributeChangedSignal(attr):Connect(function()
             if self._open then self:_render() end
         end)

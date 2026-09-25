@@ -90,14 +90,14 @@ local function onPlayerAdded(player)
     -- (fix v1.1) the first character may already exist by now
     if player.Character and ShopService:hasGear(player, "Sneakers") then
         local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 18 end
+        if hum then pcall(function() LootService:refreshWalkSpeed(player) end) end   -- v2.2: keeps trail/mask boosts
     end
     player.CharacterAdded:Connect(function(char)
         task.wait(0.5)
         EconomyService:fireCashUpdate(player)
         -- Silent Sneakers gear: +2 walk speed (LootService handles it while carrying)
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum and ShopService:hasGear(player, "Sneakers") then hum.WalkSpeed = 18 end
+        if hum then pcall(function() LootService:refreshWalkSpeed(player) end) end   -- v2.2: Sneakers + trail + mask
     end)
 end
 
@@ -118,6 +118,12 @@ end
 
 -- ── build the world (this yields: NPC outfits + Kenney models load) ─────
 local world = HeistBuilder:build()
+
+-- v2.2: Boss briefing fly-through shots of each real heist building
+do
+    local okB, BriefingShots = pcall(require, script.BriefingShots)
+    if okB and BriefingShots then pcall(function() BriefingShots:publish(world) end) end
+end
 
 -- (fix v1.2.1) Roblox loads your character while the world is still building,
 -- before the spawn pad has moved down into The Vault -- so the FIRST spawn landed

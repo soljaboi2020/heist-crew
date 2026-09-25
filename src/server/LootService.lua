@@ -23,6 +23,20 @@
     Carried bags are passed to CosmeticsService:styleBag(player, bag) if that
     service exists (progression agent), pcall-guarded.
 
+    v2.2 GEAR POWERS (gear agent):
+      • BAG TIERS — CosmeticsService:bagTier(player) → { valueMult, scale }.
+        A bag is built at the carrier's scale (bigger tiers look bigger) and
+        pays at the valueMult of the bag it's IN when it hits the trunk: the
+        loader's own bag, or — for a bot load — the bag OWNER's (bots keep your
+        bonus). Loaded rows carry { value (with bonus), base, bonus, tier, by }
+        so counts().take / the payout include it automatically.
+      • WALK SPEED — every speed this file writes is scaled by the player's
+        SpeedMult (Fox Speed mask) × TrailSpeedMult (trail) attributes.
+        LootService:refreshWalkSpeed(player) re-applies the right number (bag
+        or no bag); CosmeticsService calls it after trail changes / respawns /
+        SpeedMult flips. Crouch still caps at 8 (FeelService sees our write as
+        the new "real" speed).
+
     PUBLIC API:
         LootService:init(callbacks, ShopService)
         LootService:arm(jobRefs) / :disarm() / :reset()
@@ -35,6 +49,9 @@
         LootService:isCarrying(player) -> bool
         LootService:clearLoaded()
         LootService.info(kind) -> { value, speed, color }   (never nil; LOOT_DEFAULT fallback)
+      v2.2 gear:
+        LootService:refreshWalkSpeed(player)      -- re-apply bag/no-bag speed with every multiplier
+        LootService:refreshCarriedBag(player)     -- rebuild the carried bag (new tier size/look)
       v2.0 bots:
         LootService:transferToBot(player, botModel) -> kind | nil   -- player's bag onto the bot
         LootService:botCarrying(botModel) -> kind | nil
@@ -139,9 +156,21 @@ end
 -- ── carrying ─────────────────────────────────────────────────────────
 -- v2.0 masks: Kitsune "FOX SPEED" — MaskService sets the SpeedMult attribute
 -- (1.2) while the power is on; every speed this file writes is scaled by it.
+-- v2.2: × the trail's TrailSpeedMult (CosmeticsService) — multiplicative with Fox Speed
 local function speedMult(player)
     local m = tonumber(player:GetAttribute("SpeedMult"))
-    return (m and m > 0) and m or 1
+    local t = tonumber(player:GetAttribute("TrailSpeedMult"))
+    return ((m and m > 0) and m or 1) * ((t and t > 0) and t or 1)
+end
+
+-- v2.2 bag tiers (CosmeticsService) — { valueMult, scale, id }
+local function bagTier(player)
+    local C = player and optionalService("CosmeticsService")
+    if C and type(C.bagTier) == "function" then
+        local ok, t = pcall(C.bagTier, C, player)
+        if ok and type(t) == "table" then return t end
+    end
+    return { valueMult = 1, scale = 1, id = nil }
 end
 
 local function carrySpeed(player, kind)
@@ -153,11 +182,12 @@ local function carrySpeed(player, kind)
     return (base - slow) * speedMult(player)
 end
 
-local function makeBag(kind, cframe)
+local function makeBag(kind, cframe, scale)
+    scale = math.clamp(tonumber(scale) or 1, 0.5, 2)
     local col = UITheme.rgb(info(kind).color or { 255, 255, 255 })
     local bag = Instance.new("Part")
     bag.Name = "LootBag"
-    bag.Size = Vector3.new(2.2, 1.3, 1.2)
+    bag.Size = Vector3.new(2.2, 1.3, 1.2) * scale
     bag.Material = Enum.Material.Fabric
     bag.Color = Color3.fromRGB(28, 30, 36)
     bag.CanCollide = false
@@ -168,7 +198,7 @@ local function makeBag(kind, cframe)
     bag.CFrame = cframe or CFrame.new()
     local strap = Instance.new("Part")
     strap.Name = "Strap"
-    strap.Size = Vector3.new(2.25, 0.25, 1.25)
+    strap.Size = Vector3.new(2.25 * scale, 0.25, 1.25 * scale)
     strap.Material = Enum.Material.Fabric
     strap.Color = col
     strap.CanCollide = false
@@ -188,7 +218,7 @@ local function setCarrying(player, kind)
     if old and old.bag then old.bag:Destroy() end
     carriers[player] = nil
     player:SetAttribute("CarryingLoot", kind)
-    if hum then
+    if hum and hum.Health > 0 then
         hum.WalkSpeed = kind and carrySpeed(player, kind)
             or (DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0)) * speedMult(player)
         hum.UseJumpPower = false
@@ -197,7 +227,9 @@ local function setCarrying(player, kind)
     if not kind or not char then return end
     local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
     if not torso then return end
-    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1))
+    -- v2.2: bigger tiers are bigger (and sit a little further back so they don't eat the torso)
+    local scale = bagTier(player).scale
+    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1 + (scale - 1) * 0.6), scale)
     local weld = Instance.new("WeldConstraint")
     weld.Part0, weld.Part1 = torso, bag
     weld.Parent = bag
@@ -208,7 +240,7 @@ end
 
 -- owner (v2.1): the player whose bag skin it keeps (throw / drop / death) — optional
 local function spawnLoose(kind, cframe, velocity, owner)
-    local bag = makeBag(kind, cframe)
+    local bag = makeBag(kind, cframe, owner and bagTier(owner).scale or 1)
     if owner then styleBag(owner, bag) end
     bag.Massless = false
     bag.CanCollide = true
@@ -316,12 +348,18 @@ local function addPile(kind, visual, standCFrame, isVault, isCase, glass)
 end
 
 -- ── car ──────────────────────────────────────────────────────────────
-local function loadInto(trunk, kind, player, botName)
-    local value = info(kind).value or 0
-    table.insert(loaded, { kind = kind, value = value, bot = botName })
+-- v2.2: the bag's tier pays — `owner` = whose bag it is (the loader, or a bot's owner)
+local function loadInto(trunk, kind, player, botName, owner, tierOverride)
+    local base = info(kind).value or 0
+    local tier = tierOverride or bagTier(owner)
+    local mult = math.max(1, tonumber(tier.valueMult) or 1)
+    local value = math.floor(base * mult + 0.5)
+    table.insert(loaded, { kind = kind, value = value, base = base, bonus = value - base, tier = tier.id,
+        bot = botName, by = owner and owner.Name or nil })
     local car = trunk and trunk:FindFirstAncestorOfClass("Model")
     if car then car:SetAttribute("Bags", #loaded) end
-    cb.onEvent("load", player, { kind = kind, value = value, pos = trunk and trunk.Position, bot = botName })
+    cb.onEvent("load", player, { kind = kind, value = value, base = base, bonus = value - base,
+        tier = tier.id, tierName = tier.name, pos = trunk and trunk.Position, bot = botName })
 end
 
 function LootService:attachTrunk(trunk)
@@ -345,7 +383,7 @@ function LootService:attachTrunk(trunk)
         end
         local kind = c.kind
         setCarrying(player, nil)
-        loadInto(trunk, kind, player, nil)
+        loadInto(trunk, kind, player, nil, player)
     end))
 end
 
@@ -366,12 +404,14 @@ function LootService:transferToBot(player, botModel)
     if not torso then return nil end
     local kind = c.kind
     setCarrying(player, nil)
-    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1))
+    local tier = bagTier(player)   -- it's still YOUR bag on the bot (tier fixed at hand-over)
+    local scale = tier.scale
+    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1 + (scale - 1) * 0.6), scale)
     local weld = Instance.new("WeldConstraint")
     weld.Part0, weld.Part1 = torso, bag
     weld.Parent = bag
     bag.Parent = botModel
-    botBags[botModel] = { kind = kind, bag = bag, owner = player }
+    botBags[botModel] = { kind = kind, bag = bag, owner = player, tier = tier }
     botModel:SetAttribute("CarryingLoot", kind)
     styleBag(player, bag)
     return kind
@@ -388,7 +428,7 @@ function LootService:botLoad(botModel, trunk)
     if not b or not trunk or not trunk.Parent then return false end
     clearBotBag(botModel)
     local owner = (b.owner and b.owner.Parent) and b.owner or nil
-    loadInto(trunk, b.kind, owner, botModel:GetAttribute("BotName") or botModel.Name)
+    loadInto(trunk, b.kind, owner, botModel:GetAttribute("BotName") or botModel.Name, owner, b.tier)
     return true
 end
 
@@ -427,7 +467,10 @@ end
 -- v1.1: for the payout breakdown
 function LootService:getLoaded()
     local out = {}
-    for _, l in ipairs(loaded) do table.insert(out, { kind = l.kind, value = l.value, bot = l.bot }) end
+    for _, l in ipairs(loaded) do
+        table.insert(out, { kind = l.kind, value = l.value, bot = l.bot, base = l.base, bonus = l.bonus,
+            tier = l.tier, by = l.by })
+    end
     return out
 end
 
@@ -444,6 +487,23 @@ end
 
 function LootService:isCarrying(player)
     return carriers[player] ~= nil
+end
+
+-- v2.2: the right WalkSpeed for right now (bag or not) × SpeedMult × TrailSpeedMult
+function LootService:refreshWalkSpeed(player)
+    local char = player and player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+    local c = carriers[player]
+    local want = c and carrySpeed(player, c.kind)
+        or (DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0)) * speedMult(player)
+    if math.abs(hum.WalkSpeed - want) > 1e-3 then hum.WalkSpeed = want end
+end
+
+-- v2.2: new bag tier equipped mid-carry → rebuild it (size + skin)
+function LootService:refreshCarriedBag(player)
+    local c = player and carriers[player]
+    if c then setCarrying(player, c.kind) end
 end
 
 function LootService:clearLoaded()
