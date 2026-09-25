@@ -435,7 +435,9 @@ Constants.MASKS = {
       ability = { id = "toughguy",    name = "TOUGH GUY",   desc = "The first time a guard catches you, you break free!" } },
     { id = "Owl",       assetId = 28944404,   name = "Night Owl",       price = 3000,
       ability = { id = "nightvision", name = "NIGHT VISION", desc = "Dark spots hide you even better" } },
-    { id = "Kitsune",   assetId = 3210207381, name = "Kitsune",         price = 5000,
+    -- (v3.0.1) was Roblox "Kitsune Mask" 3210207381 — a SIDE-worn mask, sat on the side of the head.
+    -- Now the Roblox "Steampunk Fox Mask" (covers the face). Same id so owners keep it.
+    { id = "Kitsune",   assetId = 2830768205, name = "Steam Fox",         price = 5000,
       ability = { id = "foxspeed",    name = "FOX SPEED",   desc = "You run 20% faster" } },
     { id = "Pixel",     assetId = 1744163817, name = "8-Bit Skull",     price = 7500,
       ability = { id = "powerthrow",  name = "POWER THROW", desc = "Throw bags twice as far" } },
@@ -512,12 +514,12 @@ Constants.COLORS = {
 
 -- ───── Sound IDs (Roblox marketplace assets — known free) ─────
 Constants.SOUNDS = {
-    LOBBY_AMBIENT = "rbxassetid://9046657187",  -- chill background loop
+    LOBBY_AMBIENT = "rbxassetid://1846431634",  -- (v3.0.1) APM "Miami Nights A" (old id was not audio)  -- chill background loop
     ALARM         = "rbxassetid://138081509",   -- police siren / klaxon
     CASH_CHA_CHING = "rbxassetid://131886985",  -- cash register
     VAULT_CRACK   = "rbxassetid://3744371091",  -- mechanical click
-    HEIST_WIN     = "rbxassetid://9118819406",  -- triumphant sting
-    HEIST_FAIL    = "rbxassetid://5466067944",  -- fail buzzer
+    HEIST_WIN     = "rbxasset://sounds/victory.wav",  -- (v3.0.1) built-in  -- triumphant sting
+    HEIST_FAIL    = "rbxassetid://116298781032555",  -- (v3.0.1) sad trombone (verified loads)  -- fail buzzer
 }
 
 return Constants

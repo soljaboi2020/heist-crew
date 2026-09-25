@@ -10,7 +10,7 @@
       • BAGS     💰 how many bags are in the car ("Bags" model attribute)
       • CREW     👥 how many of the crew are sitting in the car
                  ("CrewIn" / "CrewNeed", kept fresh by JobService)
-      • GO!      a big green button. Everyone in the car = it goes by itself;
+      • GO!      a big green button. Auto-go only on alarm / all loot in;
                  or the driver (anyone, if the driver seat is empty) presses
                  GO! once at least one bag is loaded. Enter / gamepad X / tap.
                  Fires the "Getaway" remote { action = "go" }.
@@ -262,11 +262,17 @@ function CarHud:_update()
         ui.hint.Text = "Start a heist to use the getaway car"
     elseif n < 1 then
         ui.hint.Text = "Bring loot! Put a bag in the trunk (E)"
-    elseif need > 0 and crewIn >= need then
+    elseif need > 0 and crewIn >= need and car:GetAttribute("AutoGo") == true then
         ui.hint.Text = "Everyone's in! Here we go…"
     else
-        ui.hint.Text = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-            and "Everyone in the car = we go! Or tap GO!" or "Everyone in the car = we go! Or press GO! (Enter)"
+        -- (v3.0.1) the escape only starts itself when the alarm is on or ALL loot is in;
+        -- otherwise the server's hint tells you to press GO! when you're ready
+        local h = car:GetAttribute("GetawayHint")
+        if type(h) ~= "string" or h == "" then h = "Press GO! when you're ready (Enter)" end
+        if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+            h = h:gsub("Press GO! when you're ready %(Enter%)", "Tap GO! when you're ready"):gsub("press GO! %(Enter%)", "tap GO!")
+        end
+        ui.hint.Text = h
     end
 end
 

@@ -61,6 +61,10 @@
         The +$5,000 is NOT in counts().take — JobService adds
         TargetService:bonusFor(run) (see TargetService).
       • BAG LOOKS — the bag bulges with value and cash bundles poke out.
+        (playtest fix 2026-09-25: the carried bag covered half the third-person
+        screen.) A bag reads as a backpack/duffel: ~1.9 × 1.3 × 0.9 studs, and
+        value + bag tier + heavy together grow it at most ×1.3 (BAG_MAX_GROWTH),
+        so the biggest bag is ~2.5 studs wide. It sits snug on the back.
       • Carrier attributes for the HUD (player): CarryingLoot (kind, as before),
         CarryName, CarryValue, CarryHeavy, CarryFragile, CarryIntegrity,
         CarryJackpot, CarryTarget, CarryPartner (the other lifter's name);
@@ -72,7 +76,7 @@
         LootService:setVaultOpen(open)
         LootService:attachTrunk(trunkPart)
         LootService:drop(player)                 -- caught / left / reset (fragile: a bump)
-        LootService:counts() -> { total, loaded, take, taken, cases, casesTaken, vault, vaultTaken, open, openTaken,
+        LootService:counts() -> { total, loaded, allLoaded, take, taken, cases, casesTaken, vault, vaultTaken, open, openTaken,
                                   targetSecured, targetBonus, jackpot }     (take does NOT include targetBonus)
         LootService:getLoaded() -> { {kind, name, value, base, bonus, tier, bot?, by?, target?, jackpot?, integrity} }
         LootService:remaining() -> { {pos, kind, name, isCase, locked, heavy, target} }
@@ -336,17 +340,35 @@ local function setSpeed(player, item)
     hum.JumpHeight = item and (item.heavy and 2.5 or 4) or 7.2
 end
 
--- v3: the bag bulges with value, and cash bundles poke out of the top
+-- v3: the bag bulges with value, and cash bundles poke out of the top.
+-- (playtest fix 2026-09-25) a backpack, not a boulder: base ~1.9 x 1.3 x 0.9 and
+-- value (≤ +15%) × bag tier (half its scale, ≤ +20%) × heavy (+15%), capped ×1.3.
+local BAG_BASE = Vector3.new(1.9, 1.3, 0.9)
+local BAG_MAX_GROWTH = 1.3
+local function bagGrowth(item, value, scale)
+    local bulge = 1 + math.clamp((value - 1000) / 20000, 0, 0.15)
+    if item.heavy then bulge = math.max(bulge, 1.15) end
+    local tier = 1 + (math.clamp(tonumber(scale) or 1, 0.8, 1.4) - 1) * 0.5
+    return math.clamp(bulge * tier, 0.9, BAG_MAX_GROWTH)
+end
+-- where a bag sits on a torso: snug against the back, a touch low (so the
+-- third-person camera looks OVER it, not through it)
+local function backOffset(item, scale)
+    local g = bagGrowth(item, itemValue(item, 1), scale)
+    return CFrame.new(0, -0.15, 0.5 + BAG_BASE.Z * g / 2)
+end
+LootService._bagGrowth = bagGrowth   -- (tests)
+LootService.BAG_MAX_GROWTH = BAG_MAX_GROWTH
+
 local function makeBag(item, cframe, scale)
-    scale = math.clamp(tonumber(scale) or 1, 0.5, 2)
     local kind = item.kind
     local value = itemValue(item, 1)
-    local bulge = 1 + math.clamp((value - 1000) / 10000, 0, 0.45)
-    if item.heavy then bulge = math.max(bulge, 1.35) end
+    local g = bagGrowth(item, value, scale)
+    scale = g   -- bundles / bands follow the bag
     local col = UITheme.rgb(info(kind).color or { 255, 255, 255 })
     local bag = Instance.new("Part")
     bag.Name = "LootBag"
-    bag.Size = Vector3.new(2.2 * bulge, 1.3 * bulge, 1.2 * (1 + (bulge - 1) * 0.6)) * scale
+    bag.Size = BAG_BASE * g
     bag.Material = Enum.Material.Fabric
     bag.Color = Color3.fromRGB(28, 30, 36)
     bag.CanCollide = false
@@ -368,7 +390,7 @@ local function makeBag(item, cframe, scale)
     end
     local strap = Instance.new("Part")
     strap.Name = "Strap"
-    strap.Size = Vector3.new(bag.Size.X + 0.05, 0.25, bag.Size.Z + 0.05)
+    strap.Size = Vector3.new(bag.Size.X + 0.05, 0.2, bag.Size.Z + 0.05)
     strap.Material = Enum.Material.Fabric
     strap.Color = col
     strap.CFrame = bag.CFrame
@@ -377,15 +399,15 @@ local function makeBag(item, cframe, scale)
     for i = 1, bundles do
         local b = Instance.new("Part")
         b.Name = "CashBundle"
-        b.Size = Vector3.new(0.75, 0.28, 0.42) * scale
+        b.Size = Vector3.new(0.55, 0.22, 0.32) * scale
         b.Material = Enum.Material.Fabric
         b.Color = Color3.fromRGB(96, 170, 96)
-        local x = (i - (bundles + 1) / 2) * 0.6 * scale
+        local x = (i - (bundles + 1) / 2) * 0.5 * scale
         b.CFrame = bag.CFrame * CFrame.new(x, bag.Size.Y / 2 + 0.05, 0) * CFrame.Angles(0, 0, math.rad((i % 2 == 0) and 25 or -20))
         weldOn(b)
         local band = Instance.new("Part")
         band.Name = "Band"
-        band.Size = Vector3.new(0.12, 0.3, 0.44) * scale
+        band.Size = Vector3.new(0.1, 0.24, 0.34) * scale
         band.Material = Enum.Material.SmoothPlastic
         band.Color = Color3.fromRGB(240, 220, 150)
         band.CFrame = b.CFrame
@@ -464,9 +486,9 @@ local function attachBag(player, c)
     local char = player.Character
     local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso"))
     if not torso then return end
-    -- v2.2: bigger tiers are bigger (and sit a little further back so they don't eat the torso)
+    -- v2.2: bigger tiers are (a little) bigger; backOffset keeps it snug on the back
     local scale = bagTier(player).scale
-    local bag = makeBag(c.item, torso.CFrame * CFrame.new(0, 0, 1 + (scale - 1) * 0.6), scale)
+    local bag = makeBag(c.item, torso.CFrame * backOffset(c.item, scale), scale)
     local weld = Instance.new("WeldConstraint")
     weld.Part0, weld.Part1 = torso, bag
     weld.Parent = bag
@@ -970,7 +992,7 @@ function LootService:transferToBot(player, botModel)
     releaseHelper(botModel)
     local tier = bagTier(player)   -- it's still YOUR bag on the bot (tier fixed at hand-over)
     local scale = tier.scale
-    local bag = makeBag(item, torso.CFrame * CFrame.new(0, 0, 1 + (scale - 1) * 0.6), scale)
+    local bag = makeBag(item, torso.CFrame * backOffset(item, scale), scale)
     local weld = Instance.new("WeldConstraint")
     weld.Part0, weld.Part1 = torso, bag
     weld.Parent = bag
@@ -1035,7 +1057,10 @@ function LootService:counts()
         end
     end
     local secured = TargetService:isSecured()
-    return { total = #piles, loaded = #loaded, take = take, taken = taken, cases = cases, casesTaken = casesTaken,
+    -- allLoaded (playtest fix 2026-09-25): every bag of this job is in the trunk —
+    -- JobService lets "everyone sat down" start the escape by itself only then
+    -- (or when the alarm is on)
+    return { total = #piles, loaded = #loaded, allLoaded = #piles > 0 and #loaded >= #piles, take = take, taken = taken, cases = cases, casesTaken = casesTaken,
         vault = vault, vaultTaken = vaultTaken, open = open, openTaken = openTaken,
         targetSecured = secured == true, targetBonus = TargetService:bonusFor(nil),
         jackpot = LootShuffle:info().jackpotName }

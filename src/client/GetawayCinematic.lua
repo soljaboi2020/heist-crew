@@ -23,7 +23,15 @@
                hop (crew jump into the boat / helicopter) · sirens on/off ·
                shake · wake · stamp ("GOT AWAY!")
       shots    fixed (CFrame → CFrame) · look (camera a → b, looking at a track)
-               · chase (behind a track, offsets o1 → o2); a new shot = a hard cut
+               · chase (behind a track, offsets o1 → o2) · lookback (rides on the
+               far side of a track from a focus point, looking back through it at
+               the focus — the held final shot: boat + wake, skyline behind).
+               A new shot = a cut, and (playtest fix 2026-09-25) every cut after
+               the first happens UNDER BLACK: the frame of the cut is fully black,
+               then it fades in over CUT_DIP s — no glitch frame between shots.
+               The camera is also never left inside a part: if the spot a shot
+               asks for is inside something solid, it is pulled in toward the
+               subject along the line of sight (unclip).
       captions bottom of the screen; "📻 …" goes in the radio chip instead
 
     Letterbox bars, other HUDs hidden (restored after), controls off, SKIP
@@ -58,6 +66,7 @@ local GetawayCinematic = {}
 local localPlayer = Players.LocalPlayer
 
 local SKIP_AFTER = 3
+local CUT_DIP = 0.18          -- black dip on every cut (seconds to fade back in)
 local FAR = CFrame.new(0, -5000, 0)
 local RED = Color3.fromRGB(255, 40, 60)
 local BLUE = Color3.fromRGB(60, 110, 255)
@@ -123,6 +132,27 @@ local function flatCF(cf)
     local f = Vector3.new(look.X, 0, look.Z)
     if f.Magnitude < 1e-3 then f = Vector3.new(0, 0, -1) end
     return CFrame.lookAt(cf.Position, cf.Position + f.Unit)
+end
+
+-- never leave the camera inside a part: if `cf` sits inside something visible,
+-- pull it in toward `anchor` (the subject) to just in front of the first hit.
+-- The scene's own copies (s.folder) and hidden real parts are ignored.
+local function unclip(s, cf, anchor)
+    if not anchor or not s.overlap then return cf end
+    local pos = cf.Position
+    local okO, hits = pcall(function() return Workspace:GetPartBoundsInRadius(pos, 0.6, s.overlap) end)
+    if not okO or type(hits) ~= "table" then return cf end
+    local inside = false
+    for _, p in ipairs(hits) do
+        if p.Transparency < 0.9 and p.LocalTransparencyModifier < 0.9 and not p:IsA("Terrain") then inside = true break end
+    end
+    if not inside then return cf end
+    local dir = pos - anchor
+    if dir.Magnitude < 1 then return cf end
+    local okR, hit = pcall(function() return Workspace:Raycast(anchor, dir, s.rayParams) end)
+    if not okR or not hit then return cf end   -- (bounding-box false alarm: leave it)
+    local safe = hit.Position - dir.Unit * 0.8
+    return CFrame.lookAt(safe, safe + cf.LookVector)
 end
 
 -- ══════════════════════════════════════════════════════════════════════
@@ -482,6 +512,24 @@ function GetawayCinematic:play(msg)
         pcall(function() s.radioSnd:Play() end)
     end
 
+    -- (unclip) ignore the scene's own copies + the hidden real car / crew / boat
+    pcall(function()
+        local ignore = { folder }
+        if typeof(realCar) == "Instance" then table.insert(ignore, realCar) end
+        for _, p in ipairs(crewList) do
+            if typeof(p) == "Instance" and p:IsA("Player") and p.Character then table.insert(ignore, p.Character) end
+        end
+        local f = ReplicatedStorage:FindFirstChild("HC_GetawayProps")
+        local ov = f and f:FindFirstChild("RealBoat")
+        if ov and ov:IsA("ObjectValue") and ov.Value then table.insert(ignore, ov.Value) end
+        s.overlap = OverlapParams.new()
+        s.overlap.FilterType = Enum.RaycastFilterType.Exclude
+        s.overlap.FilterDescendantsInstances = ignore
+        s.rayParams = RaycastParams.new()
+        s.rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        s.rayParams.FilterDescendantsInstances = ignore
+    end)
+
     -- ── hide the HUD, take the camera, stop the controls ──
     for _, g in ipairs(localPlayer.PlayerGui:GetChildren()) do
         if g:IsA("ScreenGui") and not KEEP_GUIS[g.Name] and g.Enabled then
@@ -715,9 +763,14 @@ function GetawayCinematic:_frame(s, dt)
         if t >= sh.t0 and t < sh.t1 then shot, idx = sh, k end
     end
     if not shot and #shots > 0 then shot, idx = shots[#shots], #shots end
+    local dipA = 0
     if shot then
         local cut = s.lastShot ~= idx
+        -- every cut after the first lands on a black frame and fades in
+        if cut and s.lastShot ~= nil then s.dipFrom = t end
         s.lastShot = idx
+        if s.dipFrom then dipA = 1 - math.clamp((t - s.dipFrom) / CUT_DIP, 0, 1) end
+        local anchor = nil
         local su = smooth((t - shot.t0) / math.max(0.1, shot.t1 - shot.t0))
         if shot.t1 - shot.t0 > 12 then su = math.clamp((t - shot.t0) / 12, 0, 1) end   -- long holds drift slowly
         local want
@@ -729,6 +782,7 @@ function GetawayCinematic:_frame(s, dt)
             if tgt then
                 s.lastTarget = tgt
                 local at = tgt.Position + Vector3.new(0, shot.lookUp or 1.5, 0)
+                anchor = at
                 if (at - pos).Magnitude > 0.1 then want = CFrame.lookAt(pos, at) end
             end
         elseif shot.mode == "chase" then
@@ -740,9 +794,31 @@ function GetawayCinematic:_frame(s, dt)
                 if not cut and s.camCF then
                     want = s.camCF:Lerp(want, 1 - math.exp(-(dt or 0.016) * 9))
                 end
+                anchor = tgt.Position + Vector3.new(0, 2, 0)
+            end
+        elseif shot.mode == "lookback" then
+            -- ride along on the far side of the target from the focus, looking back
+            -- through it at the focus (boat + wake in front, the skyline behind)
+            local tgt = poses[shot.target] or s.lastTarget
+            local focus = typeof(shot.focus) == "Vector3" and shot.focus or Vector3.zero
+            if tgt then
+                s.lastTarget = tgt
+                local tp = tgt.Position
+                local toF = Vector3.new(focus.X - tp.X, 0, focus.Z - tp.Z)
+                toF = toF.Magnitude > 1 and toF.Unit or Vector3.new(0, 0, 1)
+                local side = Vector3.new(-toF.Z, 0, toF.X)
+                local camY = tonumber(shot.y) or (tp.Y + 8)
+                local camP = Vector3.new(tp.X, camY, tp.Z) - toF * (shot.dist or 24) + side * (shot.side or 0)
+                local at = Vector3.new(tp.X, 0, tp.Z) + toF * (shot.ahead or 70) + Vector3.new(0, shot.lookY or 6, 0)
+                want = CFrame.lookAt(camP, at)
+                if not cut and s.camCF then
+                    want = s.camCF:Lerp(want, 1 - math.exp(-(dt or 0.016) * 3))
+                end
+                anchor = tp + Vector3.new(0, 2, 0)
             end
         end
         if want then
+            want = unclip(s, want, anchor)
             s.camCF = want
             local shaken = want
             if shake > 0 then
@@ -784,7 +860,8 @@ function GetawayCinematic:_frame(s, dt)
         TweenService:Create(u.stamp, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 110 }):Play()
         task.delay(2.2, function() if u.stamp then u.stamp.Visible = false end end)
     end
-    u.black.BackgroundTransparency = (fadeA > 0) and (1 - fadeA) or (t < 0.45 and u.black.BackgroundTransparency or 1)
+    local blackA = math.max(fadeA, dipA)
+    u.black.BackgroundTransparency = (blackA > 0) and (1 - blackA) or (t < 0.45 and u.black.BackgroundTransparency or 1)
     u.skip.Visible = t >= SKIP_AFTER and t < D - 0.5
 
     -- the end: hold the final shot under the payout, then hand the camera back

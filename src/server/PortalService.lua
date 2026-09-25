@@ -243,10 +243,11 @@ local function tick()
             end, "portal")
             if started then
                 countdownWait = want
-                if want <= (P.ALL_COUNTDOWN or 5) then
-                    sayAll(string.format("Everyone's in! Going in %d…", want), "gold", 3)
-                else
-                    sayAll(string.format("Going in %d! Step in the portal to come along.", want), "gold", 3)
+                -- (playtest fix 2026-09-25) NO number in a toast: a toast is a frozen
+                -- snapshot, and it sat next to the live "Heist starting in 3!" bar
+                -- showing a different number. The objective bar + PortalHud count down.
+                if want > (P.ALL_COUNTDOWN or 5) then
+                    sayAll("Step in the portal to come along!", "gold", 3)
                 end
             end
         end

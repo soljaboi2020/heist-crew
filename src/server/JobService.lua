@@ -15,13 +15,18 @@
         • DRILL the vault/safe: it runs on its own, it JAMS (fix it), door
           swings open → loot unlocks
         • carry bags to the getaway car → "Load bag" (or give it to a bot)
-        • v3.0 THE GETAWAY (no driving): everyone still in the run sits in the
-          car (with a bag loaded, or the alarm going), or the driver presses the
-          big GO! button with ≥ 1 bag → GetawayService runs the 8 s escape vote
+        • v3.0 THE GETAWAY (no driving): the driver (or anyone, if the driver
+          seat is empty) presses the big GO! button with ≥ 1 bag loaded. It only
+          goes BY ITSELF when everyone still in the run is in the car AND either
+          the alarm is on (loud escape) or every bag of the job is in the trunk
+          (playtest fix 2026-09-25: a solo player sat down with 1 of 5 bags and
+          the vote popped instantly) → GetawayService runs the 8 s escape vote
           (Boat / Helicopter / Highway) and the movie, then the run ends and the
           loaded bags pay out (+ car / helicopter / target bonuses)
       v2.0 rules (V2_SPEC §6), simple enough for a 7-year-old:
-        • a GUARD sees / grabs you  → back to the sneakIn door (kickBack, v1.2.5)
+        • a GUARD sees / grabs you  → back to the sneakIn door (kickBack, v1.2.5).
+          That is NOT a catch: it never locks the helicopter (playtest fix
+          2026-09-25). Only a real catch — jail, or "out" — does.
         • a COP grabs you           → JAIL (JailService). A teammate holds E at
           your cell door to break you out (you respawn at sneakIn). Nobody frees
           you in 30 s → released to the club, out of this run. If nobody is left
@@ -66,7 +71,9 @@
         JobService:triggerAlarm(reason?, player?) · JobService:catchPlayer(player, by?)   (tests)
         Car model attributes kept fresh during a run (CarHud reads them):
             CrewIn, CrewNeed (seated / still-in-the-run crew), GetawayPhase
-            ("wait" | "vote" | "decided" | "scene" | ""), GetawayLoud, HeliOk
+            ("wait" | "vote" | "decided" | "scene" | ""), GetawayLoud, HeliOk,
+            AutoGo (bool: sitting down = it goes by itself — alarm on, or every
+            bag loaded), GetawayHint (string: the line the car HUD should show)
         Payout (HeistState COMPLETE payload) adds: route, getaway = { route,
             routeName, icon, loud, carName, carType, rows = {{label, amount, icon}} },
             target = { name, amount }?, bonusEach
@@ -702,7 +709,8 @@ local function kickBack(player, guard, grabbed)
             return
         end
     end
-    if grabbed then run.caught = true end   -- v3.0: a guard GRAB locks the helicopter (being spotted doesn't)
+    -- (playtest fix 2026-09-25) being sent back to the door is NOT a catch: it
+    -- never locks the helicopter. Only catchPlayer (jail / out) sets run.caught.
     S.loot:drop(player)
     S.security:dropKeycard(player)
     if guard then S.guards:stun(guard, 3) end   -- he doesn't grab you again on the way out
@@ -816,20 +824,31 @@ local function seatedInCar(player)
     return seat ~= nil and car ~= nil and car.model ~= nil and seat:IsDescendantOf(car.model)
 end
 
--- seated / still-in-the-run crew, bags in the car
+-- seated / still-in-the-run crew, bags in the car, every bag of the job loaded?
 local function getawayStatus()
     local active = activeCrew()
     local inCar = 0
     for _, p in ipairs(active) do if seatedInCar(p) then inCar = inCar + 1 end end
     local okC, c = pcall(function() return S.loot:counts() end)
-    return inCar, #active, (okC and c and c.loaded) or 0
+    local loaded = (okC and c and c.loaded) or 0
+    local total = (okC and c and c.total) or 0
+    local allLoaded = (okC and c and c.allLoaded == true) or (total > 0 and loaded >= total)
+    return inCar, #active, loaded, allLoaded
+end
+
+-- (playtest fix 2026-09-25) sitting down only starts the escape by itself when
+-- the alarm is on (a LOUD escape: no time to wait) or every bag is loaded
+-- (nothing left to grab). Otherwise the crew presses GO! when it's ready.
+local function autoGoNow(allLoaded)
+    return run ~= nil and (run.alarm == true or allLoaded == true)
 end
 
 syncCarAttrs = function()
     local m = car and car.model
     if not m or not m.Parent then return end
     if run then
-        local inCar, need = getawayStatus()
+        local inCar, need, bags, allLoaded = getawayStatus()
+        local autoGo = autoGoNow(allLoaded)
         local phase = "wait"
         if run.getaway then
             local G = Getaway()
@@ -841,12 +860,27 @@ syncCarAttrs = function()
         m:SetAttribute("GetawayPhase", phase)
         m:SetAttribute("GetawayLoud", run.alarm == true)
         m:SetAttribute("HeliOk", not run.caught)
+        m:SetAttribute("AutoGo", autoGo)
+        local hint
+        if bags < 1 then
+            hint = run.alarm and "Alarm! Everyone in the car = we go!" or "Bring loot! Put a bag in the trunk (E)"
+        elseif autoGo and need > 0 and inCar >= need then
+            hint = "Everyone's in! Here we go…"
+        elseif autoGo then
+            hint = run.alarm and "Alarm! Everyone in the car = we go! Or press GO! (Enter)"
+                or "All the loot's in! Everyone in the car = we go!"
+        else
+            hint = "Press GO! when you're ready (Enter)"
+        end
+        m:SetAttribute("GetawayHint", hint)
     else
         m:SetAttribute("CrewIn", 0)
         m:SetAttribute("CrewNeed", 0)
         m:SetAttribute("GetawayPhase", "")
         m:SetAttribute("GetawayLoud", false)
         m:SetAttribute("HeliOk", true)
+        m:SetAttribute("AutoGo", false)
+        m:SetAttribute("GetawayHint", "")
     end
 end
 
@@ -916,8 +950,10 @@ end
 
 checkGetaway = function()
     if not run or run.getaway or not car or launching then return end
-    local inCar, need, bags = getawayStatus()
-    if need > 0 and inCar >= need and (bags >= 1 or run.alarm) then
+    local inCar, need, _, allLoaded = getawayStatus()
+    -- all seated is NOT enough on its own (playtest fix 2026-09-25): the alarm
+    -- must be on, or every bag of the job must be in the trunk. Otherwise: GO!
+    if need > 0 and inCar >= need and autoGoNow(allLoaded) then
         if not run.allInSince then
             run.allInSince = os.clock()
             task.delay(1.05, function() pcall(checkGetaway) end)
@@ -1394,8 +1430,8 @@ local function checkLaunch()
         -- start a countdown, or shorten a running one when the last person readies
         if launchAt == 0 or target < launchAt - 0.5 then
             countdownTo(wait, "ready", nil)
-            notifyAll(allReady() and string.format("Everyone's ready — going in %d!", wait)
-                or string.format("Going in %d — get ready to come along!", wait), "gold", 3)
+            -- (playtest fix 2026-09-25) no number here: the objective bar counts down live
+            if not allReady() then notifyAll("Get ready to come along!", "gold", 3) end
         end
     elseif launchAt ~= 0 then
         launchAt = 0

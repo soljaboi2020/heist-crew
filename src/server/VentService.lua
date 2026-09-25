@@ -3,8 +3,13 @@
     ────────────────────────────────────────────────
     Makes every crawl vent / roof hatch usable. Job builders tag BOTH ends of a
     vent with CollectionService "Vent" and set attribute Pair = the Name of the
-    other end (docs/V2_SPEC.md §2). This adds a "Crawl through" prompt (E) on
+    other end (docs/V2_SPEC.md §2). This adds a "Crawl through" prompt on
     each end; using it fades you over to the other end.
+
+    KEY (playtest fix, 2026-09-25): vent / hatch prompts use their OWN key —
+    V on keyboard, ButtonY on gamepad — and a short 6-stud reach, so they never
+    compete with an E loot prompt standing next to them (Sunny's Mart's Golden
+    Ticket sat beside the roof hatch and E climbed to the roof instead).
 
     Where you come out: the other end's Position + its LookVector * 2.5 (builders
     point each vent part's LookVector at the spot a player should appear), lifted
@@ -62,9 +67,10 @@ local function attach(part)
     p.Name = "VentPrompt"
     p.ActionText = part:GetAttribute("Label") or "Crawl through"
     p.ObjectText = "Vent"
-    p.KeyboardKeyCode = Enum.KeyCode.E
+    p.KeyboardKeyCode = Enum.KeyCode.V        -- NOT E: E is the loot / door key
+    p.GamepadKeyCode = Enum.KeyCode.ButtonY   -- (ButtonX is the default "interact")
     p.HoldDuration = 0.5
-    p.MaxActivationDistance = 8
+    p.MaxActivationDistance = 6
     p.RequiresLineOfSight = false
     p.Parent = part
     p.Triggered:Connect(function(player)

@@ -554,29 +554,45 @@ function MiamiBuilder:_streetExtension(f)
     streetlight(f, 140, -1); streetlight(f, 140, 1)
 end
 
--- Rain-slick puddles: near-black glossy glass that catches the neon + lamp
--- highlights (Future lighting renders specular on Glass). Flat, no collision.
+-- Rain-slick puddles (v3.1). The old ones were Cylinder parts: Roblox draws a
+-- cylinder with diameter = min(Y, Z), so every one came out a perfect circle,
+-- and near-black Glass at 0.25 transparency read as HOLES in the asphalt under
+-- Future lighting. Now: a few flattened ellipsoids (SpecialMesh sphere, so the
+-- edge feathers into the road), a shade darker than the asphalt, never black,
+-- semi-transparent + reflective so they pick up neon and lamp highlights.
+-- Each spot = one main oval + a smaller offset lobe → an irregular outline.
+local PUDDLE_COL = Color3.fromRGB(36, 39, 46)   -- asphalt is 46, 48, 52
+local function puddleBlob(f, x, z, len, wid, yaw, y)
+    local p = part({
+        Name = "Puddle", Size = Vector3.new(len, 0.04, wid),
+        CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0),
+        Color = PUDDLE_COL, Material = Enum.Material.SmoothPlastic,
+        Transparency = 0.3, Reflectance = 0.4,
+        CanCollide = false, CastShadow = false, CanQuery = false, CanTouch = false,
+    }, f)
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Sphere
+    mesh.Parent = p
+    return p
+end
+
 function MiamiBuilder:_puddles(f)
+    -- fewer, spread along both lanes (was 12 spots × 2 circles)
     local spots = {
-        { -138, -17 }, { -112, -9.5 }, { -86, -18.5 }, { -64, -10 }, { -40, -19 }, { -17, -9 },
-        { 14, -18 }, { 36, -10.5 }, { 63, -16.5 }, { 92, -8.5 }, { 116, -19 }, { 141, -12 },
+        { -112, -9.5 }, { -64, -17.5 }, { -17, -9 }, { 36, -16.5 }, { 92, -8.5 }, { 141, -12 },
     }
     local rng = Random.new(1985)
     for _, sp in ipairs(spots) do
-        for k = 1, 2 do
-            local d = rng:NextNumber(2.6, 4.6) * ((k == 1) and 1 or 0.7)
-            local ox = (k == 1) and 0 or rng:NextNumber(-1.6, 1.6)
-            local oz = (k == 1) and 0 or rng:NextNumber(-0.8, 0.8)
-            part({
-                Name = "Puddle", Shape = Enum.PartType.Cylinder,
-                Size = Vector3.new(0.02 + k * 0.004, d, d * rng:NextNumber(0.6, 0.9)),
-                CFrame = CFrame.new(sp[1] + ox, 0.205 + k * 0.003, sp[2] + oz)
-                    * CFrame.Angles(0, rng:NextNumber(0, math.pi), math.rad(90)),
-                Color = Color3.fromRGB(16, 18, 32), Material = Enum.Material.Glass,
-                Transparency = 0.25, Reflectance = 0.3,
-                CanCollide = false, CastShadow = false, CanQuery = false, CanTouch = false,
-            }, f)
-        end
+        local len = rng:NextNumber(4.2, 6.4)
+        local wid = len * rng:NextNumber(0.35, 0.55)
+        local yaw = rng:NextNumber(-0.35, 0.35)          -- roughly along the street
+        puddleBlob(f, sp[1], sp[2], len, wid, yaw, 0.2)
+        -- lobe hanging off one end: same plane, so the overlap barely shows
+        local side = (rng:NextNumber() < 0.5) and -1 or 1
+        local ox = side * len * rng:NextNumber(0.3, 0.42)
+        local oz = rng:NextNumber(-0.35, 0.35) * wid
+        puddleBlob(f, sp[1] + ox * math.cos(yaw) + oz * math.sin(yaw), sp[2] - ox * math.sin(yaw) + oz * math.cos(yaw),
+            len * rng:NextNumber(0.4, 0.55), wid * rng:NextNumber(0.6, 0.8), yaw + rng:NextNumber(-0.6, 0.6), 0.198)
     end
 end
 

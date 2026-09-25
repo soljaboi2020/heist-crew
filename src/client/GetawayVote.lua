@@ -3,9 +3,14 @@
     ────────────────────────────────────────────────
     "HOW DO WE ESCAPE?" — three BIG cards while the crew sits in the car:
 
-        🚤 BOAT          always works
+        🚤 BOAT          always works                     pill "SAFE BET"
         🚁 HELICOPTER    +10% cash — 🔒 locked if anyone got caught this run
-        🛣️ HIGHWAY       the car's power ×2
+                                                          pill "+10% CASH"
+        🛣️ HIGHWAY       the car's power ×2               pill "CAR BONUS x2"
+
+    (playtest fix 2026-09-25) A LOCKED card hides its own content and shows a
+    clean dimmed face instead — big 🔒, the route name, ONE short line
+    ("Locked — someone got caught") — so the texts never pile on top of each other.
 
     Tap / click a card (or press 1 · 2 · 3, gamepad: DPad left/up/right) to
     vote; you can change your mind until the timer runs out. Dots under each
@@ -149,7 +154,16 @@ function GetawayVote:_build()
         pill.Parent = card
         UITheme.corner(pill, 19)
         local pillText = UITheme.label({ Name = "Text", Text = "", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
-            FontFace = UITheme.F.display, TextSize = 20, TextColor3 = T.bgDeep })
+            FontFace = UITheme.F.display, TextSize = 20, TextColor3 = T.bgDeep, TextScaled = true })
+        do
+            local cap = Instance.new("UITextSizeConstraint")
+            cap.MaxTextSize = 20
+            cap.Parent = pillText
+            local pad = Instance.new("UIPadding")
+            pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 10), UDim.new(0, 10)
+            pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 6), UDim.new(0, 6)
+            pad.Parent = pillText
+        end
         pillText.Parent = pill
         local dots = UITheme.label({ Name = "Dots", Text = "", Position = UDim2.fromOffset(0, 236), Size = UDim2.new(1, 0, 0, 26),
             TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 24, TextColor3 = COLOR[r] })
@@ -157,23 +171,33 @@ function GetawayVote:_build()
         local key = UITheme.caption(UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and "tap" or ("press " .. i),
             { Position = UDim2.fromOffset(0, 266), Size = UDim2.new(1, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Center })
         key.Parent = card
+        -- the LOCKED face: while it shows, the card's own content is hidden (see _paint)
+        -- so nothing overlaps — a dim panel, a big lock, the name, ONE short line
         local lock = Instance.new("Frame")
         lock.Name = "Lock"
         lock.Size = UDim2.fromScale(1, 1)
         lock.BackgroundColor3 = Color3.new(0, 0, 0)
-        lock.BackgroundTransparency = 0.35
+        lock.BackgroundTransparency = 0.45
         lock.BorderSizePixel = 0
         lock.ZIndex = 4
         lock.Visible = false
         lock.Parent = card
         UITheme.corner(lock, 22)
-        local lockText = UITheme.label({ Name = "Text", Text = "🔒\nLocked", Size = UDim2.fromScale(1, 1),
-            TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, FontFace = UITheme.F.display, TextSize = 26, ZIndex = 4 })
+        local lockIcon = UITheme.label({ Name = "LockIcon", Text = "🔒", Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 80),
+            TextXAlignment = Enum.TextXAlignment.Center, TextSize = 64, ZIndex = 4 })
+        lockIcon.Parent = lock
+        local lockName = UITheme.label({ Name = "LockName", Text = NAME[r], Position = UDim2.fromOffset(0, 128), Size = UDim2.new(1, 0, 0, 34),
+            TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 28, TextColor3 = T.muted, ZIndex = 4 })
+        lockName.Parent = lock
+        local lockText = UITheme.label({ Name = "Text", Text = "Locked — someone got caught", Position = UDim2.fromOffset(16, 172),
+            Size = UDim2.new(1, -32, 0, 48), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 18, TextColor3 = T.text, ZIndex = 4 })
         lockText.Parent = lock
         local cs = Instance.new("UIScale")
         cs.Parent = card
         cards[r] = { card = card, btn = btn, line = line, pill = pill, pillText = pillText, dots = dots, lock = lock,
-            lockText = lockText, scale = cs, stroke = card:FindFirstChild("Stroke") }
+            lockText = lockText, scale = cs, stroke = card:FindFirstChild("Stroke"),
+            content = { icon, name, line, pill, dots, key } }
         btn.Activated:Connect(function() self:vote(r) end)
     end
 
@@ -205,25 +229,28 @@ function GetawayVote:_paint()
         local opt = (st.options or {})[r] or {}
         local locked = opt.ok == false
         c.lock.Visible = locked
-        c.lockText.Text = "🔒\n" .. tostring(opt.why or "Locked")
-        -- one simple line + one money pill per card
-        local carPct = tonumber(opt.carPct) or 0
+        c.lockText.Text = tostring(opt.why or "Locked — someone got caught")
+        for _, el in ipairs(c.content) do el.Visible = not locked end
+        c.btn.Active = not locked
+        -- one simple line + one pill per card
         if r == "boat" then
             c.line.Text = "Speedboat across the ocean. Always works!"
+            c.pillText.Text = "SAFE BET"
+            c.pill.BackgroundColor3 = T.faint
         elseif r == "heli" then
-            c.line.Text = locked and "Only if NOBODY got caught" or "Fly away over the city!"
+            c.line.Text = "Fly away over the city!"
+            c.pillText.Text = pctText(tonumber(opt.heliPct) or 0.10) .. " CASH"
+            c.pill.BackgroundColor3 = T.money
         else
             c.line.Text = "Floor it! Your car's power counts double"
+            c.pillText.Text = "CAR BONUS x2"
+            c.pill.BackgroundColor3 = T.money
         end
-        local total = tonumber(opt.pct) or 0
-        c.pillText.Text = total > 0 and (pctText(total) .. " CASH") or "SAFE BET"
-        c.pill.BackgroundColor3 = total > 0 and T.money or T.faint
         local n = (st.votes or {})[r] or 0
         c.dots.Text = n > 0 and string.rep("● ", n) or ""
         local mine = st.mine == r
         c.scale.Scale = mine and 1.06 or 1
         if c.stroke then c.stroke.Thickness = mine and 5 or 2 end
-        local _ = carPct
     end
     local voted, voters = st.voted or 0, st.voters or 1
     local driverNote = st.driver and ("  ·  🏎 " .. tostring(st.driver) .. "'s vote counts x2") or ""

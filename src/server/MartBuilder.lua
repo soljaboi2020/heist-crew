@@ -139,6 +139,10 @@ local TEAL      = rgb(20, 150, 150)
 local CYAN      = UITheme.rgb(P.NEONS[2])
 local HOT_PINK  = UITheme.rgb(P.NEONS[1])
 local CREAM     = rgb(238, 232, 218)
+-- (v3.1) interior paint, knocked down from cream: under Future lighting the
+-- old off-white walls + close lamps blew out to pure white in playtest
+local WALL_IN   = rgb(184, 178, 166)     -- light warm grey / beige
+local TUBE_LENS = rgb(196, 210, 228)     -- fluorescent diffuser (was near-white neon)
 local STEEL     = rgb(58, 62, 70)
 local STEEL_DK  = rgb(30, 32, 38)
 local STEEL_LT  = rgb(170, 176, 186)
@@ -279,13 +283,13 @@ end
 
 -- fluorescent ceiling fixture. on = false → a dead tube (dark, no light).
 -- len = fixture length (default 4.4); shadows = this tube is a key light
-local function tubeLight(parent, x, z, alongX, brightness, range, on, len, shadows)
+local function tubeLight(parent, x, z, alongX, brightness, range, on, len, shadows, color)
     local half = (len or 4.4) / 2
     local hx, hz = alongX and half or 0.4, alongX and 0.4 or half
     local fx = box("TubeFixture", x - hx, CEIL - 0.25, z - hz, x + hx, CEIL, z + hz, STEEL_LT, M.Metal, parent, nc())
     box("TubeLens", x - hx + 0.15, CEIL - 0.3, z - hz + 0.1, x + hx - 0.15, CEIL - 0.25, z + hz - 0.1,
-        on == false and rgb(120, 124, 130) or COOL, on == false and M.Glass or M.Neon, parent, nc({ CastShadow = false }))
-    if on ~= false then point(fx, COOL, brightness or 1, range or 16, shadows == true) end
+        on == false and rgb(120, 124, 130) or TUBE_LENS, on == false and M.Glass or M.Neon, parent, nc({ CastShadow = false }))
+    if on ~= false then point(fx, color or COOL, brightness or 1, range or 16, shadows == true) end
     return fx
 end
 
@@ -482,7 +486,7 @@ function MartBuilder:_shell(f)
     -- sidewalk apron in front (the south sidewalk ends at z -1.4)
     box("Apron", X0, 0, -1.4, X1, FLOOR, Z0, rgb(170, 168, 162), M.Concrete, f)
     -- floors
-    box("FloorSales", X0, 0, Z0, X1, FLOOR, 15.5, rgb(226, 226, 220), M.CeramicTiles, f)
+    box("FloorSales", X0, 0, Z0, X1, FLOOR, 15.5, rgb(200, 200, 194), M.CeramicTiles, f)
     box("FloorOffice", X0, 0, 15.5, 59.5, FLOOR, Z1, rgb(70, 84, 104), M.Carpet, f)
     box("FloorStock", 59.5, 0, 15.5, X1, FLOOR, Z1, rgb(140, 138, 132), M.Concrete, f)
 
@@ -525,7 +529,7 @@ function MartBuilder:_shell(f)
         TextColor3 = rgb(200, 40, 80) }, mg)
 
     -- ceiling + roof deck
-    box("Ceiling", IX0, CEIL, IZ0, IX1, CEIL + 0.5, IZ1, rgb(214, 214, 208), M.Plaster, f)
+    box("Ceiling", IX0, CEIL, IZ0, IX1, CEIL + 0.5, IZ1, rgb(150, 150, 146), M.Plaster, f)
     box("Roof", IX0, CEIL + 0.5, IZ0, IX1, ROOF_Y, IZ1, rgb(150, 150, 150), M.Concrete, f)
     box("RoofLip", NOTCH_X0, ROOF_Y - 0.5, IZ1, NOTCH_X1, ROOF_Y, Z1, rgb(150, 150, 150), M.Concrete, f)
     box("RoofAC", 63, ROOF_Y, 10, 67, ROOF_Y + 2.6, 13.5, STEEL_LT, M.Metal, f)
@@ -535,8 +539,8 @@ function MartBuilder:_shell(f)
         Color = STEEL_LT, Material = M.Metal }, f)
 
     -- interior walls
-    wallX("SalesBackWall", SALES_Z1, BACK_Z0, IX0, IX1, { { CURTAIN_X0, CURTAIN_X1, DOOR_H } }, CREAM, M.Plaster, f)
-    wallZ("OfficeWall", OFFICE_X1, STOCK_X0, BACK_Z0, IZ1, { { SIDE_DOOR_Z0, SIDE_DOOR_Z1, DOOR_H } }, CREAM, M.Plaster, f)
+    wallX("SalesBackWall", SALES_Z1, BACK_Z0, IX0, IX1, { { CURTAIN_X0, CURTAIN_X1, DOOR_H } }, WALL_IN, M.Plaster, f)
+    wallZ("OfficeWall", OFFICE_X1, STOCK_X0, BACK_Z0, IZ1, { { SIDE_DOOR_Z0, SIDE_DOOR_Z1, DOOR_H } }, WALL_IN, M.Plaster, f)
     -- mint wainscot round the sales floor
     box("Wainscot", IX0, FLOOR, IZ0, IX0 + 0.1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
     box("Wainscot", IX0, FLOOR, SALES_Z1 - 0.1, IX1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
@@ -763,8 +767,8 @@ function MartBuilder:_fridges(f)
         -- LED strip down each door (thin neon) + the cold glow
         box("FridgeLed", x0 + 0.12, FLOOR + 0.4, dz0 + 0.12, x0 + 0.2, H - 0.2, dz0 + 0.2, COOL, M.Neon, fr, nc({ CastShadow = false }))
     end
-    point(lightAnchor("FridgeGlowN", Vector3.new(x0 - 0.5, FLOOR + 4, 5.5), fr), rgb(190, 225, 255), 1.1, 12)
-    point(lightAnchor("FridgeGlowS", Vector3.new(x0 - 0.5, FLOOR + 4, 10.5), fr), rgb(190, 225, 255), 1.1, 12)
+    point(lightAnchor("FridgeGlowN", Vector3.new(x0 - 0.5, FLOOR + 4, 5.5), fr), rgb(190, 225, 255), 0.6, 9)
+    point(lightAnchor("FridgeGlowS", Vector3.new(x0 - 0.5, FLOOR + 4, 10.5), fr), rgb(190, 225, 255), 0.6, 9)
 end
 
 function MartBuilder:_checkout(f, refs, loot)
@@ -1020,13 +1024,13 @@ function MartBuilder:_salesFloor(f, refs, loot)
     table.insert(refs.hideSpots, bigBox)
 
     -- ceiling tubes: three long rows of troffers down the aisles (v2.0.2: they
-    -- no longer overlap). Bright over the aisles, dimmer at the back, aisle 2's
+    -- no longer overlap; v3.1 dimmer + tighter for Future lighting). Bright over the aisles, dimmer at the back, aisle 2's
     -- dead tube = the dark aisle. Two tubes are key lights (shadows).
     for _, tx in ipairs({ 57.5, 63.5, 69 }) do
         for _, tz in ipairs({ 4.2, 8.6, 13.0 }) do
             local dead = (tx == 63.5 and tz == 8.6)
             local key = (tz == 8.6 and tx ~= 63.5)
-            tubeLight(s, tx, tz, false, (tz == 13.0) and 0.55 or 0.85, 14, not dead, 4.0, key)
+            tubeLight(s, tx, tz, false, (tz == 13.0) and 0.35 or 0.55, 11, not dead, 4.0, key)
         end
     end
 
@@ -1085,7 +1089,7 @@ function MartBuilder:_stockRoom(f, refs, loot)
     lit(printOn(emp, Enum.NormalId.Front, "EMPLOYEES ONLY", rgb(255, 255, 255), UITheme.F.bold, 50, 1.2).Parent)
 
     -- (v2.0.2) painted cinder-block walls, yellow forklift lines on the concrete
-    local BLOCK = rgb(196, 198, 190)
+    local BLOCK = rgb(128, 130, 126)     -- (v3.1) mid-grey painted block, was near-white
     box("BlockWall", STOCK_X0, FLOOR, IZ1 - 0.08, IX1, CEIL, IZ1, BLOCK, M.Brick, s, nc())
     box("BlockWall", STOCK_X0, FLOOR, BACK_Z0, CURTAIN_X0, CEIL, BACK_Z0 + 0.06, BLOCK, M.Brick, s, nc())
     box("BlockWall", CURTAIN_X1, FLOOR, BACK_Z0, IX1, CEIL, BACK_Z0 + 0.06, BLOCK, M.Brick, s, nc())
@@ -1205,12 +1209,18 @@ function MartBuilder:_stockRoom(f, refs, loot)
     bar("HandTruck", Vector3.new(61, FLOOR, 23.2), Vector3.new(60.6, FLOOR + 4.4, 23.6), 0.14, rgb(230, 60, 40), M.Metal, s, nc())
 
     -- (v2.0.2) one dim tube + a caged work lamp on a cord (the key light, shadows)
-    tubeLight(s, 66, 20, true, 0.4, 12)
+    -- (v3.1) warm + dim: these two are the only lights in the room
+    tubeLight(s, 66, 20, true, 0.22, 10, true, nil, false, rgb(255, 214, 170))
     bar("LampCord", Vector3.new(66.5, CEIL, 18.2), Vector3.new(66.5, CEIL - 2.6, 18.2), 0.06, STEEL_DK, M.Rubber, s, nc())
     local cage = box("CageLamp", 66.1, CEIL - 3.2, 17.8, 66.9, CEIL - 2.6, 18.6, STEEL_DK, M.Metal, s, nc())
     box("CageLampBulb", 66.25, CEIL - 3.35, 17.95, 66.75, CEIL - 3.2, 18.45, WARM, M.Neon, s, nc({ CastShadow = false }))
-    point(cage, rgb(255, 210, 160), 0.9, 13, true)
+    point(cage, rgb(255, 196, 140), 0.75, 12, true)
     table.insert(refs.shadowZones, shadowZone("ShadowStockCorner", STOCK_X0, 20.5, 63, IZ1, s))
+    -- (v3.1) block lining over the lemon exterior wall's inner face (it read as
+    -- a glowing yellow slab next to the work lamp); the back-door gap stays open
+    box("BlockLining", IX1 - 0.06, FLOOR, BACK_Z0, IX1, CEIL, SIDE_DOOR_Z0, BLOCK, M.Brick, s, nc())
+    box("BlockLining", IX1 - 0.06, FLOOR, SIDE_DOOR_Z1, IX1, CEIL, IZ1, BLOCK, M.Brick, s, nc())
+    box("BlockLining", IX1 - 0.06, DOOR_H, SIDE_DOOR_Z0, IX1, CEIL, SIDE_DOOR_Z1, BLOCK, M.Brick, s, nc())
 
     -- ── the back door: open steel double doors onto the east alley ──
     local x = X1
@@ -1243,13 +1253,13 @@ function MartBuilder:_office(f, refs, loot)
     -- (v2.0.2) walls: navy painted wainscot + white rail + striped wallpaper on
     -- the north (desk) and south (safe) walls
     local WAINSCOT = rgb(34, 46, 74)
-    local RAIL = rgb(226, 222, 210)
+    local RAIL = rgb(176, 168, 152)
     for _, w in ipairs({ { BACK_Z0, BACK_Z0 + 0.06, Enum.NormalId.Back }, { IZ1 - 0.06, IZ1, Enum.NormalId.Front } }) do
         box("Wainscot", IX0, FLOOR, w[1], OFFICE_X1, FLOOR + 3.6, w[2], WAINSCOT, M.Plaster, o, nc())
         local rz0 = (w[3] == Enum.NormalId.Back) and w[1] or w[2] - 0.12
         box("ChairRail", IX0, FLOOR + 3.6, rz0, OFFICE_X1, FLOOR + 3.85, rz0 + 0.12, RAIL, M.Plaster, o, nc())
-        local wp = box("Wallpaper", IX0, FLOOR + 3.85, w[1], OFFICE_X1, CEIL, w[2], rgb(232, 214, 170), M.Fabric, o, nc())
-        wallpaper(wp, w[3], rgb(228, 210, 166), rgb(214, 120, 60), 6)
+        local wp = box("Wallpaper", IX0, FLOOR + 3.85, w[1], OFFICE_X1, CEIL, w[2], rgb(186, 168, 134), M.Fabric, o, nc())
+        wallpaper(wp, w[3], rgb(182, 164, 130), rgb(170, 92, 50), 6)
     end
 
     -- desk along the north wall (satin wood — the old WoodPlanks read as stripes)
@@ -1264,7 +1274,7 @@ function MartBuilder:_office(f, refs, loot)
     box("LampBase", lx - 0.25, topY, lz - 0.25, lx + 0.25, topY + 0.1, lz + 0.25, STEEL_DK, M.Metal, o, nc())
     bar("LampArm", Vector3.new(lx, topY + 0.1, lz), Vector3.new(lx - 0.4, topY + 1.3, lz + 0.2), 0.07, STEEL_DK, M.Metal, o, nc())
     local shade = box("LampShade", lx - 0.8, topY + 1.1, lz - 0.1, lx - 0.1, topY + 1.45, lz + 0.5, SUN_DEEP, M.Metal, o, nc())
-    spot(shade, Enum.NormalId.Bottom, rgb(255, 214, 160), 1.6, 10, 80, true)
+    spot(shade, Enum.NormalId.Bottom, rgb(255, 200, 140), 1.25, 11, 80, true)
     -- papers + a mug
     box("Papers", 57, topY, dz0 + 0.6, 58, topY + 0.1, dz0 + 1.4, rgb(250, 250, 244), M.Fabric, o, nc())
     part({ Name = "Mug", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 0.35, 0.35),
@@ -1281,7 +1291,7 @@ function MartBuilder:_office(f, refs, loot)
         text({ Text = label, Size = UDim2.fromScale(0.9, 0.18), Position = UDim2.fromScale(0.05, 0.05),
             TextScaled = true, FontFace = UITheme.F.mono, TextColor3 = rgb(140, 220, 200) }, cell)
     end
-    point(lightAnchor("MonitorGlow", Vector3.new(56.5, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.5, 7)
+    point(lightAnchor("MonitorGlow", Vector3.new(56.5, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.3, 6)
 
     -- calendar + "SAFE CODE? NICE TRY" note
     -- (v3.0) the calendar moved to the west wall; the golden ticket hangs where it was
@@ -1310,8 +1320,12 @@ function MartBuilder:_office(f, refs, loot)
         TextColor3 = rgb(30, 30, 30) }, ig)
 
     local lamp = box("OfficeLight", 54.5, CEIL - 0.25, 19.3, 57.5, CEIL, 20.1, STEEL_LT, M.Metal, o, nc())
-    box("OfficeLightLens", 54.6, CEIL - 0.3, 19.4, 57.4, CEIL - 0.25, 20, WARM, M.Neon, o, nc())
-    point(lamp, WARM, 0.45, 11, false)
+    box("OfficeLightLens", 54.6, CEIL - 0.3, 19.4, 57.4, CEIL - 0.25, 20, rgb(214, 188, 150), M.Neon, o, nc())
+    point(lamp, WARM, 0.25, 9, false)
+    -- (v3.1) the west wall's inner face was the lemon exterior plaster: line it
+    -- with the same navy wainscot + muted paint as the rest of the office
+    box("Wainscot", IX0, FLOOR, BACK_Z0, IX0 + 0.05, FLOOR + 3.6, IZ1, WAINSCOT, M.Plaster, o, nc())
+    box("WallLining", IX0, FLOOR + 3.6, BACK_Z0, IX0 + 0.05, CEIL, IZ1, WALL_IN, M.Plaster, o, nc())
 
     -- ── the floor safe ──
     local sx0, sx1 = SAFE_X - SAFE_HW, SAFE_X + SAFE_HW
@@ -1448,11 +1462,11 @@ function MartBuilder:_office(f, refs, loot)
     text({ Text = "SUNNY'S MART  ·  $1,000,000 WINNER  ·  1987", Size = UDim2.fromScale(0.72, 0.2), Position = UDim2.fromScale(0.24, 0.52),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextColor3 = rgb(110, 70, 10) }, tg)
     frame({ Size = UDim2.fromScale(0.5, 0.06), Position = UDim2.fromScale(0.35, 0.8), BackgroundColor3 = rgb(150, 100, 20) }, tg)
-    point(ticket, rgb(255, 214, 120), 0.5, 4, false)
+    point(ticket, rgb(255, 214, 120), 0.3, 3.5, false)
     -- brass picture light over the frame
     bar("PictureLightArm", Vector3.new(gx, gy + fh + 0.16, wz + 0.05), Vector3.new(gx, gy + fh + 0.5, wz + 0.4), 0.06, GILT, M.Metal, o, nc())
     local pl = box("PictureLight", gx - 0.8, gy + fh + 0.42, wz + 0.3, gx + 0.8, gy + fh + 0.58, wz + 0.55, GILT, M.Metal, o, nc())
-    spot(pl, Enum.NormalId.Bottom, rgb(255, 226, 170), 1.5, 7, 75, false)
+    spot(pl, Enum.NormalId.Bottom, rgb(255, 216, 160), 0.9, 6, 70, false)
     local plq = box("TicketPlaque", gx - 0.6, gy - fh - 0.52, wz, gx + 0.6, gy - fh - 0.28, wz + 0.04, GILT, M.Metal, o, nc())
     lit(printOn(plq, Enum.NormalId.Back, "OUR FIRST MILLIONAIRE", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
     local ts = Vector3.new(gx, FLOOR + 3, 18.4)
@@ -1582,10 +1596,22 @@ function MartBuilder:_yard(f, refs)
     part({ Name = "FlatBoxes", Size = Vector3.new(0.3, 3.4, 2.6),
         CFrame = CFrame.new(EX0 - 0.5, 1.8, 21.5) * CFrame.Angles(0, 0, math.rad(10)),
         Color = rgb(186, 150, 104), Material = M.Cardboard, CanCollide = false }, a)
-    -- puddles: flat, reflective, catch the lamps (no collision)
-    for _, pd in ipairs({ { 80.6, 20.5, 2.6, 3.4 }, { 76.2, 2.8, 2.2, 1.6 }, { 66, 30, 3.6, 1.8 } }) do
-        box("Puddle", pd[1] - pd[3] / 2, 0.1, pd[2] - pd[4] / 2, pd[1] + pd[3] / 2, 0.13, pd[2] + pd[4] / 2,
-            rgb(22, 24, 34), M.Glass, a, nc({ Reflectance = 0.45, Transparency = 0.15, CastShadow = false }))
+    -- puddles: flat, reflective, catch the lamps (no collision). (v3.1) were
+    -- near-black glass slabs that read as holes: now flattened ovals a shade
+    -- darker than the ground under them, semi-transparent + reflective.
+    -- { x, z, length, width, yaw, colour }
+    for _, pd in ipairs({
+        { 80.6, 20.5, 3.8, 2.0, 1.3, rgb(40, 41, 48) },       -- yard asphalt (52, 52, 58)
+        { 76.2, 2.8, 2.8, 1.4, 0.2, rgb(40, 41, 48) },
+        { 66, 30, 4.2, 1.7, -0.15, rgb(92, 91, 88) },         -- back strip concrete (120, 118, 112)
+    }) do
+        local pud = part({ Name = "Puddle", Size = Vector3.new(pd[3], 0.04, pd[4]),
+            CFrame = CFrame.new(pd[1], 0.1, pd[2]) * CFrame.Angles(0, pd[5], 0), Color = pd[6],
+            Material = M.SmoothPlastic, Transparency = 0.3, Reflectance = 0.4,
+            CanCollide = false, CastShadow = false, CanQuery = false, CanTouch = false }, a)
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.Sphere
+        mesh.Parent = pud
     end
     -- painted sun on the back wall of the yard (it takes the lamp light)
     local mural = box("YardMural", 60, 2, SZ0 - 0.06, 68, 9, SZ0, BRICK, M.Brick, a, nc({ Transparency = 1 }))

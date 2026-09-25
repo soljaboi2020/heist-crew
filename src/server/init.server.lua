@@ -81,6 +81,9 @@ local PoliceService = optional("PoliceService", {
 
 -- ── players: connect FIRST, then catch anyone who joined while we built ──
 local function onPlayerAdded(player)
+    -- (v3.0.1) tight heist rooms jammed the camera against your head: walls between
+    -- the camera and you now fade see-through instead (Roblox "Invisicam").
+    pcall(function() player.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam end)
     print(string.format("[HEIST CREW] %s joined the crew 💼", player.Name))
     PlayerDataService:loadPlayer(player)
     EconomyService:fireCashUpdate(player)

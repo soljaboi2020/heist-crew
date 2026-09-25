@@ -1,13 +1,15 @@
 --[[
     HEIST CREW — GetawayService  (v3.0 "THE SCORE", getaway agent)
     ────────────────────────────────────────────────
-    Nobody drives any more. When the crew is done (JobService decides: everyone
-    still in the run sits in the getaway car, or the driver presses GO! with at
-    least one bag loaded) the escape plays as a MOVIE:
+    Nobody drives any more. When the crew is done (JobService decides: the
+    driver — or anyone, if the driver seat is empty — presses GO! with at least
+    one bag loaded; or everyone still in the run sits in the car AND the alarm
+    is on or every bag is loaded) the escape plays as a MOVIE:
 
       1. VOTE (8 s) — every crew member gets three big cards:
             🚤 BOAT        always open
-            🚁 HELICOPTER  only if nobody got caught / jailed this run. +10% cash
+            🚁 HELICOPTER  only if nobody got caught (jailed / out) this run. +10% cash.
+                           A guard sending you back to the door is NOT a catch.
             🛣️ HIGHWAY     the car's power on full display: car bonus ×2
          Majority wins; a tie (or nobody voting) → BOAT. Everyone voted → it
          ends early.
@@ -68,7 +70,8 @@
               yaw: CFrame.Angles(0, y, 0).LookVector points where it drives.
           props = { { kind = "Shutter"|"Roadblock", cf = CFrame, t0, t1 } },
           events = { { t, kind = "smash"|"nitro"|"fade"|"hop"|"sirens"|"stamp"|"shake", ... } },
-          shots = { { t0, t1, mode = "fixed"|"look"|"chase", ... } },
+          shots = { { t0, t1, mode = "fixed"|"look"|"chase"|"lookback", ... } },
+              lookback = { target, focus = Vector3, dist, side, y?, ahead, lookY } (see lookbackShot)
           captions = { { t, dur, text } }, radio = bool,
           boatCF?, heliSeats?, stunt? = { kind, t, s, cf } }
 --]]
@@ -381,6 +384,17 @@ end
 local function fixedShot(t0, t1, from, to, fov)
     return { t0 = r3(t0), t1 = r3(t1), mode = "fixed", from = from, to = to or from, fov = fov }
 end
+-- (playtest fix 2026-09-25) the final HELD shot: the camera rides along on the far
+-- side of the target from `focus` (the city), looking back THROUGH the target at
+-- it — the boat + its wake in the foreground, the lit skyline behind.
+--   dist = studs behind the target (away from focus), side = sideways offset,
+--   y = absolute camera height, ahead = how far past the target (toward focus)
+--   the camera aims, lookY = the height it aims at
+local function lookbackShot(t0, t1, target, focus, o)
+    o = o or {}
+    return { t0 = r3(t0), t1 = r3(t1), mode = "lookback", target = target, focus = focus,
+        dist = o.dist or 24, side = o.side or 0, y = o.y, ahead = o.ahead or 70, lookY = o.lookY or 6, fov = o.fov or 62 }
+end
 
 -- how far the car goes before it's out of the yard gate (the first leg straight ahead)
 local function streetPoint(startCF, laneZ)
@@ -590,37 +604,59 @@ function GetawayService.buildScene(opts)
         local tHop, tLaunch = tStop + 0.35, tStop + 1.9
         ev({ t = tHop, kind = "hop", to = "boat", dur = 1.25 })
         cap(tStop - 1.4, "TO THE BOAT!", 1.8)
-        -- boat keys: still, then blast north
+        -- boat keys: still, then blast north off the pier, carve a turn and cruise
+        -- ALONG the coast (playtest fix 2026-09-25: it used to blast ~900 studs north,
+        -- past the camera and off the end of the water — the held shot under the
+        -- payout was flat empty ocean). Parallel to the beach the city stays ~160
+        -- studs away (inside the fog start), so the final shot can look back at it.
         local bk = {}
         local bp = boatCF.Position
         local byaw = yawOf(boatCF.LookVector)
         table.insert(bk, { t = 0, p = bp, y = byaw })
         table.insert(bk, { t = r3(tLaunch), p = bp, y = byaw })
-        local look = flat(boatCF.LookVector).Unit
-        local vB, a, sB, tt = 0, 30, 0, tLaunch
-        local tBoatEnd = tLaunch + 5 + HOLD
+        local cruiseDir = (bp.X >= 0) and Vector3.new(-1, 0, 0) or Vector3.new(1, 0, 0)   -- toward the city centre
+        local cruiseYaw = yawOf(cruiseDir)
+        local dYaw = ((cruiseYaw - byaw + math.pi) % (2 * math.pi)) - math.pi
+        local STRAIGHT, TURN_R = 22, 22                -- clear the pier end (z -150) before turning
+        local turnLen = math.max(1, TURN_R * math.abs(dYaw))
+        local V_BLAST, V_CRUISE = 58, 20
+        local tBlastEnd = tLaunch + 2.4
+        local tBoatEnd = tLaunch + 5.2 + HOLD + 6      -- (+6: the client's hold safety margin)
+        local vB, sB, tt, yaw = 0, 0, tLaunch, byaw
+        local p = bp
+        local DT = 0.2
         while tt < tBoatEnd do
-            tt = tt + 0.25
-            vB = math.min(78, vB + a * 0.25)
-            sB = sB + vB * 0.25
+            tt = tt + DT
+            if tt <= tBlastEnd then vB = math.min(V_BLAST, vB + 30 * DT)
+            else vB = math.max(V_CRUISE, vB - 20 * DT) end
+            local ds = vB * DT
+            sB = sB + ds
+            -- heading: straight out, then a constant-radius turn onto the cruise line
+            local u = math.clamp((sB - STRAIGHT) / turnLen, 0, 1)
+            yaw = byaw + dYaw * u
+            p = p + CFrame.Angles(0, yaw, 0).LookVector * ds
+            local turning = u > 0 and u < 1
             local bob = math.sin(tt * 5) * 0.12
-            local veer = -math.min(1, sB / 400) * 18   -- a lazy curve west
-            local p = bp + look * sB + Vector3.new(veer, bob, 0)
-            table.insert(bk, { t = r3(tt), p = p, y = byaw + math.rad(veer * 0.35), x = r3(math.min(0.14, vB / 500)) })
+            table.insert(bk, { t = r3(tt), p = Vector3.new(p.X, bp.Y + bob, p.Z), y = yaw,
+                x = r3(math.min(0.14, vB / 500)), r = turning and r3(0.2 * (dYaw >= 0 and 1 or -1)) or 0 })
         end
         tracks.boat = bk
         ev({ t = tLaunch, kind = "wake", on = true })
-        -- shots
-        chaseUntil(tStop - 1.9, Vector3.new(0, 6.5, 18), Vector3.new(-3, 6, 16))
+        -- shots. (The chase along the pier keeps to the EAST side and above the
+        -- lanterns — x 100.6, y 7..7.9 — which the old offset flew straight through:
+        -- the one-frame glitch between shots.)
+        chaseUntil(tStop - 1.9, Vector3.new(0, 8.5, 18), Vector3.new(3.5, 8.5, 16))
         table.insert(scene.shots, fixedShot(shotT, tLaunch + 0.4,
             CFrame.lookAt(Vector3.new(114, 6.5, -157), Vector3.new(104, 1.8, -133)),
             CFrame.lookAt(Vector3.new(115, 6, -155), Vector3.new(106, 1.4, -139)), 58))
         shotT = tLaunch + 0.4
-        table.insert(scene.shots, chaseShot(shotT, tLaunch + 2.4, "boat", Vector3.new(-7, 3.2, 17), Vector3.new(-4, 4.2, 22), Vector3.new(0, 1.5, -10), 70))
+        table.insert(scene.shots, chaseShot(shotT, tLaunch + 2.4, "boat", Vector3.new(-7, 4, 17), Vector3.new(-4, 5, 22), Vector3.new(0, 1.5, -10), 70))
         shotT = tLaunch + 2.4
-        local camFinal = Vector3.new(bp.X - 34, 20, bp.Z - 205)
         scene.duration = r3(tLaunch + 5.2)
-        table.insert(scene.shots, lookShot(shotT, scene.duration + HOLD, camFinal, camFinal + Vector3.new(-6, 3, -18), "boat", 2, 60))
+        -- FINAL (held under the payout): out on the water beyond the boat, looking
+        -- back at it — wake in the foreground, the lit Miami skyline behind
+        table.insert(scene.shots, lookbackShot(shotT, scene.duration + HOLD, "boat", Vector3.new(0, 0, STREET_Z),
+            { dist = 26, side = 7, y = 8.5, ahead = 80, lookY = 9, fov = 60 }))
         cap(tLaunch + 2.6, loud and "WE GOT AWAY!" or "CLEAN GETAWAY!", 2.4)
         if loud then ev({ t = tLaunch + 1.5, kind = "sirens", on = false }) end
     elseif route == "heli" then
@@ -638,16 +674,22 @@ function GetawayService.buildScene(opts)
         table.insert(hk, { t = r3(tStop - 0.7), p = landP + Vector3.new(0, 3.5, 0), y = hy, x = 0.05 })
         table.insert(hk, { t = r3(tLand), p = landP, y = hy })
         table.insert(hk, { t = r3(tLift), p = landP, y = hy })
-        local northYaw = 0   -- LookVector (0, 0, -1)
+        -- (playtest fix 2026-09-25) it flies off ALONG Ocean Drive over the city
+        -- (hotels ≤ 30 tall; it cruises at 70+), not out to sea: the held shot
+        -- under the payout looks down past it at the city lights
+        local cdx = (landP.X > 0) and -1 or 1
+        local cruiseYaw = yawOf(Vector3.new(cdx, 0, 0))
+        local cz = STREET_Z - 22
         local function turnYaw(u)
-            local diff = ((northYaw - hy + math.pi) % (2 * math.pi)) - math.pi
+            local diff = ((cruiseYaw - hy + math.pi) % (2 * math.pi)) - math.pi
             return hy + diff * smooth(u)
         end
         table.insert(hk, { t = r3(tLift + 0.8), p = landP + Vector3.new(0, 7, 0), y = turnYaw(0.2), x = -0.05 })
-        table.insert(hk, { t = r3(tLift + 1.7), p = landP + Vector3.new(0, 20, -6), y = turnYaw(0.7), x = -0.16, r = 0.14 })
-        table.insert(hk, { t = r3(tLift + 3.2), p = Vector3.new(landP.X + 6, 42, -60), y = northYaw, x = -0.24, r = 0.05 })
-        table.insert(hk, { t = r3(tLift + 5.2), p = Vector3.new(landP.X + 14, 62, -190), y = northYaw, x = -0.22 })
-        table.insert(hk, { t = r3(tLift + 5.2 + HOLD), p = Vector3.new(landP.X + 26, 78, -560), y = northYaw, x = -0.2 })
+        table.insert(hk, { t = r3(tLift + 1.7), p = landP + Vector3.new(cdx * 4, 22, -4), y = turnYaw(0.7), x = -0.16, r = 0.14 * cdx })
+        table.insert(hk, { t = r3(tLift + 3.2), p = Vector3.new(landP.X + cdx * 36, 50, cz), y = cruiseYaw, x = -0.22, r = 0.05 })
+        table.insert(hk, { t = r3(tLift + 5.2), p = Vector3.new(landP.X + cdx * 90, 70, cz), y = cruiseYaw, x = -0.18 })
+        table.insert(hk, { t = r3(tLift + 5.2 + HOLD), p = Vector3.new(landP.X + cdx * (90 + 22 * HOLD), 78, cz), y = cruiseYaw, x = -0.15 })
+        table.insert(hk, { t = r3(tLift + 5.2 + HOLD + 6), p = Vector3.new(landP.X + cdx * (90 + 22 * (HOLD + 6)), 82, cz), y = cruiseYaw, x = -0.15 })
         tracks.heli = hk
         ev({ t = tStop + 0.4, kind = "hop", to = "heli", dur = 1.3 })
         cap(tStop - 1.8, "CHOPPER'S HERE!", 1.9)
@@ -659,7 +701,8 @@ function GetawayService.buildScene(opts)
         table.insert(scene.shots, lookShot(shotT, tLift + 2.6, camU, camU + Vector3.new(0, 5, 0), "heli", 2.5, 66))
         shotT = tLift + 2.6
         scene.duration = r3(tLift + 5.0)
-        table.insert(scene.shots, chaseShot(shotT, scene.duration + HOLD, "heli", Vector3.new(-12, 5, 30), Vector3.new(-16, 9, 38), Vector3.new(0, -2, -30), 66))
+        -- FINAL (held): above and behind it, looking down past it at the city lights
+        table.insert(scene.shots, chaseShot(shotT, scene.duration + HOLD, "heli", Vector3.new(-8, 12, 32), Vector3.new(-12, 16, 40), Vector3.new(0, -40, -70), 64))
         cap(tLift + 2.8, loud and "WE GOT AWAY!" or "CLEAN GETAWAY!", 2.4)
         if loud then ev({ t = tLift + 1, kind = "sirens", on = false }) end
     else
@@ -832,7 +875,7 @@ function GetawayService:start(ctx)
             pct = round6(b.total + driverPct), carPct = b.car, heliPct = b.heli, driverPct = driverPct,
             name = GetawayService.ROUTE_INFO[r].name, icon = GetawayService.ROUTE_INFO[r].icon,
             line = GetawayService.ROUTE_INFO[r].line,
-            why = (r == "heli" and ctx.heliAllowed ~= true) and "Locked: someone got caught" or nil,
+            why = (r == "heli" and ctx.heliAllowed ~= true) and "Locked — someone got caught" or nil,
         }
     end
     state.endsAt = now() + voteTime

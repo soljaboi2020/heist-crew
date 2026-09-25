@@ -2138,7 +2138,7 @@ function JewelryBuilder:_yard(f, refs)
     -- puddles: flat, reflective, catch the lamps (no collision)
     for _, pd in ipairs({ { -40, 23.4, 3.2, 2 }, { -32.6, 10.5, 2.4, 3.8 }, { -57.5, 40.2, 4, 1.8 }, { -31, 31.5, 2, 2.6 } }) do
         box("Puddle", pd[1] - pd[3] / 2, 0.1, pd[2] - pd[4] / 2, pd[1] + pd[3] / 2, 0.13, pd[2] + pd[4] / 2,
-            rgb(22, 24, 34), M.Glass, a, nc({ Reflectance = 0.45, Transparency = 0.15, CastShadow = false }))
+            rgb(40, 43, 50), M.SmoothPlastic, a, nc({ Reflectance = 0.4, Transparency = 0.35, CastShadow = false }))   -- (v3.0.1) was near-black glass = looked like a hole
     end
 
     -- painted words on the walls (they take the lamp light)
