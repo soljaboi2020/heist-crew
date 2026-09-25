@@ -31,6 +31,16 @@ Remotes.NAMES = {
     LaunchJob       = "LaunchJob",         -- server→client ({phase="fade"|"title", jobName, tagline})
     ShopAction      = "ShopAction",        -- RemoteFunction (action:string, payload:table) -> {ok,msg,state}
 
+    -- v2.0 (docs/V2_SPEC.md §3)
+    FeelFX          = "FeelFX",            -- server→client ({kind="cash"|"loot"|"load"|"sound", amount, pos, sound})
+    Crouch          = "Crouch",            -- client→server (on:boolean)
+    Hide            = "Hide",              -- server→client ({hidden:boolean, spot:BasePart?})
+    Portal          = "Portal",            -- server→client ({portals = {[jobId] = {count, needed, launchAt}}})
+    IntroCam        = "IntroCam",          -- server→client ({points = {CFrame...}}) first-join fly-over
+    DailyReward     = "DailyReward",       -- RemoteFunction ("status"|"claim") -> {ok, day, amount, nextAt, msg}
+    Jail            = "Jail",              -- server→client ({jailed:boolean, freeAt:number?})
+    Leaderboard     = "Leaderboard",       -- server→client ({rows = {{name, cash, heists}}})
+
     -- Client → Server (none yet — using ProximityPrompt for vault interaction)
 }
 

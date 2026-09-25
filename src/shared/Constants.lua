@@ -92,24 +92,36 @@ Constants.WORLD = {
     STREET_LENGTH          = 300,     -- x -150..150
 
     -- Villa Rosa (job 1) — beachfront art-deco villa, north of the street
-    MANSION_CENTER         = {x = 0,  y = 0,    z = -60},
-    MANSION_HALF_WIDTH     = 30,
-    MANSION_HALF_DEPTH     = 22,      -- z -82..-38, front door at z -38
+    -- v2.0 "BIGGER": the villa grew to x -42..42, z -96..-38 (docs/V2_SPEC.md §1)
+    MANSION_CENTER         = {x = 0,  y = 0,    z = -67},
+    MANSION_HALF_WIDTH     = 42,
+    MANSION_HALF_DEPTH     = 29,      -- z -96..-38, front door at z -38
     MANSION_WALL_HEIGHT    = 16,
     MANSION_DOOR_WIDTH     = 10,
 
     -- Diamond Dolls Jewelers (job 2) — storefront on the south side of the street
-    JEWELRY_CENTER         = {x = -58, y = 0,   z = 11},
-    JEWELRY_HALF_WIDTH     = 12,      -- x -70..-46
-    JEWELRY_HALF_DEPTH     = 12,      -- z -1..23, shopfront faces north (z -1)
+    JEWELRY_CENTER         = {x = -64, y = 0,   z = 17},
+    JEWELRY_HALF_WIDTH     = 18,      -- x -82..-46 (v2.0: was 24 wide)
+    JEWELRY_HALF_DEPTH     = 18,      -- z -1..35, shopfront faces north (z -1)
+
+    -- v2.0 new jobs + buildings (docs/V2_SPEC.md §1)
+    MART_CENTER            = {x = 62, y = 0,   z = 13},   -- Sunny's Mart (warm-up) x 50..74, z 1..25, front faces north
+    MART_HALF_WIDTH        = 12,
+    MART_HALF_DEPTH        = 12,
+    BANK_CENTER            = {x = 112, y = 0,  z = 28},   -- Ocean Bank x 84..140, z 1..55, front faces north
+    BANK_HALF_WIDTH        = 28,
+    BANK_HALF_DEPTH        = 27,
+    POLICE_STATION_CENTER  = {x = -92, y = 0,  z = -40},  -- north side, x -104..-80, z -52..-28, front faces south
+    POLICE_STATION_HALF_WIDTH = 12,
+    POLICE_STATION_HALF_DEPTH = 12,
 
     -- Beach + ocean (Terrain)
-    BEACH_Z0               = -88,     -- sand from here north...
-    BEACH_Z1               = -108,    -- ...to here, then water
+    BEACH_Z0               = -102,    -- sand from here north... (v2.0: was -88)
+    BEACH_Z1               = -122,    -- ...to here, then water (v2.0: was -108)
     OCEAN_SURFACE_Y        = -0.6,
 
     -- The marina drop-off: drive the loaded getaway car here to cash out
-    DROPOFF                = {x = 106, y = 0,   z = -96},
+    DROPOFF                = {x = 106, y = 0,   z = -110},   -- v2.0: was z -96 (beach moved north)
     DROPOFF_RADIUS         = 14,
 
     -- Default getaway parking (jobs override this with their own spot)
