@@ -211,8 +211,9 @@ local function addSpot(part)
     if existing then existing:Destroy() end
     local p = Instance.new("ProximityPrompt")
     p.Name = PROMPT_NAME
-    p.KeyboardKeyCode = Enum.KeyCode.E
-    p.GamepadKeyCode = Enum.KeyCode.ButtonX
+    -- (v3.0.1) H = Hide, its own key: on E it stole grabs from nearby loot (Studio playtest)
+    p.KeyboardKeyCode = Enum.KeyCode.H
+    p.GamepadKeyCode = Enum.KeyCode.ButtonY
     p.HoldDuration = 0
     p.MaxActivationDistance = 8
     p.RequiresLineOfSight = false   -- the prompt sits inside a closet/plant; LOS would block it

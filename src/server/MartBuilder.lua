@@ -1469,7 +1469,7 @@ function MartBuilder:_office(f, refs, loot)
     spot(pl, Enum.NormalId.Bottom, rgb(255, 216, 160), 0.9, 6, 70, false)
     local plq = box("TicketPlaque", gx - 0.6, gy - fh - 0.52, wz, gx + 0.6, gy - fh - 0.28, wz + 0.04, GILT, M.Metal, o, nc())
     lit(printOn(plq, Enum.NormalId.Back, "OUR FIRST MILLIONAIRE", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
-    local ts = Vector3.new(gx, FLOOR + 3, 18.4)
+    local ts = Vector3.new(gx, FLOOR + 3, 17.1)   -- (v3.0.1) was z 18.4: its E prompt sat 2.7 studs from the safe's "Place drill" and lost to it
     table.insert(loot, { kind = "GoldenTicket", target = "GoldenTicket", cframe = CFrame.lookAt(ts, Vector3.new(gx, ts.Y, BACK_Z0)),
         visual = tv, pool = "office", inVault = false })
 
