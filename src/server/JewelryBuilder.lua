@@ -1120,7 +1120,7 @@ function JewelryBuilder:build(folder)
         entryPoint = Vector3.new(CX, 3, -4),
         -- (v1.2.3) the crew drops in at the alley back door -> office. No guard or
         -- camera in the office; the closet next door has the breaker.
-        sneakIn = { at = Vector3.new(-42.5, 3.5, 20), face = Vector3.new(-50, 3.5, 20), spread = Vector3.new(0, 0, 1) },
+        sneakIn = { at = Vector3.new(-48.8, 3.5, 19.8), face = Vector3.new(-60, 3.5, 19.8), spread = Vector3.new(0, 0, 0.6) },   -- (v1.2.4) INSIDE the back office
         policeStop = Vector3.new(CX - 20, 0, -14),   -- (v1.1: moved west so parked cruisers sit well clear of the getaway spot)
         getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -10), Vector3.new(-30, 0, -10)),
     }

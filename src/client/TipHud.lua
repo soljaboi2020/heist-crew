@@ -25,7 +25,7 @@ local localPlayer = Players.LocalPlayer
 
 local TIPS = {
     welcome = { "Welcome to The Vault!", "1. Stand on a colored circle to pick your role.  2. Talk to the Boss (press F).  3. Press E at the glowing table when you're ready." },
-    start   = { "You're in!", "Sneak in the STAFF ONLY door. Stay out of flashlights and red camera beams, or you'll get caught." },
+    start   = { "You're in!", "You snuck in! Stay out of flashlights and red camera beams, or you'll get caught." },
     spotted = { "Someone sees you!", "Hide! Get out of their sight and the meter goes back down." },
     bag     = { "Heavy bag!", "Bags make you slow. Take it to the car and press E at the trunk. Or press G to throw it to a friend." },
     trunk   = { "Load it up", "Hold E at the back of the car to put the bag in. Bags in the car = money at the end." },

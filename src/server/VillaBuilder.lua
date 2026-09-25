@@ -1273,7 +1273,7 @@ function VillaBuilder:build(folder)
         -- (v1.2.3) the crew drops in at the sneaky side door: east wall, into the
         -- security room right beside the breaker. No camera covers it and Guard B's
         -- x=20 route never looks at that corner (> 40 deg off his cone).
-        sneakIn = { at = Vector3.new(34, 3, -55), face = Vector3.new(20, 3, -55), spread = Vector3.new(0, 0, 1) },
+        sneakIn = { at = Vector3.new(25, 3, -57), face = Vector3.new(10, 3, -57), spread = Vector3.new(0, 0, 0.75) },   -- (v1.2.4) INSIDE the security room
         policeStop = Vector3.new(0, 0, -18),
         getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -18), Vector3.new(-30, 0, -18)),
         openSign = openSign,
