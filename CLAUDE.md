@@ -439,6 +439,13 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   The Vault. `init.server` now pivots every already-loaded character to `SPAWN_POSITION` (facing
   the holo table) right after the build. Respawns were already fine.
 
+- **2026-09-25** — **v1.2.2** from Studio playtest: holo-table prompt flicker (Boss briefing + Ready up both
+  on E, a few studs apart → Roblox flip-flopped) → Boss is now **F**, Ready (E) / Pick heist (R) sit on their
+  own attachments on the spawn side of the table. Role pad text was upside down → rotated 180. All Boss
+  briefing lines, tips and step text rewritten **so a 7-year-old gets it** (Malachi's bar — keep it that way).
+  ⏳ OPEN: Malachi wants to drop in **inside the heist**, not on the sidewalk by the car — pitched options,
+  awaiting his pick (villa foyer is watched by camera C1; jewelry entrance is on guard A's aisle).
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot
