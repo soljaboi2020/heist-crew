@@ -17,6 +17,7 @@
       DetectionHud   "being spotted" meter + direction arrow                  (v1.1)
       PayoutScreen   end-of-heist breakdown, grade, XP, PLAY AGAIN            (v1.1)
       TipHud         first-run coaching from the Boss                         (v1.1)
+      ClubFX         The Vault: dance floor, moving lights, LED equaliser      (v1.2)
 
     Each module is started in its own protected call — one broken HUD can't
     stop the others from mounting.
@@ -55,6 +56,7 @@ local ORDER = {
     "CashHud", "Notifications", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",
     "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud",
+    "ClubFX",
 }
 
 for _, name in ipairs(ORDER) do

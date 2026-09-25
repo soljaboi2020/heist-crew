@@ -154,8 +154,9 @@ local function buildTargets(j, c)
     local refs = j.refs
     if not run then
         local b = Constants.WORLD.BOSS_NPC_POS
-        add(Vector3.new(b.x, 6, b.z), "BRIEFING", "boss")
-        add(Vector3.new(0, 5, 18), "READY UP", "ready")
+        local tb = Constants.WORLD.HUB_TABLE
+        add(Vector3.new(b.x, b.y + 6.5, b.z), "BRIEFING", "boss")
+        add(Vector3.new(tb.x, tb.y + 5, tb.z), "READY UP", "ready")
         return t
     end
     local carPos = car and car.model and car.model.Parent and car.model:GetPivot().Position
@@ -616,6 +617,7 @@ finish = function(result)
     S.loot:clearLoaded()
     pushInfo()
 
+    if JobService.onFinished then task.spawn(JobService.onFinished) end
     task.delay(Constants.JOB_RESET_COOLDOWN, function()
         S.security:reset()
         S.loot:reset()
@@ -663,6 +665,41 @@ local function launch()
     if not j or run then return end
     launchAt = 0
     launchToken = nil
+
+    -- v1.2 cut-scene: a copy of the getaway car rolls up the ramp in The Vault's
+    -- garage bay while every client's camera watches, then fade → drop-in.
+    local bay = JobService.hub and JobService.hub.bay
+    local real = S.vehicles.getCar and S.vehicles:getCar()
+    if bay and real and real.model then
+        local ok, copy = pcall(function() return real.model:Clone() end)
+        if ok and copy then
+            for _, d in ipairs(copy:GetDescendants()) do
+                if d:IsA("ProximityPrompt") or d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Sound") then d:Destroy()
+                elseif d:IsA("Seat") or d:IsA("VehicleSeat") then d.Disabled = true
+                elseif d:IsA("BasePart") then d.Anchored = true d.CanCollide = false end
+            end
+            for _, tag in ipairs(game:GetService("CollectionService"):GetTags(copy)) do
+                game:GetService("CollectionService"):RemoveTag(copy, tag)
+            end
+            copy.Name = "RolloutCar"
+            -- keep the car's pivot height above ground (it's parked at road level y≈0)
+            local lift = Vector3.new(0, real.model:GetPivot().Position.Y - ((job().refs.getawayCFrame or CFrame.new()).Position.Y), 0)
+            copy:PivotTo(bay.start + lift)
+            copy.Parent = Workspace
+            launchRemote:FireAllClients({ phase = "rollout", camFrom = bay.camFrom, camTo = bay.camTo })
+            local path = { bay.start + lift, bay.rampFoot + lift, bay.rampTop + lift }
+            local t0 = os.clock()
+            local dur = 2.6
+            while os.clock() - t0 < dur do
+                local a = (os.clock() - t0) / dur
+                local cf = (a < 0.35) and path[1]:Lerp(path[2], a / 0.35) or path[2]:Lerp(path[3], (a - 0.35) / 0.65)
+                copy:PivotTo(cf)
+                task.wait()
+            end
+            task.delay(3, function() copy:Destroy() end)
+        end
+    end
+
     launchRemote:FireAllClients({ phase = "fade", jobName = j.cfg.name, tagline = j.cfg.tagline })
     task.wait(1.1)
     local pts = dropPoints(j)

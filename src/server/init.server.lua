@@ -68,6 +68,7 @@ local GuardService      = require(script.GuardService)
 local JobService        = require(script.JobService)
 local HeistBuilder      = require(script.HeistBuilder)
 local SafehouseBuilder  = require(script.SafehouseBuilder)
+local ClubBuilder       = require(script.ClubBuilder)
 local TestPad           = require(script.TestPad)
 
 local VehicleService = optional("VehicleService", {
@@ -118,17 +119,57 @@ end
 -- ── build the world (this yields: NPC outfits + Kenney models load) ─────
 local world = HeistBuilder:build()
 
-CrewService:init(world.safehouse, PlayerDataService)
+-- v1.2: the crew pads, TV and blueprint live in The Vault (the club HQ)
+local hub = world.hub or {}
+CrewService:init(hub, PlayerDataService)
 
+JobService.hub = hub
 JobService.onJobChanged = function(cfg, jobRefs)
-    SafehouseBuilder:showJob(world.safehouse, cfg, jobRefs)
+    SafehouseBuilder:showJob(hub, cfg, jobRefs)
 end
-SafehouseBuilder.onNextJob = function(player)
-    JobService:cycleJob(player)
+ClubBuilder.onNextJob = function(player) JobService:cycleJob(player) end
+ClubBuilder.onReadyUp = function(player) JobService:toggleReady(player) end
+
+-- Freight lift between The Vault and the auto shop (client fades, we teleport)
+local launchRemote = Remotes.getRemote(Remotes.NAMES.LaunchJob, "RemoteEvent")
+local travelling = {}
+local function travel(player, dir)
+    if travelling[player] then return end
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    travelling[player] = true
+    launchRemote:FireClient(player, { phase = "travel", dir = dir })
+    task.delay(0.45, function()
+        local W = Constants.WORLD
+        if hrp.Parent then
+            if dir == "down" then
+                local e = W.HUB_ELEVATOR
+                hrp.CFrame = CFrame.lookAt(Vector3.new(e.x, W.HUB_FLOOR + 3, e.z - 2), Vector3.new(e.x, W.HUB_FLOOR + 3, e.z - 20))
+            else
+                local e = W.SAFEHOUSE_ELEVATOR
+                hrp.CFrame = CFrame.lookAt(Vector3.new(e.x, e.y + 3, e.z), Vector3.new(e.x, e.y + 3, e.z - 20))
+            end
+        end
+        travelling[player] = nil
+    end)
 end
-SafehouseBuilder.onReadyUp = function(player)
-    JobService:toggleReady(player)
+ClubBuilder.onElevator = travel
+SafehouseBuilder.onElevator = travel
+
+-- Trophy room: shows the best heist count of anyone in the server
+local function refreshTrophies()
+    if not hub.setTrophies then return end
+    local best = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        local d = PlayerDataService:getData(p)
+        if d and (d.heistsCompleted or 0) > best then best = d.heistsCompleted end
+    end
+    pcall(hub.setTrophies, best)
 end
+JobService.onFinished = refreshTrophies
+Players.PlayerAdded:Connect(function() task.delay(3, refreshTrophies) end)
+Players.PlayerRemoving:Connect(function() task.defer(refreshTrophies) end)
+task.delay(3, refreshTrophies)
 
 JobService:init({
     jobs = world.jobs,

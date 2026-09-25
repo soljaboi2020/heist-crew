@@ -414,6 +414,26 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - **Known, not fixed:** driving may look choppy on other clients (server PivotTo of an anchored car).
     If it does, next step = unanchored chassis + AlignPosition owned by the driver.
 
+- **2026-09-25** — **v1.1.1** fixes from screenshots: CanvasGroup fades didn't hide on Malachi's PC
+  ("SPOTTING…" + drop-in title stuck on screen) → `init.client` drives `Visible` from
+  `GroupTransparency` for every CanvasGroup; `UITheme.label` default Text "" (the word "Label"
+  showed); extra SpawnLocations in the place are disabled (players spawned outside); max 2 SEARCH
+  markers.
+- **2026-09-25** — **🪩 v1.2.0 "THE VAULT"** — Malachi wanted *"a huge inside center where the heist
+  spawns you"*; picked option A. New **`ClubBuilder.lua`**: underground neon club HQ under the auto
+  shop, x -44..44 / z 0..64 / floor y -27.5 (`WORLD.HUB_*`). DJ stage + LED wall ("THE VAULT") +
+  moving truss spots, glass dance floor, bar + VIP mezzanine (stairs by the stage), **holo planning
+  table** (blueprint + READY UP (E) / change job (R)) with the job screen hanging above it, crew
+  pads + signs (east), **mask wall** (real catalog masks on display heads; shop counter prompt
+  `OpenShop`), **trophy room** (`Constants.TROPHIES`, unlocks by the best `heistsCompleted` in the
+  server), **garage bay + ramp** (launch cut-scene: a copy of the getaway car rolls up it while
+  every camera watches), freight elevator ↔ auto shop (fade + teleport; prompts `ElevatorUp`/
+  `ElevatorDown`). **Spawn moved into the club** (0,-27.4,54); Boss at the holo table.
+  The auto shop (SafehouseBuilder) is now just the street-level cover business + lift; its old
+  pads/table/gear wall/TV functions are kept but not called. Client **`ClubFX`** animates tiles,
+  lights, spots and the EQ locally (only while you're in the club). Extras (training course,
+  leaderboard wall, arcade) deferred by Malachi — "later when I feel happy".
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

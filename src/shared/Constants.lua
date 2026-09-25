@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "1.1.0"
+Constants.VERSION      = "1.2.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Dev switches ─────
@@ -63,8 +63,19 @@ Constants.HEIST_PAYOUT_CRACKER_BONUS = 750  -- to the player who cracked the vau
 Constants.WORLD = {
     FLOOR                  = 0.5,
 
-    -- Spawn — inside the safehouse, facing north toward the planning table
-    SPAWN_POSITION         = {x = 0,  y = 0.6,  z = 27},
+    -- v1.2 "THE VAULT": the underground club HQ under the auto shop. You spawn
+    -- here. x -44..44, z 0..64, floor top y -27.5, ceiling y -3.5 (the lawn is y -2..0).
+    HUB_FLOOR              = -27.5,
+    HUB_CENTER             = {x = 0,  y = -27.5, z = 32},
+    HUB_HALF_WIDTH         = 44,
+    HUB_HALF_DEPTH         = 32,
+    HUB_HEIGHT             = 24,
+    HUB_TABLE              = {x = 0,  y = -27.5, z = 38},   -- holo planning table (centre)
+    HUB_ELEVATOR           = {x = 12, y = -27.5, z = 60},   -- freight lift up to the auto shop
+    SAFEHOUSE_ELEVATOR     = {x = 0,  y = 0.5,   z = 22},   -- freight lift down (in the auto shop)
+
+    -- Spawn — inside The Vault, south end, facing north toward the holo table + DJ stage
+    SPAWN_POSITION         = {x = 0,  y = -27.4, z = 54},
 
     -- The safehouse (warehouse / "Riverside Auto Body"). Garage in the NORTH wall.
     SAFEHOUSE_CENTER       = {x = 0,  y = 0,    z = 22},
@@ -73,7 +84,7 @@ Constants.WORLD = {
     SAFEHOUSE_HEIGHT       = 16,
     GARAGE_WIDTH           = 18,
     GARAGE_HEIGHT          = 12,
-    BOSS_NPC_POS           = {x = 8,  y = 0,    z = 19},
+    BOSS_NPC_POS           = {x = 7,  y = -28,  z = 41},   -- at the holo table (y = floor - 0.5)
 
     -- Ocean Drive: the street (runs east-west)
     STREET_Z               = -14,
@@ -239,6 +250,15 @@ Constants.MASKS = {
     { id = "Catrina",   assetId = 2528067691, name = "Catrina",         price = 10000 },
     { id = "Mystery",   assetId = 125377979,  name = "Mystery",         price = 15000 },
     { id = "Cyber",     assetId = 7466060125, name = "Cyber",           price = 25000 },
+}
+
+-- ───── Trophy room (v1.2): unlocks by the best heistsCompleted in the server ─────
+Constants.TROPHIES = {
+    { at = 1,  name = "FIRST SCORE",   blurb = "A single gold bar" },
+    { at = 2,  name = "BANKROLL",      blurb = "Stacks of cash" },
+    { at = 3,  name = "ICE",           blurb = "The Villa Rosa diamond" },
+    { at = 5,  name = "THE MASTERPIECE", blurb = "A painting nobody reported stolen" },
+    { at = 10, name = "LEGEND",        blurb = "The golden bear" },
 }
 
 -- ───── Codes (promo codes → cash, once per player) ─────

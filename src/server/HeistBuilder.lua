@@ -28,6 +28,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local NpcFactory = require(script.Parent.NpcFactory)
 local SafehouseBuilder = require(script.Parent.SafehouseBuilder)
+local ClubBuilder = require(script.Parent.ClubBuilder)
 
 local HeistBuilder = {}
 
@@ -237,6 +238,7 @@ function HeistBuilder:build()
     self:_setupAmbientMusic()
 
     local safehouse = run("Safehouse", SafehouseBuilder.build, SafehouseBuilder, heistFolder) or {}
+    local hub = run("The Vault", ClubBuilder.build, ClubBuilder, heistFolder) or {}
     if Miami and Miami.skinSafehouse then run("Safehouse skin", Miami.skinSafehouse, Miami, heistFolder) end
     run("Boss", self._buildBoss, self, heistFolder)
 
@@ -281,7 +283,7 @@ function HeistBuilder:build()
     spawn.Parent = heistFolder
 
     print("[HeistBuilder] World built ✨  jobs:", jobs.villa and "villa" or "-", jobs.jewelry and "jewelry" or "-")
-    return { heistFolder = heistFolder, safehouse = safehouse, jobs = jobs }
+    return { heistFolder = heistFolder, safehouse = safehouse, hub = hub, jobs = jobs }
 end
 
 return HeistBuilder

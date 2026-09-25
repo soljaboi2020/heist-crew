@@ -728,6 +728,45 @@ function SafehouseBuilder:showJob(refs, cfg, jobRefs)
 end
 
 -- ──────────────────────────────────────────────
+-- 🛗 v1.2: freight lift down to The Vault
+-- ──────────────────────────────────────────────
+function SafehouseBuilder:_liftDown(f)
+    local e = W.SAFEHOUSE_ELEVATOR
+    local x0, x1, z0, z1 = e.x - 4, e.x + 4, e.z - 4, e.z + 4
+    local yellow = Color3.fromRGB(212, 168, 44)
+    box("LiftPlate", x0, FLOOR, z0, x1, FLOOR + 0.25, z1, Color3.fromRGB(70, 72, 78), Enum.Material.DiamondPlate, f)
+    box("LiftStripeN", x0, FLOOR + 0.25, z0, x1, FLOOR + 0.28, z0 + 0.4, yellow, Enum.Material.SmoothPlastic, f, { CanCollide = false })
+    box("LiftStripeS", x0, FLOOR + 0.25, z1 - 0.4, x1, FLOOR + 0.28, z1, yellow, Enum.Material.SmoothPlastic, f, { CanCollide = false })
+    for _, p in ipairs({ { x0, z0 }, { x1, z0 }, { x0, z1 }, { x1, z1 } }) do
+        box("LiftPost", p[1] - 0.25, FLOOR, p[2] - 0.25, p[1] + 0.25, FLOOR + 9, p[2] + 0.25, yellow, Enum.Material.Metal, f)
+    end
+    box("LiftFrame", x0 - 0.25, FLOOR + 9, z0 - 0.25, x1 + 0.25, FLOOR + 9.5, z1 + 0.25, yellow, Enum.Material.Metal, f)
+    local panel = box("LiftPanel", x1 - 0.2, FLOOR + 3.5, z1 - 1.4, x1 + 0.3, FLOOR + 5.5, z1 - 0.4, Color3.fromRGB(20, 20, 24), Enum.Material.Metal, f)
+    box("LiftButton", x1 + 0.3, FLOOR + 4.3, z1 - 1.1, x1 + 0.4, FLOOR + 4.7, z1 - 0.7, Color3.fromRGB(255, 70, 180), Enum.Material.Neon, f, { CanCollide = false })
+    local sign = box("LiftSign", x0 + 0.5, FLOOR + 9.6, z1 - 0.1, x1 - 0.5, FLOOR + 11.2, z1 + 0.1, Color3.fromRGB(10, 10, 14), Enum.Material.Metal, f)
+    local sg = surface(sign, Enum.NormalId.Back, 30)
+    sg.Brightness = 2
+    text({ Text = "▼ THE VAULT", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(255, 150, 215) }, sg)
+    local pl = Instance.new("PointLight")
+    pl.Color = Color3.fromRGB(255, 70, 180)
+    pl.Brightness = 1.2
+    pl.Range = 12
+    pl.Parent = panel
+    local p = Instance.new("ProximityPrompt")
+    p.Name = "ElevatorDown"
+    p.ActionText = "Down to The Vault"
+    p.ObjectText = "Freight lift"
+    p.HoldDuration = 0.5
+    p.MaxActivationDistance = 9
+    p.RequiresLineOfSight = false
+    p.Parent = panel
+    p.Triggered:Connect(function(player)
+        if SafehouseBuilder.onElevator then SafehouseBuilder.onElevator(player, "down") end
+    end)
+end
+
+-- ──────────────────────────────────────────────
 function SafehouseBuilder:build(folder)
     local f = Instance.new("Folder")
     f.Name = "Safehouse"
@@ -736,11 +775,12 @@ function SafehouseBuilder:build(folder)
 
     self:_shell(f)
     self:_garageDoor(f)
-    self:_planningTable(f, refs)
-    self:_crewPads(f, refs)
-    self:_gearWall(f)
-    self:_lounge(f, refs)
+    -- v1.2: the crew pads, planning table, gear wall and TV moved down to The
+    -- Vault (ClubBuilder). The auto shop is just the cover business now, with
+    -- a freight lift down to the club. (_planningTable/_crewPads/_gearWall/
+    -- _lounge are kept in this file but no longer called.)
     self:_clutter(f)
+    self:_liftDown(f)
 
     local street = Instance.new("Folder")
     street.Name = "Street"

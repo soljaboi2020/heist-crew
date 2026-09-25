@@ -24,7 +24,7 @@ local TipHud = {}
 local localPlayer = Players.LocalPlayer
 
 local TIPS = {
-    welcome = { "Welcome to the crew", "Talk to me (E on the Boss) for the plan. Pick a role on a pad by the wall, then ready up at the table." },
+    welcome = { "Welcome to The Vault", "Pick a role on the pads by the east wall, talk to me (E) for the plan, then ready up at the holo table." },
     start   = { "You're in", "Follow the markers. Stay out of flashlights and red camera cones — they fill a meter before the alarm." },
     spotted = { "They're onto you", "That meter means someone can see you. Break line of sight and it drains." },
     bag     = { "Heavy, huh?", "Bags slow you down. Take it to the car and press E at the trunk — or G to throw it to a teammate." },

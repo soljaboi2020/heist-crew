@@ -29,11 +29,14 @@ local T = UITheme.C
 local BriefingUI = {}
 local localPlayer = Players.LocalPlayer
 
+-- v1.2: shots inside The Vault (club HQ): holo table, job screen, DJ stage, garage bay
+local HF = Constants.WORLD.HUB_FLOOR
+local TB = Constants.WORLD.HUB_TABLE
 local SHOTS = {
-    -- camera position, look-at (world) — safehouse interior
-    { from = Vector3.new(-7, 12, 25), to = Vector3.new(-1, 3.8, 18), drift = Vector3.new(6, 0, 0) },
-    { from = Vector3.new(6, 8, 26), to = Vector3.new(0, 9, 39.5), drift = Vector3.new(-5, 0, 0) },
-    { from = Vector3.new(0, 7, 20), to = Vector3.new(0, 6, 3), drift = Vector3.new(0, 0, -4) },
+    { from = Vector3.new(TB.x - 8, HF + 11, TB.z + 7), to = Vector3.new(TB.x, HF + 3.4, TB.z), drift = Vector3.new(8, 0, 0) },
+    { from = Vector3.new(TB.x + 6, HF + 10, TB.z + 4), to = Vector3.new(TB.x, HF + 13, TB.z - 9), drift = Vector3.new(-6, 0, 0) },
+    { from = Vector3.new(0, HF + 6, 30), to = Vector3.new(0, HF + 9, 2), drift = Vector3.new(0, 2, -5) },
+    { from = Vector3.new(-2, HF + 7, 42), to = Vector3.new(-17, HF + 3, 52), drift = Vector3.new(-3, 0, 2) },
 }
 local LINE_TIME = 4.2
 
@@ -234,13 +237,43 @@ function BriefingUI:play()
     self:_showReady()
 end
 
+function BriefingUI:_restoreCamera()
+    local cam = workspace.CurrentCamera
+    if cam.CameraType == Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Custom end
+    local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then cam.CameraSubject = hum end
+end
+
 function BriefingUI:_dropIn(payload)
     local u = self._ui
     u.readyCard.Visible = false
+    if payload.phase == "travel" then
+        -- freight lift: a quick dip to black while the server moves you
+        u.black.BackgroundTransparency = 1
+        TweenService:Create(u.black, TweenInfo.new(0.35), { BackgroundTransparency = 0 }):Play()
+        task.delay(0.8, function()
+            TweenService:Create(u.black, TweenInfo.new(0.5), { BackgroundTransparency = 1 }):Play()
+        end)
+        return
+    end
+    if payload.phase == "rollout" then
+        -- v1.2: watch the getaway car roll up the ramp in the garage bay
+        if self._playing then return end
+        self:_letterbox(true)
+        local cam = workspace.CurrentCamera
+        if typeof(payload.camFrom) == "Vector3" and typeof(payload.camTo) == "Vector3" then
+            cam.CameraType = Enum.CameraType.Scriptable
+            cam.CFrame = CFrame.lookAt(payload.camFrom, payload.camTo)
+            TweenService:Create(cam, TweenInfo.new(2.6, Enum.EasingStyle.Sine),
+                { CFrame = CFrame.lookAt(payload.camFrom + Vector3.new(-4, 3, 6), payload.camTo + Vector3.new(0, 6, 8)) }):Play()
+        end
+        return
+    end
     if payload.phase == "fade" then
         self:_letterbox(true)
         TweenService:Create(u.black, TweenInfo.new(0.9), { BackgroundTransparency = 0 }):Play()
     elseif payload.phase == "title" then
+        self:_restoreCamera()
         u.tName.Text = payload.jobName or ""
         u.black.BackgroundTransparency = 0
         u.title.GroupTransparency = 1
