@@ -153,11 +153,9 @@ function TipHud:start()
             if hum and hum.SeatPart and hum.SeatPart:IsA("VehicleSeat") then self:show("drive") end
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root and not self._seen.lasers then
-                -- lasers live behind keycard doors; if a beam is visible within 14 studs, warn
-                local parts = workspace:GetPartBoundsInRadius(root.Position, 14)
-                for _, p in ipairs(parts) do
-                    if p.Material == Enum.Material.Neon and p.Color.R > 0.8 and p.Color.G < 0.35 and p.Transparency < 0.5
-                        and p.Size.Y < 0.3 and math.max(p.Size.X, p.Size.Z) > 4 then
+                -- (fix v1.1) beams are CanQuery=false, so find them by the "Laser" tag
+                for _, p in ipairs(game:GetService("CollectionService"):GetTagged("Laser")) do
+                    if p:IsA("BasePart") and p.Transparency < 0.5 and (p.Position - root.Position).Magnitude < 14 then
                         self:show("lasers")
                         break
                     end

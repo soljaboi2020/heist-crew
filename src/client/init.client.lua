@@ -29,6 +29,12 @@ print("════════════════════════�
 print(string.format("[HEIST CREW] Client online ✅ — playing as %s", localPlayer.Name))
 print("══════════════════════════════════════════")
 
+-- (fix v1.1) Roblox's own player list sits top-right, right on top of the cash
+-- and job cards. The safehouse TV shows the leaderboard instead.
+pcall(function()
+    game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+end)
+
 local ORDER = {
     "CashHud", "Notifications", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",

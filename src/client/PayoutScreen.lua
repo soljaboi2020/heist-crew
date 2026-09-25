@@ -80,9 +80,16 @@ function PayoutScreen:_build()
     UITheme.stroke(card)
     local scale = Instance.new("UIScale")
     scale.Parent = card
-    local fit = Instance.new("UISizeConstraint")
-    fit.MaxSize = Vector2.new(520, 520)
-    fit.Parent = card
+    -- (fix v1.1) scale the whole card down on small screens (phones): the card's
+    -- UIScale animates between 0.9x and 1x of this fit factor
+    self._fit = 1
+    local function refit()
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+        self._fit = math.clamp(math.min((vp.Y - 40) / 540, (vp.X - 40) / 540), 0.4, 1)
+        if screen.Enabled then scale.Scale = self._fit end
+    end
+    refit()
+    if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(refit) end
     local accent = Instance.new("Frame")
     accent.Size = UDim2.new(1, 0, 0, 5)
     accent.BorderSizePixel = 0
@@ -219,9 +226,10 @@ function PayoutScreen:show(win, p)
 
     u.screen.Enabled = true
     u.card.GroupTransparency = 1
-    u.scale.Scale = 0.9
+    local fit = self._fit or 1
+    u.scale.Scale = 0.9 * fit
     TweenService:Create(u.card, TweenInfo.new(0.3), { GroupTransparency = 0 }):Play()
-    TweenService:Create(u.scale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+    TweenService:Create(u.scale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = fit }):Play()
 
     task.spawn(function()
         task.wait(0.5)

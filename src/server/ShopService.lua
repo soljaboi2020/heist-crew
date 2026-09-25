@@ -38,6 +38,7 @@ for _, g in ipairs(Constants.GEAR) do GEAR_BY_ID[g.id] = g end
 for _, m in ipairs(Constants.MASKS) do MASK_BY_ID[m.id] = m end
 
 local maskTemplates = {}   -- assetId -> Accessory (never parented)
+local wearing = {}         -- [player] = true while a mask should be on
 
 local function gearString(d)
     local owned = {}
@@ -162,10 +163,12 @@ function ShopService:wearMask(player)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not d or not hum then return end
     self:removeMask(player)
+    wearing[player] = true
     local m = MASK_BY_ID[d.mask] or MASK_BY_ID.Bandit
     task.spawn(function()
         local template = getMaskTemplate(m.assetId)
-        if not template or not char.Parent then return end
+        -- (fix v1.1) the load can finish after the run already ended
+        if not template or not char.Parent or not wearing[player] then return end
         local acc = template:Clone()
         acc.Name = "HC_Mask"
         for _, d2 in ipairs(acc:GetDescendants()) do
@@ -176,6 +179,7 @@ function ShopService:wearMask(player)
 end
 
 function ShopService:removeMask(player)
+    wearing[player] = nil
     local char = player.Character
     local old = char and char:FindFirstChild("HC_Mask")
     if old then old:Destroy() end

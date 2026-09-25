@@ -383,6 +383,37 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     carries seated players, touch-button positions (`TOUCH_POS` in LootHud/AbilityHud).
   - ⏸️ **NOTHING HERE HAS BEEN PLAYTESTED.** Everything compiles + analyzes clean; that's all.
 
+- **2026-09-25** — **🎬 v1.1.0 — "MAKE IT FEEL LIKE A HEIST" + FULL BUG SWEEP.** Malachi: v1.0 *"looks
+  great, everything works"* but *"not much of a heist… kind of confusing."* Built:
+  - **Briefing + drop-in** (`BriefingUI`): E on the Boss → letterboxed camera sweep over blueprint/TV/
+    garage with typed-out lines (`Constants.JOBS[].briefing`) → READY UP. Ready also at the planning
+    table (E; change job moved to R). All ready → 5s, or ≥half ready → 15s → fade → crew teleported to
+    the sidewalk by the car → masks on → title card. Implicit start (first heist action) still works.
+  - **Waypoints** (`WaypointHud`) from `JobInfo.targets` (server computes the next goal: BRIEFING/READY,
+    BREAKER, SEARCH (keycard rooms), KEYPAD, DRILL/FIX DRILL, LOOT, SMASH, CAR, MARINA). Carrying a bag
+    → only CAR/MARINA. Off-screen → edge arrow.
+  - **Detection meters** (`DetectionHud`): guards (`GuardService`, 0.4s point-blank → 1.4s at range,
+    drains out of sight) and cameras publish `GuardSuspicion`/`CameraSuspicion` + source position →
+    "SPOTTING…" meter + direction arrow. Guards no longer alarm instantly.
+  - **Payout screen** (`PayoutScreen`): bags count in with cha-chings, stealth bonus, YOUR CUT rolls
+    up, grade stamp **S/A/B/C/F**, +XP, time, PLAY AGAIN; failures show why + a tip. Old result card
+    retired.
+  - **Rookie tips** (`TipHud`, attribute `Rookie` until first finished heist) + objective pill now
+    "Step 1/2/3 of 3" in the lobby and "Stealth · m:ss" during a run.
+  - **Bug sweep** (independent reviewer, 30 findings, 0 crashes) — fixed: drop-off latch could die for
+    the run · empty parked car could be busted · reset race could skip the job reset · bags lost on
+    death / after 180s · prompts through walls (LOS on everywhere, drill needs the door open) ·
+    jewelry open-room loot locked (`inVault=false`) · **failed DataStore read no longer saves defaults
+    over real data** · Hacker's keypad prompt hidden by Swipe (own key H + AlwaysShow) · seated players
+    teleported while welded (`unseat`) · keycard step stayed ticked · briefing camera tween leak ·
+    READY button toggled you off · off-screen arrows mirrored · Roblox player list over the HUD ·
+    phones (role card, payout scale) · bag strap welded at origin · loose bags blocking the car ·
+    guards chasing into the safehouse · pad toast spam · drill bonus farmable · mask race ·
+    late joiners missing the alarm · laser tip never showing · guard loop surviving respawn · camera
+    perf · street lamp shadows · first-spawn Sneakers · one AFK player blocking launch.
+  - **Known, not fixed:** driving may look choppy on other clients (server PivotTo of an anchored car).
+    If it does, next step = unanchored chassis + AlignPosition owned by the driver.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

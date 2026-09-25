@@ -89,7 +89,7 @@ local function carrySpeed(player, kind)
     return base - slow
 end
 
-local function makeBag(kind)
+local function makeBag(kind, cframe)
     local info = Constants.LOOT[kind] or {}
     local col = UITheme.rgb(info.color or { 255, 255, 255 })
     local bag = Instance.new("Part")
@@ -100,6 +100,9 @@ local function makeBag(kind)
     bag.CanCollide = false
     bag.Massless = true
     bag:SetAttribute("Kind", kind)
+    -- (fix v1.1) position BEFORE welding — a WeldConstraint keeps the offset it
+    -- sees when made, so welding at the origin left the strap floating there
+    bag.CFrame = cframe or CFrame.new()
     local strap = Instance.new("Part")
     strap.Name = "Strap"
     strap.Size = Vector3.new(2.25, 0.25, 1.25)
@@ -131,8 +134,7 @@ local function setCarrying(player, kind)
     if not kind or not char then return end
     local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
     if not torso then return end
-    local bag = makeBag(kind)
-    bag.CFrame = torso.CFrame * CFrame.new(0, 0, 1)
+    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1))
     local weld = Instance.new("WeldConstraint")
     weld.Part0, weld.Part1 = torso, bag
     weld.Parent = bag
@@ -141,23 +143,30 @@ local function setCarrying(player, kind)
 end
 
 local function spawnLoose(kind, cframe, velocity)
-    local bag = makeBag(kind)
+    local bag = makeBag(kind, cframe)
     bag.Massless = false
     bag.CanCollide = true
-    bag.CFrame = cframe
     bag.Parent = refs and refs.root or workspace
     for _, d in ipairs(bag:GetDescendants()) do
         if d:IsA("BasePart") then d.Massless = true end
     end
     pcall(function() bag:SetNetworkOwner(nil) end)
     if velocity then bag.AssemblyLinearVelocity = velocity end
+    -- (fix v1.1) once it has landed, pin it and stop it colliding — a bag on the
+    -- road used to stop the getaway car dead
+    task.delay(2, function()
+        if bag.Parent then
+            bag.Anchored = true
+            bag.CanCollide = false
+        end
+    end)
     local p = Instance.new("ProximityPrompt")
     p.Name = "PickUpBag"
     p.ActionText = "Pick up"
     p.ObjectText = kind .. " · " .. UITheme.money((Constants.LOOT[kind] or {}).value or 0)
     p.HoldDuration = 0.3
     p.MaxActivationDistance = 8
-    p.RequiresLineOfSight = false
+    p.RequiresLineOfSight = true
     p.Parent = bag
     track(p.Triggered:Connect(function(player)
         if carriers[player] or not bag.Parent then return end
@@ -201,7 +210,7 @@ local function addPile(kind, visual, standCFrame, isVault, isCase, glass)
     p.ObjectText = kind .. " · " .. UITheme.money(info.value or 0)
     p.HoldDuration = isCase and 1.2 or 1
     p.MaxActivationDistance = 7
-    p.RequiresLineOfSight = false
+    p.RequiresLineOfSight = true   -- (fix v1.1) no grabbing loot through walls
     p.Enabled = not isVault
     p.Parent = anchor
     local pile = { kind = kind, visual = visual, prompt = p, anchor = anchor, taken = false, isVault = isVault, isCase = isCase,
@@ -339,7 +348,9 @@ function LootService:arm(jobRefs)
     self:disarm()
     refs = jobRefs
     for _, spot in ipairs(refs.lootSpots or {}) do
-        addPile(spot.kind, spot.visual, spot.cframe, refs.vault ~= nil, false)
+        -- (fix v1.1) loot sitting out in the open (jewelry pink diamond / painting)
+        -- is marked inVault = false by the builder and is grabbable straight away
+        addPile(spot.kind, spot.visual, spot.cframe, refs.vault ~= nil and spot.inVault ~= false, false)
     end
     for _, case in ipairs(refs.smashCases or {}) do
         addPile(case.kind or "Jewels", case.visual, case.cframe, false, true, case.glass)
@@ -395,23 +406,35 @@ function LootService:init(callbacks, shopService)
         local muscle = player:GetAttribute("Role") == "Muscle"
         local speed = Constants.BAG_THROW_SPEED * (muscle and 1.3 or 1)
         local bag = spawnLoose(kind, root.CFrame * CFrame.new(0, 1.5, -2.5), flat * speed + Vector3.new(0, 22, 0))
-        Debris:AddItem(bag, 180)
         cb.onEvent("throw", player, { kind = kind })
     end)
 
-    -- respawning mid-run resets WalkSpeed to default — re-apply while carrying
-    Players.PlayerAdded:Connect(function(player)
-        player.CharacterAdded:Connect(function()
-            carriers[player] = nil
-            player:SetAttribute("CarryingLoot", nil)
-        end)
-    end)
-    for _, player in ipairs(Players:GetPlayers()) do
-        player.CharacterAdded:Connect(function()
-            carriers[player] = nil
-            player:SetAttribute("CarryingLoot", nil)
-        end)
+    -- (fix v1.1) dying / resetting while carrying drops the bag where you fell
+    -- (it used to vanish with the old character, lost for the whole run)
+    local function hook(player)
+        local function onChar(char, existing)
+            if not existing then
+                carriers[player] = nil
+                player:SetAttribute("CarryingLoot", nil)
+            end
+            local hum = char:WaitForChild("Humanoid", 10)
+            if hum then
+                hum.Died:Connect(function()
+                    local c = carriers[player]
+                    if not c then return end
+                    local root = char:FindFirstChild("HumanoidRootPart")
+                    if c.bag then c.bag:Destroy() end
+                    carriers[player] = nil
+                    player:SetAttribute("CarryingLoot", nil)
+                    if root and refs then spawnLoose(c.kind, root.CFrame) end
+                end)
+            end
+        end
+        player.CharacterAdded:Connect(onChar)
+        if player.Character then task.spawn(onChar, player.Character, true) end
     end
+    Players.PlayerAdded:Connect(hook)
+    for _, player in ipairs(Players:GetPlayers()) do hook(player) end
 end
 
 return LootService

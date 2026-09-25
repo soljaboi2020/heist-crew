@@ -631,7 +631,7 @@ function SafehouseBuilder:buildStreet(f)
                 sp.Brightness = 2.2
                 sp.Range = 22
                 sp.Color = Color3.fromRGB(255, 200, 140)
-                sp.Shadows = true
+                sp.Shadows = false   -- (perf v1.1) 12 shadowed street lamps was too heavy on phones
                 sp.Parent = head
             end
         end

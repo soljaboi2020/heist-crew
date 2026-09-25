@@ -86,6 +86,11 @@ local function onPlayerAdded(player)
     ProgressService:sync(player)
     ShopService:onPlayerJoined(player)
 
+    -- (fix v1.1) the first character may already exist by now
+    if player.Character and ShopService:hasGear(player, "Sneakers") then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 18 end
+    end
     player.CharacterAdded:Connect(function(char)
         task.wait(0.5)
         EconomyService:fireCashUpdate(player)

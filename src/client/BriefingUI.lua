@@ -84,8 +84,8 @@ function BriefingUI:_build()
 
     local skip = Instance.new("TextButton")
     skip.Name = "Skip"
-    skip.AnchorPoint = Vector2.new(1, 0)
-    skip.Position = UDim2.new(1, -20, 0, 70)
+    skip.AnchorPoint = Vector2.new(1, 1)
+    skip.Position = UDim2.new(1, -20, 1, -120)   -- (v1.1) bottom-right, clear of the JOB card
     skip.Size = UDim2.fromOffset(110, 36)
     skip.BackgroundColor3 = T.bg
     skip.BackgroundTransparency = 0.2
@@ -203,8 +203,10 @@ function BriefingUI:play()
         if skipped then break end
         local shot = SHOTS[(i - 1) % #SHOTS + 1]
         cam.CFrame = CFrame.lookAt(shot.from, shot.to)
-        TweenService:Create(cam, TweenInfo.new(LINE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            { CFrame = CFrame.lookAt(shot.from + shot.drift, shot.to) }):Play()
+        if self._camTween then self._camTween:Cancel() end
+        self._camTween = TweenService:Create(cam, TweenInfo.new(LINE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            { CFrame = CFrame.lookAt(shot.from + shot.drift, shot.to) })
+        self._camTween:Play()
         -- typewriter
         u.line.Text = text
         u.line.MaxVisibleGraphemes = 0
@@ -219,6 +221,8 @@ function BriefingUI:play()
 
     ContextActionService:UnbindAction("HC_SkipBriefing")
     skipConn:Disconnect()
+    -- (fix v1.1) stop the last shot's tween or it keeps dragging the camera
+    if self._camTween then self._camTween:Cancel() self._camTween = nil end
     cam.CameraType = (oldType == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or oldType
     local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
     if hum then cam.CameraSubject = hum end
@@ -257,7 +261,7 @@ function BriefingUI:start()
     local readyRemote = Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent")
 
     u.readyBtn.Activated:Connect(function()
-        if readyRemote then readyRemote:FireServer() end
+        if readyRemote then readyRemote:FireServer(true) end   -- SET ready (never toggles off)
         u.readyCard.Visible = false
     end)
     u.later.Activated:Connect(function() u.readyCard.Visible = false end)

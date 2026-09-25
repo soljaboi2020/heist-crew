@@ -678,7 +678,8 @@ local function updateBust(car, dt: number)
         end
     end
     local meter = tonumber(car.model:GetAttribute("BustMeter")) or 0
-    if near and car:getSpeed() < TUNE.BUST_MAX_CAR_SPEED then
+    -- (fix v1.1: an EMPTY car can't be busted — the driver may be out loading bags)
+    if near and car:getSpeed() < TUNE.BUST_MAX_CAR_SPEED and #car:getOccupants() > 0 then
         meter = meter + TUNE.BUST_FILL * dt
     else
         meter = meter - TUNE.BUST_DRAIN * dt

@@ -26,6 +26,7 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local PlayerDataService = {}
 
 local cache = {}  -- [userId] = data table
+local loadFailed = {}  -- [userId] = true → NEVER save over their real data this session
 
 -- DataStore key. Bump the version suffix if you ever change the data shape
 -- in a way that breaks old saves.
@@ -76,11 +77,24 @@ function PlayerDataService:loadPlayer(player)
     local data = nil
 
     if store then
-        local success, result = pcall(function()
-            return store:GetAsync("Player_" .. player.UserId)
-        end)
-        if success and result then
-            data = result
+        -- (fix v1.1) retry, and if the read truly fails, play on defaults but
+        -- never save — saving defaults would wipe the player's real progress
+        local ok = false
+        for attempt = 1, 3 do
+            local success, result = pcall(function()
+                return store:GetAsync("Player_" .. player.UserId)
+            end)
+            if success then
+                ok = true
+                if result then data = result end
+                break
+            end
+            warn(string.format("[PlayerDataService] load attempt %d failed for %s: %s", attempt, player.Name, tostring(result)))
+            task.wait(attempt)
+        end
+        if not ok then
+            loadFailed[player.UserId] = true
+            warn("[PlayerDataService] " .. player.Name .. " couldn't be loaded — this session won't save")
         end
     end
 
@@ -98,6 +112,10 @@ end
 function PlayerDataService:savePlayer(player)
     local data = cache[player.UserId]
     if not data then return end
+    if loadFailed[player.UserId] then
+        warn("[PlayerDataService] not saving " .. player.Name .. " — their load failed earlier")
+        return
+    end
 
     if store then
         local success, err = pcall(function()

@@ -69,7 +69,7 @@ function CashHud:_buildUi()
     local delta = UITheme.label({
         Name = "Delta",
         AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -18, 0, 80),
+        Position = UDim2.new(1, -228, 0, 34),   -- (v1.1) left of the cash card, clear of the JOB card
         Size = UDim2.fromOffset(160, 22),
         TextXAlignment = Enum.TextXAlignment.Right,
         FontFace = UITheme.F.display,
@@ -107,11 +107,11 @@ function CashHud:setCash(newAmount, animate)
         -- "+$X" drifts down and fades
         local d = self._delta
         d.Text = "+" .. UITheme.money(newAmount - old)
-        d.Position = UDim2.new(1, -18, 0, 80)
+        d.Position = UDim2.new(1, -228, 0, 34)
         d.TextTransparency = 0
         d.TextStrokeTransparency = 0.6
         TweenService:Create(d, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = UDim2.new(1, -18, 0, 96),
+            Position = UDim2.new(1, -228, 0, 50),
             TextTransparency = 1,
             TextStrokeTransparency = 1,
         }):Play()

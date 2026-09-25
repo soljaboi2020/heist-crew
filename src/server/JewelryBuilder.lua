@@ -1009,7 +1009,7 @@ function JewelryBuilder:_safeRoom(f, refs)
     gem(dB, Vector3.new(px, FLOOR + 3.45, pz), 0.24, HOT_PINK, true)
     gem(dB, Vector3.new(px - 0.25, FLOOR + 3.08, pz + 0.2), 0.12, CYAN, true)
     gem(dB, Vector3.new(px + 0.25, FLOOR + 3.08, pz - 0.2), 0.12, CYAN, true)
-    table.insert(loot, { kind = "Diamonds", cframe = stand(px, 18.0, pz), visual = dB })
+    table.insert(loot, { kind = "Diamonds", cframe = stand(px, 18.0, pz), visual = dB, inVault = false })
     canLight(s, px, pz, rgb(255, 236, 246), 3, 36)
 
     -- 4) Art: a framed Miami sunset on a wooden easel
@@ -1046,7 +1046,7 @@ function JewelryBuilder:_safeRoom(f, refs)
             BackgroundColor3 = rgb(70, 30, 120) }, ag)
     end
     frame({ Size = UDim2.fromScale(1, 0.18), Position = UDim2.fromScale(0, 0.82), BackgroundColor3 = rgb(40, 120, 160) }, ag)
-    table.insert(loot, { kind = "Art", cframe = stand(ex, 18.1, ez), visual = art })
+    table.insert(loot, { kind = "Art", cframe = stand(ex, 18.1, ez), visual = art, inVault = false })
     canLight(s, ex, ez - 0.8, rgb(255, 232, 210), 2.6, 40)
 
     -- light over the safe + a caged work lamp for the room
@@ -1096,7 +1096,7 @@ function JewelryBuilder:build(folder)
         id = "jewelry",
         root = f,
         entryPoint = Vector3.new(CX, 3, -4),
-        policeStop = Vector3.new(CX, 0, -14),
+        policeStop = Vector3.new(CX - 20, 0, -14),   -- (v1.1: moved west so parked cruisers sit well clear of the getaway spot)
         getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -10), Vector3.new(-30, 0, -10)),
     }
 

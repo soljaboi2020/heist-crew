@@ -36,7 +36,7 @@ function DetectionHud:start()
 
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.Position = UDim2.fromScale(0.5, 0.36)
+    card.Position = UDim2.fromScale(0.5, 0.62)   -- (v1.1) below the crosshair, clear of the toast stack
     card.Size = UDim2.fromOffset(200, 44)
     card.BackgroundTransparency = 1
     card.GroupTransparency = 1
@@ -83,7 +83,6 @@ function DetectionHud:start()
         if active and cam and typeof(from) == "Vector3" then
             local rel = cam.CFrame:PointToObjectSpace(from)
             local dir = Vector2.new(rel.X, -rel.Y)
-            if rel.Z > 0 then dir = -dir end
             if dir.Magnitude > 1e-3 then
                 dir = dir.Unit
                 local centre = cam.ViewportSize / 2

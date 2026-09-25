@@ -53,6 +53,12 @@ function CrewHud:_buildUi()
     -- bottom-left: top-left belongs to Roblox's chat window (it covered this card)
     local role = UITheme.panel({ Name = "RoleCard", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16),
         Size = UDim2.fromOffset(240, 62), radius = 14 })
+    -- (fix v1.1) on phones the bottom-left is the thumbstick — move the card up
+    local UIS = game:GetService("UserInputService")
+    if UIS.TouchEnabled and not UIS.KeyboardEnabled then
+        role.AnchorPoint = Vector2.new(0, 0)
+        role.Position = UDim2.new(0, 16, 0, 64)
+    end
     role.Parent = screen
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(0, 4, 1, -20)

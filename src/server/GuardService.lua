@@ -98,6 +98,8 @@ local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, hea
         if not character or character == model then return end
         local player = Players:GetPlayerFromCharacter(character)
         if not player then return end
+        local hum = character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.SeatPart then return end   -- (fix v1.1) in the car = the police's job
         if guard.cooldown > 0 then return end
         if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
         guard.cooldown = 2  -- prevent multi-fire
@@ -158,7 +160,11 @@ local function nearestPlayer(from, maxDist)
         local char = p.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hum and hrp and hum.Health > 0 and not hum.SeatPart then
+        -- (fix v1.1) never chase into the safehouse — it's home base
+        local sh = Constants.WORLD.SAFEHOUSE_CENTER
+        local inSafehouse = hrp and math.abs(hrp.Position.X - sh.x) < Constants.WORLD.SAFEHOUSE_HALF_WIDTH + 1
+            and math.abs(hrp.Position.Z - sh.z) < Constants.WORLD.SAFEHOUSE_HALF_DEPTH + 1
+        if hum and hrp and hum.Health > 0 and not hum.SeatPart and not inSafehouse then
             local d = (hrp.Position - from).Magnitude
             if d < bestD then best, bestD = hrp.Position, d end
         end
@@ -168,7 +174,7 @@ end
 
 local function runBrain(guard)
     task.spawn(function()
-        while guards[guard.name] do
+        while guards[guard.name] == guard do   -- (fix v1.1) a respawned guard with the same name ends the old loop
             local gen = guard.gen
             if guard.stunnedUntil and os.clock() < guard.stunnedUntil then
                 task.wait(0.2)

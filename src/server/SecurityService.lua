@@ -65,8 +65,8 @@ local function prompt(parent, name, action, object, hold, extra)
     p.ActionText = action
     p.ObjectText = object or ""
     p.HoldDuration = hold or 0
-    p.MaxActivationDistance = 9
-    p.RequiresLineOfSight = false
+    p.MaxActivationDistance = 8
+    p.RequiresLineOfSight = true   -- (fix v1.1) nothing through walls (breaker from outside, keycard from the garden…)
     p.KeyboardKeyCode = Enum.KeyCode.E
     for k, v in pairs(extra or {}) do p:SetAttribute(k, v) end
     p.Parent = parent
@@ -118,19 +118,25 @@ local function publishCameraSuspicion()
         if math.abs(best - old) > 0.02 or (best == 0 and old ~= 0) then
             player:SetAttribute("CameraSuspicion", best)
         end
-        if from then player:SetAttribute("CameraFrom", from) end
+        if from and best > 0 then player:SetAttribute("CameraFrom", from) end
     end
 end
 
+local camRayParams, camRayBuilt = nil, 0
 local function tickCameras(dt)
     if not refs or state.camerasCut then return end
     local t = os.clock()
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    local exclude = {}
-    for _, cam in ipairs(refs.cameras or {}) do table.insert(exclude, cam.model) end
-    for _, g in ipairs(CollectionService:GetTagged("Guard")) do table.insert(exclude, g) end
-    rayParams.FilterDescendantsInstances = exclude
+    -- (perf v1.1) rebuild the raycast filter once a second, not every frame
+    if not camRayParams or t - camRayBuilt > 1 then
+        camRayParams = RaycastParams.new()
+        camRayParams.FilterType = Enum.RaycastFilterType.Exclude
+        local exclude = {}
+        for _, cam in ipairs(refs.cameras or {}) do table.insert(exclude, cam.model) end
+        for _, g in ipairs(CollectionService:GetTagged("Guard")) do table.insert(exclude, g) end
+        camRayParams.FilterDescendantsInstances = exclude
+        camRayBuilt = t
+    end
+    local rayParams = camRayParams
 
     local cosHalf = math.cos(math.rad(S.CAMERA_HALF_ANGLE))
     for i, cam in ipairs(refs.cameras or {}) do
@@ -204,13 +210,14 @@ local function spawnKeycard()
 
     local p = prompt(card, "TakeKeycard", "Take", "Keycard", 0.4)
     p.MaxActivationDistance = 7
-    track(p.Triggered:Connect(function(player)
+    table.remove(prompts)   -- (fix v1.1) lives and dies with the card; don't grow the list forever
+    p.Triggered:Connect(function(player)
         if player:GetAttribute("HasKeycard") then return end
         player:SetAttribute("HasKeycard", true)
         card:Destroy()
         state.keycardPart = nil
         cb.onEvent("keycard", player)
-    end))
+    end)
     state.keycardPart = card
 end
 
@@ -262,6 +269,7 @@ end
 
 -- ── lasers ───────────────────────────────────────────────────────────
 local laserAcc = 0
+local pubAcc = 0
 local function tickLasers(dt)
     if not refs or not refs.laserRows then return end
     laserAcc = laserAcc + dt
@@ -326,6 +334,9 @@ function SecurityService:arm(jobRefs)
         if cam.head then state.camBase[i] = cam.head.CFrame end
         if cam.model then CollectionService:AddTag(cam.model, "SecurityCamera") end
     end
+    for _, row in ipairs(refs.laserRows or {}) do
+        for _, beam in ipairs(row.beams or {}) do CollectionService:AddTag(beam, "Laser") end
+    end
 
     -- breaker: everyone 3s, Hacker 1s (two prompts, the client shows the right one)
     if refs.breaker then
@@ -349,6 +360,12 @@ function SecurityService:arm(jobRefs)
             end
         end))
         local hack = prompt(door.panel, "HackKeypad", "Hack keypad", "Keypad", S.HACK_DOOR_HOLD, { RoleOnly = "Hacker" })
+        -- (fix v1.1) same panel as "Swipe" — give it its own key and let both show,
+        -- otherwise Roblox shows only one prompt per key and the Hacker never sees this
+        hack.KeyboardKeyCode = Enum.KeyCode.H
+        hack.GamepadKeyCode = Enum.KeyCode.ButtonY
+        hack.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
+        swipe.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
         track(hack.Triggered:Connect(function(player)
             if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
         end))
@@ -358,7 +375,11 @@ function SecurityService:arm(jobRefs)
         local ok, err = pcall(function()
             tickCameras(dt)
             tickLasers(dt)
-            publishCameraSuspicion()
+            pubAcc = pubAcc + dt
+            if pubAcc > 0.1 then
+                pubAcc = 0
+                publishCameraSuspicion()
+            end
         end)
         if not ok then warn("[SecurityService] tick failed:", err) end
     end))

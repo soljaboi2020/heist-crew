@@ -28,6 +28,7 @@ local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local CrewService = {}
 
 local holders = {}     -- roleId -> Player
+local spam = {}
 local refs = nil
 local PlayerData = nil
 local notifyRemote = Remotes.getRemote(Remotes.NAMES.Notify, "RemoteEvent")
@@ -64,7 +65,12 @@ local function assign(player, roleId)
     local current = holders[roleId]
     if current == player then return end
     if current and current.Parent then
-        notify(player, string.format("%s is already the %s", current.DisplayName, roleId), "red")
+        -- (fix v1.1) Touched fires constantly while you stand there — tell them once
+        local key = player.UserId .. roleId
+        if not (spam[key] and os.clock() - spam[key] < 3) then
+            spam[key] = os.clock()
+            notify(player, string.format("%s is already the %s", current.DisplayName, roleId), "red")
+        end
         return
     end
     local old = roleOf(player)

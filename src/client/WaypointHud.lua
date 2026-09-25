@@ -141,7 +141,8 @@ function WaypointHud:start()
                     local centre = vp / 2
                     local rel = cam.CFrame:PointToObjectSpace(t.pos)
                     local dir = Vector2.new(rel.X, -rel.Y)
-                    if rel.Z > 0 then dir = -dir end   -- behind you: flip
+                    -- (fix v1.1) no flip: rel is already in camera space, flipping mirrored
+                    -- things behind you onto the wrong side of the screen
                     if dir.Magnitude < 1e-3 then dir = Vector2.new(0, 1) end
                     dir = dir.Unit
                     local sx = (centre.X - EDGE) / math.max(math.abs(dir.X), 1e-3)

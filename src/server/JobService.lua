@@ -97,7 +97,21 @@ end
 
 local function job() return currentId and jobs[currentId] end
 
+-- (fix v1.1) a seated character is welded to the (anchored) car seat — moving
+-- its root would drag the seat or snap back. Break the seat weld first.
+local function unseat(player)
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if hum and hum.SeatPart then
+        local seat = hum.SeatPart
+        local w = seat:FindFirstChild("SeatWeld")
+        if w then w:Destroy() end
+        hum.Sit = false
+        task.wait()
+    end
+end
+
 local function sendToSafehouse(player)
+    unseat(player)
     local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     local sp = Constants.WORLD.SPAWN_POSITION
     if hrp then hrp.CFrame = CFrame.new(sp.x + math.random(-4, 4), sp.y + 3, sp.z + math.random(-2, 2)) end
@@ -209,7 +223,11 @@ local function buildInfo()
         add("cases", string.format("Smash the cases  %d/%d", c.casesTaken, c.cases), c.cases > 0 and c.casesTaken >= c.cases)
     end
     local doorsOpen = S.security:doorsOpen()
-    add("keycard", "Find the keycard", doorsOpen or (run and run.keycardFound) or false, false)
+    -- (fix v1.1) ticked only while someone actually HOLDS the card (or the door is open);
+    -- if the holder gets caught the card respawns and the step comes back
+    local held = false
+    for _, p in ipairs(Players:GetPlayers()) do if p:GetAttribute("HasKeycard") then held = true end end
+    add("keycard", "Find the keycard", doorsOpen or held, false)
     add("door", j.cfg.id == "jewelry" and "Get into the back room" or "Open the vault wing", doorsOpen)
     local noun = j.cfg.id == "jewelry" and "Safe" or "Vault"
     add("vault", drillLabel(noun), run ~= nil and run.vaultOpen == true)
@@ -276,10 +294,9 @@ local function openVault(player)
     playOneShot(Constants.SOUNDS.VAULT_CRACK, 0.9)
     progressRemote:FireAllClients(1)
     task.delay(1.2, function() progressRemote:FireAllClients(0) end)
-    if player and player.Parent then
-        S.economy:addCash(player, Constants.HEIST_PAYOUT_CRACKER_BONUS, "Drilled the vault", { payout = true })
-        notify(player, string.format("+%s for running the drill", UITheme.money(Constants.HEIST_PAYOUT_CRACKER_BONUS)), "gold", 3)
-    end
+    -- (fix v1.1) the drill bonus is paid at a SUCCESSFUL finish, not here — it was
+    -- farmable by drilling and bailing
+    run.driller = player
     notifyAll("It's open — bag the loot and get it to the car", "green", 4)
     pushInfo()
 end
@@ -343,6 +360,10 @@ local startRun, triggerAlarm   -- forward declarations
 local function startDrill(player)
     local j = job()
     if not j or not j.refs.vault then return end
+    if not S.security:doorsOpen() then
+        notify(player, "Get through the keycard door first", "white", 2)
+        return
+    end
     if not run then startRun(player, "drill") end
     if not run then return end
     addToCrew(player)
@@ -501,7 +522,9 @@ finish = function(result)
     local r = run
     local j = job()
     run = nil
-    resettingUntil = os.clock() + Constants.JOB_RESET_COOLDOWN
+    -- (fix v1.1) block new runs until the reset has ACTUALLY happened (it used to be
+    -- skippable if someone tripped a sensor on the exact frame the cooldown ended)
+    resettingUntil = math.huge
 
     alarmLoop(false)
     alarmRemote:FireAllClients(false)
@@ -523,9 +546,14 @@ finish = function(result)
     if #escapees > 0 and take > 0 then
         each = math.floor(take * (1 + (stealth and j.cfg.stealthBonus or 0)) + 0.5)
     end
+    local success_pre = #escapees > 0 and take > 0
     local xpEach = Constants.XP.PER_HEIST + Constants.XP.PER_BAG * #bags + (stealth and Constants.XP.STEALTH or 0)
     local escapeeIds = {}
     for _, p in ipairs(escapees) do table.insert(escapeeIds, p.UserId) end
+    if success_pre and r.driller and r.driller.Parent and r.crew[r.driller] and r.crew[r.driller].escaped then
+        S.economy:addCash(r.driller, Constants.HEIST_PAYOUT_CRACKER_BONUS, "Drilled the vault", { payout = true })
+        notify(r.driller, string.format("+%s drill bonus", UITheme.money(Constants.HEIST_PAYOUT_CRACKER_BONUS)), "gold", 4)
+    end
     for _, p in ipairs(escapees) do
         if each > 0 then
             S.economy:addCash(p, each, "Heist payout " .. r.jobId, { payout = true })
@@ -590,7 +618,6 @@ finish = function(result)
     pushInfo()
 
     task.delay(Constants.JOB_RESET_COOLDOWN, function()
-        if run then return end
         S.security:reset()
         S.loot:reset()
         closeVault()
@@ -599,6 +626,7 @@ finish = function(result)
         -- fresh guards at their posts
         S.guards:spawnPatrols(nil, j.refs.guardRoutes)
         broadcastState("IDLE", {})
+        resettingUntil = 0
         notifyAll(string.format("%s has reset — ready for the next job", j.cfg.name), "gold", 3)
         pushInfo()
     end)
@@ -608,6 +636,14 @@ end
 local function allReady()
     local n, total = readyCounts()
     return total > 0 and n == total
+end
+
+-- (v1.1) one AFK player can't hold the crew hostage: if at least half are
+-- ready, a longer countdown starts; if everyone is, the short one.
+local MAJORITY_COUNTDOWN = 15
+local function enoughReady()
+    local n, total = readyCounts()
+    return total > 0 and n >= math.max(1, math.ceil(total / 2))
 end
 
 local function dropPoints(j)
@@ -633,8 +669,7 @@ local function launch()
     local pts = dropPoints(j)
     for i, p in ipairs(Players:GetPlayers()) do
         local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-        local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.Sit = false end
+        unseat(p)
         local pos = pts[(i - 1) % #pts + 1]
         if hrp then
             local faceTarget = j.refs.entryPoint or (pos + Vector3.new(0, 0, -1))
@@ -647,14 +682,18 @@ end
 
 local function checkLaunch()
     if run or os.clock() < resettingUntil then return end
-    if allReady() then
-        if launchAt == 0 then
-            launchAt = now() + Constants.LAUNCH_COUNTDOWN
+    if enoughReady() then
+        local wait = allReady() and Constants.LAUNCH_COUNTDOWN or MAJORITY_COUNTDOWN
+        local target = now() + wait
+        -- start a countdown, or shorten a running one when the last person readies
+        if launchAt == 0 or target < launchAt - 0.5 then
+            launchAt = target
             local token = {}
             launchToken = token
-            notifyAll(string.format("Everyone's ready — rolling out in %d", Constants.LAUNCH_COUNTDOWN), "gold", 3)
-            task.delay(Constants.LAUNCH_COUNTDOWN, function()
-                if launchToken == token and allReady() then launch() end
+            notifyAll(allReady() and string.format("Everyone's ready — rolling out in %d", wait)
+                or string.format("Rolling out in %d — ready up to come along", wait), "gold", 3)
+            task.delay(wait, function()
+                if launchToken == token and enoughReady() then launch() end
             end)
         end
     elseif launchAt ~= 0 then
@@ -665,7 +704,7 @@ local function checkLaunch()
     pushInfo()
 end
 
-function JobService:toggleReady(player)
+function JobService:toggleReady(player, forceReady)
     if run then
         notify(player, "The job's already running", "white", 2)
         return
@@ -674,7 +713,12 @@ function JobService:toggleReady(player)
         notify(player, "The job is resetting — give it a few seconds", "white", 2)
         return
     end
-    ready[player] = (not ready[player]) or nil
+    if forceReady then
+        if ready[player] then return end
+        ready[player] = true
+    else
+        ready[player] = (not ready[player]) or nil
+    end
     local n, total = readyCounts()
     if ready[player] then
         notifyAll(string.format("%s is ready  (%d/%d)", player.DisplayName, n, total), "gold", 2)
@@ -720,8 +764,8 @@ function JobService:selectJob(id)
         p.ActionText = "Place drill"
         p.ObjectText = target.cfg.id == "jewelry" and "Safe" or "Vault"
         p.HoldDuration = 0.8
-        p.MaxActivationDistance = 9
-        p.RequiresLineOfSight = false
+        p.MaxActivationDistance = 7
+        p.RequiresLineOfSight = true   -- (fix v1.1) no drilling through walls
         p.Parent = refs.vault.door
         p.Triggered:Connect(function(player) startDrill(player) end)
         drillPrompt = p
@@ -880,8 +924,8 @@ function JobService:init(deps)
         end,
     })
 
-    Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent").OnServerEvent:Connect(function(player)
-        JobService:toggleReady(player)
+    Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent").OnServerEvent:Connect(function(player, force)
+        JobService:toggleReady(player, force == true)
     end)
 
     Players.PlayerAdded:Connect(function(p)
@@ -890,6 +934,7 @@ function JobService:init(deps)
             if p.Parent then
                 local ok, info = pcall(buildInfo)
                 if ok then infoRemote:FireClient(p, info) end
+                if run and run.alarm then alarmRemote:FireClient(p, true) end   -- (fix v1.1)
             end
         end)
     end)

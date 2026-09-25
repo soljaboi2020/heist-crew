@@ -710,15 +710,19 @@ function Car:_step(dt)
     end
 
     -- drop-off
-    if not self.dropoffFired then
-        local d = Vector3.new(self.pos.X - DROPOFF.X, 0, self.pos.Z - DROPOFF.Z).Magnitude
-        if d <= W.DROPOFF_RADIUS then
+    -- (fix v1.1: the latch now re-arms when the car leaves the zone, so a joyride to
+    -- the marina before the heist can't disable the drop-off for the real run)
+    local d = Vector3.new(self.pos.X - DROPOFF.X, 0, self.pos.Z - DROPOFF.Z).Magnitude
+    if d <= W.DROPOFF_RADIUS then
+        if not self.dropoffFired then
             local occ = self:getOccupants()
             if #occ > 0 then
                 self.dropoffFired = true
                 fire(callbacks.onDropoff, self, occ)
             end
         end
+    else
+        self.dropoffFired = false
     end
 end
 
