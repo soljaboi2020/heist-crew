@@ -24,8 +24,22 @@
         z 34 └─────────────┴───┴─ breaker ───┴───────────────────────┘
             x -81        -68  -67         -57                      -47
         K = keycard door (slides into the wall)   D = office door
-        Roof: ladder on the east alley wall (z 10) → roof → hatch → closet.
+        Roof: ladder on the store's east wall (z 21.5, in the yard) → roof → hatch → closet.
         Crawl vent: break room (south wall) ↔ showroom (back wall, behind the sofa).
+
+    v2.0.2 (2026-09-25, Malachi: "shouldn't be able to walk out the heist and see
+    the ugly green terrain" + "the graphics are very simple / bad"):
+      • WALLED SERVICE YARD x -46..-25.1, z 2.6..44 (+ a strip behind the store,
+        x -82.6..-46, z 35..44): 12-tall brick all round, sliding chain-link
+        vehicle gate x -46..-37.4 on the north side (z 2.6), the getaway car
+        parked inside at (-42.4, 0, 13) facing north. Dumpsters, crates, drums,
+        puddles, a shadowed key lamp over the car.
+      • Graphics: contrast lighting (tight spotlit cases + a sparkle light in
+        each, sconce pools, a desk lamp as the office key light, dimmer fill),
+        room finishes (marble border, damask wallpaper, green wainscot +
+        wallpaper in the office, diner checker + tile splashback in the break
+        room, painted skirting instead of stripy wood), printed decals take the
+        room light, and Kenney props are repainted after they load.
 
     Geometry + props + refs ONLY. No gameplay logic, no Scripts, no prompts —
     JobService / SecurityService / LootService / GuardService / HideService
@@ -89,8 +103,25 @@ local OB_Z0, OB_Z1 = 25, 26                           -- office | break room wal
 local OB_DOOR_X0, OB_DOOR_X1 = -53.5, -47.5
 local BREAK_Z0 = 26
 local SIDE_Z0, SIDE_Z1 = 26.8, 33.8                   -- staff door in the east exterior wall
-local NOTCH_Z0, NOTCH_Z1 = 8.5, 11.5                  -- parapet notch over the roof ladder
-local LADDER_Z = 10
+-- (v2.0.2) the roof ladder moved from z 10 to z 21.5 so the getaway car can
+-- park beside the store in the service yard with a clear run to the gate
+local NOTCH_Z0, NOTCH_Z1 = 20, 23                     -- parapet notch over the roof ladder
+local LADDER_Z = 21.5
+
+-- ── the walled SERVICE YARD (v2.0.2) ──
+-- East of the store, wrapping round behind it. The staff door opens into it;
+-- the getaway car parks in it, nose at a wide vehicle gate onto Ocean Drive.
+-- Brick walls on every side: from the yard you see brick, the street and sky.
+local YARD_X1 = -25.1                   -- east wall outer face (safehouse skin trim starts at -25.05)
+local YARD_Z0 = 2.6                     -- north wall z 2.6..3.2 (just behind the bus stop)
+local YARD_Z1 = 44                      -- south wall z 43.4..44
+local BACK_X0 = -82.6                   -- west wall of the strip behind the store
+local YWALL_T = 0.6                     -- yard wall thickness
+local YWALL_H = 12                      -- yard wall height
+local GATE_X0, GATE_X1 = -46, -37.4     -- vehicle gate opening (8.6 wide, store wall to gate post)
+-- getaway parking spot (car faces north, at the gate). x -42.4 keeps the car's
+-- 4.7-wide run clear of the bus-stop shelter posts (x -39) on the sidewalk.
+local CAR_X, CAR_Z = -42.4, 13
 
 -- showroom cases: 4.4 long x 2.2 deep, glass top at y ~4.8
 local CASE_HX, CASE_HZ = 2.2, 1.1
@@ -215,6 +246,14 @@ local function surface(p, face, pps, bright)
     return g
 end
 
+-- (v2.0.2) painted / printed things (posters, panels, lockers, wallpaper) take
+-- the room's light instead of glowing flat. Screens + neon signs stay unlit.
+local function lit(g)
+    g.LightInfluence = 1
+    g.Brightness = 1
+    return g
+end
+
 local function frame(props, parent)
     local f = Instance.new("Frame")
     f.BorderSizePixel = 0
@@ -330,6 +369,61 @@ local function facingPart(name, centre, size, out, color, material, parent, extr
     return part(props, parent)
 end
 
+-- (v2.0.2) vertical-stripe wallpaper printed on one face of a thin panel
+local function wallpaper(p, face, base, stripe, n)
+    local g = lit(surface(p, face, 8, 1))
+    frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = base }, g)
+    for k = 0, n - 1 do
+        frame({ Size = UDim2.fromScale(0.28 / n, 1), Position = UDim2.fromScale((k + 0.36) / n, 0),
+            BackgroundColor3 = stripe, BackgroundTransparency = 0.25 }, g)
+    end
+    return g
+end
+
+-- (v2.0.2) Kenney furniture arrives as plain white / grey meshes (the importer
+-- drops the kit's colours). After a prop is placed, repaint it: the biggest
+-- part gets `main`, the rest get `accent`; `byName` (lower-case substring of the
+-- MeshPart name → spec) wins when the kit's part names are descriptive.
+-- A spec is { Color3, Material, reflectance? }. Textured meshes are left alone.
+local function paintModel(model, paint)
+    local parts = {}
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") then table.insert(parts, d) end
+    end
+    table.sort(parts, function(a, b)
+        return a.Size.X * a.Size.Y * a.Size.Z > b.Size.X * b.Size.Y * b.Size.Z
+    end)
+    for i, p in ipairs(parts) do
+        local spec
+        if paint.byName then
+            local n = string.lower(p.Name)
+            for pat, s in pairs(paint.byName) do
+                if string.find(n, pat, 1, true) then
+                    spec = s
+                    break
+                end
+            end
+        end
+        spec = spec or ((i == 1 or not paint.accent) and paint.main or paint.accent)
+        local textured = p:IsA("MeshPart") and p.TextureID ~= ""
+        if spec and not textured then
+            p.Color = spec[1]
+            p.Material = spec[2]
+            p.Reflectance = spec[3] or 0
+        end
+    end
+end
+
+-- place one Kenney prop (async, never errors) and repaint it
+local function prop(kit, name, pos, facing, parent, paint, opts)
+    task.spawn(function()
+        local o = { parent = parent }
+        for k, v in pairs(opts or {}) do o[k] = v end
+        local ok, model = pcall(KenneyLoader.place, kit, name, pos, facing, o)
+        if ok and model and paint then pcall(paintModel, model, paint) end
+    end)
+end
+
 -- ──────────────────────────────────────────────
 -- 🏗 SHELL: floors, walls, ceiling, roof
 -- ──────────────────────────────────────────────
@@ -339,7 +433,18 @@ function JewelryBuilder:_shell(f)
     box("FloorSecure", X0, 0, 16.5, -67.5, FLOOR, Z1, rgb(76, 79, 86), M.DiamondPlate, f)
     box("FloorHall", -67.5, 0, 16.5, -56.5, FLOOR, Z1, rgb(132, 128, 124), M.Slate, f)
     box("FloorOffice", -56.5, 0, 16.5, X1, FLOOR, 25.5, rgb(78, 44, 66), M.Carpet, f)
-    box("FloorBreak", -56.5, 0, 25.5, X1, FLOOR, Z1, rgb(200, 226, 216), M.CeramicTiles, f)
+    local fb = box("FloorBreak", -56.5, 0, 25.5, X1, FLOOR, Z1, rgb(200, 226, 216), M.CeramicTiles, f)
+    -- (v2.0.2) diner checker on the break-room floor (2-stud tiles, lit by the room)
+    local cg = lit(surface(fb, Enum.NormalId.Top, 6, 1))
+    local nx, nz = 5, 5
+    for i = 0, nx - 1 do
+        for j = 0, nz - 1 do
+            if (i + j) % 2 == 0 then
+                frame({ Size = UDim2.fromScale(1 / nx, 1 / nz), Position = UDim2.fromScale(i / nx, j / nz),
+                    BackgroundColor3 = rgb(40, 70, 72) }, cg)
+            end
+        end
+    end
     -- step between the sidewalk (ends z -1.4) and the shopfront
     box("Threshold", X0, 0, Z0 - 0.4, X1, FLOOR, Z0, rgb(214, 206, 198), M.Concrete, f)
 
@@ -357,8 +462,8 @@ function JewelryBuilder:_shell(f)
     box("CopingE", IX1 - 0.05, TOP, Z0 - 0.45, X1 + 0.15, TOP + 0.3, NOTCH_Z0, STUCCO, M.Plaster, f)
     box("CopingE", IX1 - 0.05, TOP, NOTCH_Z1, X1 + 0.15, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
     box("CopingS", IX0, TOP, IZ1 - 0.05, IX1, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    -- a downpipe + wall lamps down the alley side (it's the side people see from the street)
-    box("Downpipe", X1, FLOOR, 2.6, X1 + 0.35, TOP, 2.95, STEEL_LT, M.Metal, f)
+    -- a downpipe + pilasters down the yard side (moved off the gate post in v2.0.2)
+    box("Downpipe", X1, FLOOR, 5.2, X1 + 0.35, TOP, 5.55, STEEL_LT, M.Metal, f)
     for _, pz in ipairs({ 4, 18 }) do
         box("PilasterE", X1, FLOOR, pz - 0.6, X1 + 0.25, TOP - 0.4, pz + 0.6, PINK, M.Plaster, f, nc())
     end
@@ -615,9 +720,46 @@ function JewelryBuilder:_walls(f)
         end
         box("PanelRailTop", xa, FLOOR + 11, 0.4, xw - side * 0.22, FLOOR + 11.2, z, BRASS, M.Metal, f)
         box("PanelRailLow", xa, FLOOR + 0.5, 0.4, xw - side * 0.22, FLOOR + 0.7, z, BRASS, M.Metal, f)
-        local strip = box("BaseNeon", xw - side * 0.17, FLOOR, 0.3, xw - side * 0.29, FLOOR + 0.12, 15.7, HOT_PINK,
+        -- thin pink kick-strip (glow only — no light, so the floor stays dark between pools)
+        box("BaseNeon", xw - side * 0.17, FLOOR, 0.3, xw - side * 0.29, FLOOR + 0.12, 15.7, HOT_PINK,
             M.Neon, f, nc({ CastShadow = false }))
-        point(strip, HOT_PINK, 0.5, 10)
+
+        -- (v2.0.2) brass wall sconces between the wall cases: small warm pools up the walls
+        for _, sz in ipairs({ 7.1, 13.2 }) do
+            local sx = xw - side * 0.22
+            local plate = box("SconcePlate", sx, FLOOR + 7.6, sz - 0.35, sx - side * 0.12, FLOOR + 9.4, sz + 0.35,
+                BRASS, M.Metal, f, nc())
+            box("SconceShade", sx - side * 0.12, FLOOR + 8.1, sz - 0.3, sx - side * 0.62, FLOOR + 8.9, sz + 0.3,
+                rgb(255, 226, 190), M.Glass, f, nc({ Transparency = 0.2, CastShadow = false }))
+            point(plate, rgb(255, 196, 150), 0.8, 9, false)
+        end
+    end
+
+    -- (v2.0.2) light marble border + brass inlay round the showroom floor
+    local BORDER = rgb(214, 200, 212)
+    local fz1 = SHOW_Z1 - 0.1
+    box("FloorBorder", IX0, FLOOR, IZ0, IX1, FLOOR + 0.02, IZ0 + 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
+    box("FloorBorder", IX0, FLOOR, fz1 - 1.2, IX1, FLOOR + 0.02, fz1, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
+    box("FloorBorder", IX0, FLOOR, IZ0 + 1.2, IX0 + 1.2, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
+    box("FloorBorder", IX1 - 1.2, FLOOR, IZ0 + 1.2, IX1, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
+    box("FloorInlay", IX0 + 1.2, FLOOR, IZ0 + 1.2, IX1 - 1.2, FLOOR + 0.03, IZ0 + 1.35, BRASS, M.Metal, f, nc())
+    box("FloorInlay", IX0 + 1.2, FLOOR, fz1 - 1.35, IX1 - 1.2, FLOOR + 0.03, fz1 - 1.2, BRASS, M.Metal, f, nc())
+    box("FloorInlay", IX0 + 1.2, FLOOR, IZ0 + 1.35, IX0 + 1.35, FLOOR + 0.03, fz1 - 1.35, BRASS, M.Metal, f, nc())
+    box("FloorInlay", IX1 - 1.35, FLOOR, IZ0 + 1.35, IX1 - 1.2, FLOOR + 0.03, fz1 - 1.35, BRASS, M.Metal, f, nc())
+
+    -- (v2.0.2) the back wall: black-marble skirting, damask wallpaper, brass rail
+    -- (the counter mirror sits in front of the west half, the lounge the east half)
+    for _, seg in ipairs({ { IX0, ARCH_X0 - 0.3 }, { ARCH_X1 + 0.3, IX1 } }) do
+        box("Skirting", seg[1], FLOOR, SHOW_Z1 - 0.1, seg[2], FLOOR + 0.7, SHOW_Z1, rgb(20, 16, 24), M.Marble, f, nc())
+        local wp = box("Wallpaper", seg[1], FLOOR + 0.7, SHOW_Z1 - 0.05, seg[2], FLOOR + 11, SHOW_Z1, rgb(60, 32, 70), M.Fabric, f, nc())
+        wallpaper(wp, Enum.NormalId.Front, rgb(58, 30, 68), rgb(112, 60, 110), 9)
+        box("WallRail", seg[1], FLOOR + 11, SHOW_Z1 - 0.12, seg[2], FLOOR + 11.2, SHOW_Z1, BRASS, M.Metal, f, nc())
+    end
+
+    -- (v2.0.2) two stucco ceiling beams (they break up the flat ceiling)
+    for _, bz in ipairs({ 2.2, 12.9 }) do
+        box("CeilingBeam", IX0, CEIL - 0.6, bz - 0.4, IX1, CEIL, bz + 0.4, rgb(70, 44, 80), M.Plaster, f, nc())
+        box("BeamTrim", IX0, CEIL - 0.66, bz - 0.42, IX1, CEIL - 0.6, bz + 0.42, BRASS, M.Metal, f, nc())
     end
 
     -- brass cornice where the walls meet the ceiling
@@ -633,8 +775,8 @@ function JewelryBuilder:_walls(f)
     box("ArchTrimW", ARCH_X0 - 0.3, FLOOR, SHOW_Z1 - 0.2, ARCH_X0, ARCH_TOP + 0.3, SHOW_Z1, BRASS, M.Metal, f)
     box("ArchTrimE", ARCH_X1, FLOOR, SHOW_Z1 - 0.2, ARCH_X1 + 0.3, ARCH_TOP + 0.3, SHOW_Z1, BRASS, M.Metal, f)
     box("ArchTrimTop", ARCH_X0 - 0.3, ARCH_TOP, SHOW_Z1 - 0.2, ARCH_X1 + 0.3, ARCH_TOP + 0.3, SHOW_Z1, BRASS, M.Metal, f)
-    local plaque = box("StaffPlaque", -64, ARCH_TOP + 0.8, SHOW_Z1 - 0.1, -60, ARCH_TOP + 1.9, SHOW_Z1, BRASS, M.Metal, f, nc())
-    printOn(plaque, Enum.NormalId.Front, "STAFF ONLY", rgb(60, 36, 14), UITheme.F.display, 50, 1)
+    local plaque = box("StaffPlaque", -64, ARCH_TOP + 0.8, SHOW_Z1 - 0.14, -60, ARCH_TOP + 1.9, SHOW_Z1 - 0.04, BRASS, M.Metal, f, nc())
+    lit(printOn(plaque, Enum.NormalId.Front, "STAFF ONLY", rgb(60, 36, 14), UITheme.F.display, 50, 1).Parent)
     -- velvet rope stanchions either side of the archway (a "keep out" feel, not a block)
     for _, sx in ipairs({ ARCH_X0 - 1.2, ARCH_X1 + 1.2 }) do
         part({ Name = "Stanchion", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3.2, 0.3, 0.3),
@@ -685,7 +827,9 @@ function JewelryBuilder:_chandelier(f, x, z)
         CFrame = CFrame.new(x, y0 - 1.4, z) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
         Color = crystal, Material = M.Glass, Transparency = 0.15, Reflectance = 0.5,
         CanCollide = false, CastShadow = false }, c)
-    point(pendant, rgb(255, 214, 170), 1.3, 26, true)
+    -- (v2.0.2) the one big key light in the showroom: shadows on, a bit dimmer
+    -- so the case spots read as bright pools
+    point(pendant, rgb(255, 214, 170), 1.0, 22, true)
 end
 
 function JewelryBuilder:_counter(f)
@@ -727,13 +871,13 @@ function JewelryBuilder:_counter(f)
     box("MirrorFrame", mx0 - 0.15, my0 - 0.15, SHOW_Z1 - 0.18, mx1 + 0.15, my0, SHOW_Z1, BRASS, M.Metal, f, nc())
     box("MirrorFrame", mx0 - 0.15, my0, SHOW_Z1 - 0.18, mx0, my1, SHOW_Z1, BRASS, M.Metal, f, nc())
     box("MirrorFrame", mx1, my0, SHOW_Z1 - 0.18, mx1 + 0.15, my1, SHOW_Z1, BRASS, M.Metal, f, nc())
-    local mg = surface(mirror, Enum.NormalId.Front, 30, 1)
+    local mg = lit(surface(mirror, Enum.NormalId.Front, 30, 1))
     text({ Text = "Diamond Dolls", Size = UDim2.fromScale(0.8, 0.2), Position = UDim2.fromScale(0.1, 0.06),
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTransparency = 0.15,
         FontFace = Font.new("rbxasset://fonts/families/Kalam.json", Enum.FontWeight.Bold),
         TextColor3 = rgb(222, 180, 96) }, mg)
-    canLight(f, -77.5, 14.5, WARM, 2.2, 55)
-    canLight(f, -72.5, 14.5, WARM, 2.2, 55)
+    canLight(f, -77.5, 14.5, WARM, 2.4, 40)
+    canLight(f, -72.5, 14.5, WARM, 2.4, 40)
 
     -- keycard spot: west end of the counter top
     return CFrame.new(-78.4, ty, 14.45)
@@ -772,7 +916,7 @@ function JewelryBuilder:_lounge(f, refs)
     box("VentFrame", vx - 1.45, FLOOR, SHOW_Z1 - 0.2, vx + 1.45, FLOOR + 2.75, SHOW_Z1, BRASS, M.Metal, f, nc())
     local vent = facingPart("DD_VentShowroom", Vector3.new(vx, FLOOR + 1.3, SHOW_Z1 - 0.25), Vector3.new(2.5, 2.4, 0.12),
         Vector3.new(0, 0, -1), rgb(40, 40, 46), M.DiamondPlate, f)
-    local vg = surface(vent, Enum.NormalId.Front, 30, 1)
+    local vg = lit(surface(vent, Enum.NormalId.Front, 30, 1))
     for k = 0, 5 do
         frame({ Size = UDim2.fromScale(0.9, 0.06), Position = UDim2.fromScale(0.05, 0.1 + k * 0.14),
             BackgroundColor3 = rgb(16, 16, 20) }, vg)
@@ -868,7 +1012,10 @@ function JewelryBuilder:_case(f, i, centre, faceDir)
         end
     end
 
-    canLight(f, centre.X, centre.Z, WARM, 3, 40, i <= 2)
+    -- (v2.0.2) glam spotlighting: a tight, bright pool on every case (the four
+    -- island faces cast shadows) + a cool glow inside the glass so the stones sparkle
+    canLight(f, centre.X, centre.Z, rgb(255, 238, 220), 4.5, 26, i == 3 or i == 4)
+    point(glass, rgb(226, 236, 255), 0.9, 4.5, false)
 
     local stand = lp(0, 3, -(HZ + 1.9))
     return {
@@ -919,13 +1066,21 @@ function JewelryBuilder:_hall(f, refs)
     local h = Instance.new("Folder")
     h.Name = "BackHall"
     h.Parent = f
-    -- dado rail + skirting down both walls, a couple of framed posters
-    for _, xw in ipairs({ HALL_X0, HALL_X1 }) do
-        local s = xw == HALL_X0 and 1 or -1
-        box("Skirting", xw, FLOOR, BOH_Z0, xw + s * 0.12, FLOOR + 0.5, HALL_Z1, BOH_DARK, M.Wood, h, nc())
+    -- (v2.0.2) painted skirting (was stripy wood running across the doorways) +
+    -- a teal wayfinding stripe, only on the solid stretches of wall
+    local HALL_TEAL = rgb(56, 120, 128)
+    for _, seg in ipairs({ { HALL_X0, 1, KC_Z1, HALL_Z1 }, { HALL_X1, -1, OFFICE_DOOR_Z1, HALL_Z1 } }) do
+        local xw, s, z0, z1 = seg[1], seg[2], seg[3], seg[4]
+        box("Skirting", xw, FLOOR, z0, xw + s * 0.12, FLOOR + 0.6, z1, BOH_DARK, M.Plaster, h, nc())
+        box("WayStripe", xw, FLOOR + 3.4, z0, xw + s * 0.06, FLOOR + 3.8, z1, HALL_TEAL, M.Plaster, h, nc())
     end
-    local poster = box("Poster", HALL_X1 - 0.08, 5, 25.2, HALL_X1, 8.2, 27.6, rgb(250, 196, 220), M.Fabric, h, nc())
-    local pg = surface(poster, Enum.NormalId.Left, 40, 1)
+    -- short return walls either side of the archway (hall side, z 17)
+    for _, seg in ipairs({ { HALL_X0, ARCH_X0 - 0.3 }, { ARCH_X1 + 0.3, HALL_X1 } }) do
+        box("Skirting", seg[1], FLOOR, BOH_Z0, seg[2], FLOOR + 0.6, BOH_Z0 + 0.12, BOH_DARK, M.Plaster, h, nc())
+    end
+    -- poster above the lockers (it used to sit behind them)
+    local poster = box("Poster", HALL_X1 - 0.08, 8.2, 25.2, HALL_X1, 11.2, 27.6, rgb(250, 196, 220), M.Fabric, h, nc())
+    local pg = lit(surface(poster, Enum.NormalId.Left, 40, 1))
     text({ Text = "EMPLOYEE\nOF THE\nMONTH", Size = UDim2.fromScale(0.9, 0.6), Position = UDim2.fromScale(0.05, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(120, 20, 70) }, pg)
@@ -934,7 +1089,7 @@ function JewelryBuilder:_hall(f, refs)
     -- staff lockers against the east wall (HideSpot)
     local lx0, lx1, lz0, lz1 = HALL_X1 - 1.5, HALL_X1, 25.0, 27.8
     local lockers = box("StaffLockers", lx0, FLOOR, lz0, lx1, FLOOR + 7.2, lz1, rgb(70, 110, 140), M.Metal, h)
-    local lg = surface(lockers, Enum.NormalId.Left, 30, 1)
+    local lg = lit(surface(lockers, Enum.NormalId.Left, 30, 1))
     for k = 0, 1 do
         local door = frame({ Size = UDim2.fromScale(0.47, 0.96), Position = UDim2.fromScale(0.02 + k * 0.5, 0.02),
             BackgroundColor3 = rgb(80, 124, 156) }, lg)
@@ -953,7 +1108,9 @@ function JewelryBuilder:_hall(f, refs)
     box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 27.1, HALL_X0 + 1.3, FLOOR + 1.9, 27.8, rgb(186, 150, 104), M.Cardboard, h)
     box("StockBox", HALL_X0 + 0.2, FLOOR + 1.6, 26.4, HALL_X0 + 1.2, FLOOR + 2.6, 27.0, rgb(250, 196, 220), M.Cardboard, h)
 
-    tubeLight(h, -62, 19.5, false, 0.8, 14)
+    -- the key light of the hall casts shadows (the guard walks under it)
+    local hallTube = tubeLight(h, -62, 19.5, false, 0.8, 14)
+    for _, l in ipairs(hallTube:GetChildren()) do if l:IsA("PointLight") then l.Shadows = true end end
     tubeLight(h, -62, 25.5, false, 0.35, 9)      -- the dim end (shadow zone below)
     table.insert(refs.shadowZones, shadowZone("ShadowHallEnd", HALL_X0, 24.4, -63, HALL_Z1, h))
 end
@@ -963,7 +1120,7 @@ function JewelryBuilder:_keycardDoor(f)
     -- wall (the wall is solid for z 24..34, the pane hides inside it)
     local pane = box("KeycardDoor", -67.65, FLOOR, KC_Z0, -67.35, DOOR_H, KC_Z1, rgb(150, 215, 232), M.Glass, f,
         { Transparency = 0.35, Reflectance = 0.2 })
-    local dg = surface(pane, Enum.NormalId.Right, 30, 1)
+    local dg = lit(surface(pane, Enum.NormalId.Right, 30, 1))
     frame({ Size = UDim2.fromScale(1, 0.12), Position = UDim2.fromScale(0, 0.42), BackgroundColor3 = rgb(240, 248, 255),
         BackgroundTransparency = 0.3 }, dg)
     text({ Text = "SAFE ROOM  ·  KEYCARD ONLY", Size = UDim2.fromScale(0.86, 0.08), Position = UDim2.fromScale(0.07, 0.44),
@@ -1054,7 +1211,7 @@ function JewelryBuilder:_closet(f, refs)
     -- breaker panel on the east wall (faces west into the closet)
     local bz0, bz1 = 30.4, 32.6
     local breaker = box("BreakerPanel", HALL_X1 - 0.45, FLOOR + 2.6, bz0, HALL_X1, FLOOR + 6.2, bz1, rgb(96, 102, 110), M.Metal, c)
-    local bg = surface(breaker, Enum.NormalId.Left, 50, 1.1)
+    local bg = lit(surface(breaker, Enum.NormalId.Left, 50, 1.1))
     text({ Text = "SECURITY", Size = UDim2.new(1, 0, 0.16, 0), Position = UDim2.fromScale(0, 0.04),
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
         TextColor3 = rgb(250, 204, 21) }, bg)
@@ -1074,7 +1231,7 @@ function JewelryBuilder:_closet(f, refs)
     box("Conduit", HALL_X1 - 0.3, FLOOR + 6.2, 31.4, HALL_X1 - 0.12, CEIL, 31.6, STEEL_LT, M.Metal, c, nc())
     -- hazard sign over the panel
     local warn = box("HighVoltage", HALL_X1 - 0.08, FLOOR + 6.6, 30.8, HALL_X1, FLOOR + 7.6, 32.2, rgb(250, 204, 21), M.Metal, c, nc())
-    printOn(warn, Enum.NormalId.Left, "DANGER", rgb(30, 30, 30), UITheme.F.display, 50, 1)
+    lit(printOn(warn, Enum.NormalId.Left, "DANGER", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
     -- metal shelving on the south wall; the keycard can turn up on the middle shelf
     local shx0, shx1 = -62.2, -57.6
@@ -1100,7 +1257,7 @@ function JewelryBuilder:_closet(f, refs)
     end
     box("CartBag", cx0 + 0.2, FLOOR + 3.6, cz0 + 0.2, cx0 + 1.5, FLOOR + 5.0, cz1 - 0.2, rgb(40, 40, 44), M.Fabric, c, nc())
     bar("Mop", Vector3.new(cx1 - 0.5, FLOOR + 3.6, cz0 + 0.5), Vector3.new(cx1 - 0.3, FLOOR + 7.6, cz0 + 0.3), 0.12,
-        WALNUT, M.WoodPlanks, c, nc())
+        WALNUT, M.Wood, c, nc())
     tag(cart, "HideSpot", { Label = "Janitor cart" })
     table.insert(refs.hideSpots, cart)
 
@@ -1116,14 +1273,14 @@ function JewelryBuilder:_closet(f, refs)
     local inside = facingPart("DD_RoofHatchInside", Vector3.new(HALL_X0 + 0.7, FLOOR + 3, (lz0 + lz1) / 2),
         Vector3.new(2.2, 5, 0.15), Vector3.new(1, 0, 0), rgb(250, 204, 21), M.Metal, c,
         { Transparency = 0.2, CanCollide = false })
-    local ig = surface(inside, Enum.NormalId.Front, 40, 1)
+    local ig = lit(surface(inside, Enum.NormalId.Front, 40, 1))
     text({ Text = "UP TO ROOF", Size = UDim2.fromScale(0.9, 0.2), Position = UDim2.fromScale(0.05, 0.05),
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
         TextColor3 = rgb(30, 30, 30) }, ig)
 
     local bulb = box("ClosetBulb", -61.3, CEIL - 0.3, 30.7, -60.7, CEIL, 31.3, STEEL_DK, M.Metal, c, nc())
     box("ClosetBulbLens", -61.2, CEIL - 0.34, 30.8, -60.8, CEIL - 0.3, 31.2, COOL, M.Neon, c, nc())
-    point(bulb, COOL, 0.7, 12, true)
+    point(bulb, COOL, 0.6, 11, false)
 
     return breaker, CFrame.new(-59.8, FLOOR + 2.95, IZ1 - 0.75), inside
 end
@@ -1136,11 +1293,36 @@ function JewelryBuilder:_office(f)
     o.Parent = f
     local dx0, dx1, dz0, dz1 = IX1 - 2.6, IX1, 18.2, 22.6
     local topY = FLOOR + 2.9
-    box("DeskTop", dx0, topY - 0.25, dz0, dx1, topY, dz1, WALNUT, M.WoodPlanks, o)
-    box("DeskSide", dx0 + 0.05, FLOOR, dz0, dx1, topY - 0.25, dz0 + 0.2, WALNUT, M.WoodPlanks, o)
-    box("DeskSide", dx0 + 0.05, FLOOR, dz1 - 0.2, dx1, topY - 0.25, dz1, WALNUT, M.WoodPlanks, o)
-    box("DeskModesty", dx0 + 0.05, FLOOR + 0.8, dz0, dx0 + 0.25, topY - 0.25, dz1, WALNUT, M.WoodPlanks, o)
+
+    -- (v2.0.2) walls: bottle-green painted wainscot + white rail + striped
+    -- wallpaper on the north and east walls (behind the cabinets / desk)
+    local WAINSCOT = rgb(34, 70, 58)
+    local RAIL = rgb(226, 222, 210)
+    box("Wainscot", EC_X0, FLOOR, BOH_Z0, IX1, FLOOR + 4, BOH_Z0 + 0.08, WAINSCOT, M.Plaster, o, nc())
+    box("ChairRail", EC_X0, FLOOR + 4, BOH_Z0, IX1, FLOOR + 4.25, BOH_Z0 + 0.14, RAIL, M.Plaster, o, nc())
+    local wpN = box("Wallpaper", EC_X0, FLOOR + 4.25, BOH_Z0, IX1, CEIL, BOH_Z0 + 0.05, rgb(214, 196, 160), M.Fabric, o, nc())
+    wallpaper(wpN, Enum.NormalId.Back, rgb(206, 190, 152), rgb(150, 110, 70), 7)
+    box("Wainscot", IX1 - 0.08, FLOOR, BOH_Z0, IX1, FLOOR + 4, OB_Z0, WAINSCOT, M.Plaster, o, nc())
+    box("ChairRail", IX1 - 0.14, FLOOR + 4, BOH_Z0, IX1, FLOOR + 4.25, OB_Z0, RAIL, M.Plaster, o, nc())
+    local wpE = box("Wallpaper", IX1 - 0.05, FLOOR + 4.25, BOH_Z0, IX1, CEIL, OB_Z0, rgb(214, 196, 160), M.Fabric, o, nc())
+    wallpaper(wpE, Enum.NormalId.Left, rgb(206, 190, 152), rgb(150, 110, 70), 6)
+    box("Skirting", EC_X0, FLOOR, OB_Z0 - 0.1, OB_DOOR_X0, FLOOR + 0.6, OB_Z0, rgb(26, 30, 28), M.Plaster, o, nc())
+
+    -- desk (satin walnut — the old WoodPlanks read as stripes at this size)
+    box("DeskTop", dx0, topY - 0.25, dz0, dx1, topY, dz1, WALNUT, M.Wood, o)
+    box("DeskSide", dx0 + 0.05, FLOOR, dz0, dx1, topY - 0.25, dz0 + 0.2, WALNUT, M.Wood, o)
+    box("DeskSide", dx0 + 0.05, FLOOR, dz1 - 0.2, dx1, topY - 0.25, dz1, WALNUT, M.Wood, o)
+    box("DeskModesty", dx0 + 0.05, FLOOR + 0.8, dz0, dx0 + 0.25, topY - 0.25, dz1, WALNUT, M.Wood, o)
+    box("DeskBlotter", dx0 + 0.4, topY, 19.4, dx1 - 0.3, topY + 0.03, 21.6, rgb(30, 60, 44), M.Fabric, o, nc())
     point(lightAnchor("MonitorGlow", Vector3.new(dx0 + 1, topY + 1.2, 20.4), o), rgb(150, 200, 255), 0.6, 8)
+
+    -- banker's lamp: the office's key light (shadows on), everything else stays dim
+    local lx, lz = dx1 - 0.7, dz0 + 0.55
+    box("LampBase", lx - 0.3, topY, lz - 0.2, lx + 0.3, topY + 0.12, lz + 0.2, BRASS, M.Metal, o, nc())
+    bar("LampStem", Vector3.new(lx, topY + 0.12, lz), Vector3.new(lx, topY + 1.1, lz), 0.08, BRASS, M.Metal, o, nc())
+    local shade = box("LampShade", lx - 0.45, topY + 1.05, lz - 0.2, lx + 0.45, topY + 1.35, lz + 0.2, rgb(20, 110, 60),
+        M.Glass, o, nc({ Transparency = 0.1 }))
+    spot(shade, Enum.NormalId.Bottom, rgb(255, 214, 160), 1.8, 10, 80, true)
 
     -- CCTV monitor on the east wall above the desk
     local mon = box("CctvMonitor", IX1 - 0.25, FLOOR + 5, 18.8, IX1, FLOOR + 7.4, 22.2, rgb(20, 20, 24), M.Metal, o)
@@ -1158,7 +1340,7 @@ function JewelryBuilder:_office(f)
     for k = 0, 1 do
         local x0 = EC_X0 + 0.2 + k * 1.9
         local cab = box("FilingCabinet", x0, FLOOR, BOH_Z0, x0 + 1.8, FLOOR + 4.6, BOH_Z0 + 1.6, rgb(120, 126, 136), M.Metal, o)
-        local cg = surface(cab, Enum.NormalId.Back, 30, 1)
+        local cg = lit(surface(cab, Enum.NormalId.Back, 30, 1))
         for d = 0, 2 do
             frame({ Size = UDim2.fromScale(0.9, 0.28), Position = UDim2.fromScale(0.05, 0.04 + d * 0.32),
                 BackgroundColor3 = rgb(140, 146, 156) }, cg)
@@ -1166,22 +1348,27 @@ function JewelryBuilder:_office(f)
                 BackgroundColor3 = STEEL_DK }, cg)
         end
     end
-    -- cork board with notes
-    local cork = box("CorkBoard", -52.4, 5.6, BOH_Z0, -48.2, 8.6, BOH_Z0 + 0.12, rgb(180, 140, 96), M.Wood, o, nc())
-    local ng = surface(cork, Enum.NormalId.Back, 40, 1)
+    -- cork board with notes (sits proud of the wallpaper)
+    local cork = box("CorkBoard", -52.4, 5.6, BOH_Z0 + 0.05, -48.2, 8.6, BOH_Z0 + 0.17, rgb(180, 140, 96), M.Wood, o, nc())
+    local ng = lit(surface(cork, Enum.NormalId.Back, 40, 1))
     for k, col in ipairs({ rgb(250, 240, 140), rgb(250, 196, 220), rgb(170, 230, 255), rgb(250, 240, 140) }) do
         frame({ Size = UDim2.fromScale(0.2, 0.3), Position = UDim2.fromScale(0.06 + (k - 1) * 0.23, 0.12 + (k % 2) * 0.35),
             Rotation = (k % 2 == 0) and 6 or -5, BackgroundColor3 = col }, ng)
     end
 
-    tubeLight(o, -51.5, 21, true, 0.8, 13, WARM)
+    -- the ceiling tube is dimmed right down: the desk lamp does the work
+    tubeLight(o, -51.5, 21, true, 0.35, 11, WARM)
 
-    KenneyLoader.placeMany({
-        { kit = "furniture", name = "computerScreen", pos = Vector3.new(dx1 - 0.9, topY, 20.4), facing = Vector3.new(-1, 0, 0) },
-        { kit = "furniture", name = "chairDesk", pos = Vector3.new(dx0 - 1.3, FLOOR, 20.4), facing = Vector3.new(1, 0, 0) },
-        { kit = "furniture", name = "pottedPlant", pos = Vector3.new(EC_X0 + 0.9, FLOOR, 23.8), facing = Vector3.new(1, 0, 0) },
-        { kit = "furniture", name = "trashcan", pos = Vector3.new(EC_X0 + 0.9, FLOOR, 21.2), facing = Vector3.new(1, 0, 0) },
-    }, o)
+    local METAL_DK = { rgb(36, 38, 44), M.Metal, 0.05 }
+    prop("furniture", "computerScreen", Vector3.new(dx1 - 0.9, topY, 20.4), Vector3.new(-1, 0, 0), o,
+        { main = METAL_DK, byName = { screen = { rgb(40, 90, 140), M.Glass, 0.2 } } })
+    prop("furniture", "chairDesk", Vector3.new(dx0 - 1.3, FLOOR, 20.4), Vector3.new(1, 0, 0), o,
+        { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } })
+    prop("furniture", "pottedPlant", Vector3.new(EC_X0 + 0.9, FLOOR, 23.8), Vector3.new(1, 0, 0), o,
+        { main = { rgb(52, 120, 70), M.Grass }, accent = { rgb(176, 96, 64), M.Concrete },
+          byName = { pot = { rgb(176, 96, 64), M.Concrete }, leaf = { rgb(52, 120, 70), M.Grass }, plant = { rgb(52, 120, 70), M.Grass } } })
+    prop("furniture", "trashcan", Vector3.new(EC_X0 + 0.9, FLOOR, 21.2), Vector3.new(1, 0, 0), o,
+        { main = { rgb(60, 64, 72), M.Metal, 0.05 } })
 
     return CFrame.new(dx0 + 0.9, topY, 21.8)
 end
@@ -1206,7 +1393,7 @@ function JewelryBuilder:_breakRoom(f, refs)
         0.12, STEEL_LT, M.Metal, b, nc())
     local note = box("FridgeNote", EC_X0 + 2.3, FLOOR + 5.6, fz0 + 0.5, EC_X0 + 2.32, FLOOR + 6.6, fz0 + 1.5,
         rgb(250, 240, 140), M.Fabric, b, nc())
-    local ng = surface(note, Enum.NormalId.Right, 60, 1)
+    local ng = lit(surface(note, Enum.NormalId.Right, 60, 1))
     text({ Text = "DON'T EAT\nMY LUNCH\n- TONY", Size = UDim2.fromScale(0.9, 0.9), Position = UDim2.fromScale(0.05, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
         TextColor3 = rgb(40, 40, 60) }, ng)
@@ -1214,9 +1401,17 @@ function JewelryBuilder:_breakRoom(f, refs)
     -- kitchenette counter along the west wall
     local kz0, kz1 = 29.2, IZ1
     local topY = FLOOR + 3.3
-    box("Kitchenette", EC_X0, FLOOR, kz0, EC_X0 + 1.9, topY - 0.2, kz1, rgb(96, 160, 150), M.Wood, b)
+    -- (v2.0.2) painted cabinets (not stripy wood), door seams, a white tile splashback
+    local CAB = rgb(70, 140, 134)
+    box("Kitchenette", EC_X0, FLOOR, kz0, EC_X0 + 1.9, topY - 0.2, kz1, CAB, M.Plaster, b)
     box("KitchenetteTop", EC_X0, topY - 0.2, kz0, EC_X0 + 2.05, topY, kz1, rgb(236, 232, 226), M.Marble, b)
-    box("UpperCabinet", EC_X0, FLOOR + 6.2, kz0, EC_X0 + 1.3, FLOOR + 8.8, kz1, rgb(96, 160, 150), M.Wood, b)
+    box("UpperCabinet", EC_X0, FLOOR + 6.2, kz0, EC_X0 + 1.3, FLOOR + 8.8, kz1, CAB, M.Plaster, b)
+    for _, sz in ipairs({ 30.8, 32.4 }) do
+        box("CabinetSeam", EC_X0 + 1.9, FLOOR + 0.3, sz - 0.04, EC_X0 + 1.93, topY - 0.4, sz + 0.04, rgb(40, 90, 86), M.Plaster, b, nc())
+        box("CabinetSeam", EC_X0 + 1.3, FLOOR + 6.4, sz - 0.04, EC_X0 + 1.33, FLOOR + 8.6, sz + 0.04, rgb(40, 90, 86), M.Plaster, b, nc())
+    end
+    box("Splashback", EC_X0, topY, kz0, EC_X0 + 0.06, FLOOR + 6.2, kz1, rgb(240, 240, 234), M.CeramicTiles, b, nc())
+    box("Skirting", EC_X0 + 0.1, FLOOR, IZ1 - 0.16, IX1, FLOOR + 0.6, IZ1 - 0.1, rgb(40, 70, 66), M.Plaster, b, nc())
 
     -- vending machine against the south wall — glowing front, readable at a glance
     local vx0, vx1, vz0 = -53, -50.6, IZ1 - 2.2
@@ -1238,7 +1433,7 @@ function JewelryBuilder:_breakRoom(f, refs)
     box("VentFrame", ventX - 1.4, FLOOR, IZ1 - 0.2, ventX + 1.4, FLOOR + 2.7, IZ1, STEEL_LT, M.Metal, b, nc())
     local vent = facingPart("DD_VentBreakRoom", Vector3.new(ventX, FLOOR + 1.3, IZ1 - 0.25), Vector3.new(2.4, 2.4, 0.12),
         Vector3.new(0, 0, -1), rgb(60, 62, 70), M.DiamondPlate, b)
-    local ventG = surface(vent, Enum.NormalId.Front, 30, 1)
+    local ventG = lit(surface(vent, Enum.NormalId.Front, 30, 1))
     for k = 0, 5 do
         frame({ Size = UDim2.fromScale(0.9, 0.06), Position = UDim2.fromScale(0.05, 0.1 + k * 0.14),
             BackgroundColor3 = rgb(20, 20, 24) }, ventG)
@@ -1246,7 +1441,7 @@ function JewelryBuilder:_breakRoom(f, refs)
 
     -- staff notice board + clock over the kitchenette
     local board = box("NoticeBoard", EC_X0, FLOOR + 9.6, 29.8, EC_X0 + 0.12, FLOOR + 12, 33.2, rgb(40, 60, 70), M.Slate, b, nc())
-    local bg = surface(board, Enum.NormalId.Right, 40, 1)
+    local bg = lit(surface(board, Enum.NormalId.Right, 40, 1))
     text({ Text = "BREAK ROOM", Size = UDim2.fromScale(0.9, 0.3), Position = UDim2.fromScale(0.05, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(250, 240, 220) }, bg)
@@ -1257,9 +1452,14 @@ function JewelryBuilder:_breakRoom(f, refs)
     -- the room light: warm, a little dim, on the whole time
     local lamp = box("BreakLight", -52.2, CEIL - 0.25, 29.2, -50.8, CEIL, 30.6, STEEL_DK, M.Metal, b, nc())
     box("BreakLightLens", -52.1, CEIL - 0.3, 29.3, -50.9, CEIL - 0.25, 30.5, WARM, M.Neon, b, nc())
-    point(lamp, WARM, 1, 14, true)
+    point(lamp, WARM, 1, 12, false)
 
-    -- ── the staff door in the east alley wall (open double doors) ──
+    prop("furniture", "kitchenMicrowave", Vector3.new(EC_X0 + 1, FLOOR + 3.3, 30.4), Vector3.new(1, 0, 0), b,
+        { main = { rgb(232, 232, 228), M.Metal, 0.05 }, accent = { rgb(30, 32, 36), M.Glass, 0.2 } })
+    prop("furniture", "kitchenCoffeeMachine", Vector3.new(EC_X0 + 1, FLOOR + 3.3, 32.6), Vector3.new(1, 0, 0), b,
+        { main = { rgb(26, 26, 30), M.Metal, 0.05 }, accent = { rgb(170, 174, 182), M.Metal, 0.1 } })
+
+    -- ── the staff door in the east yard wall (open double doors) ──
     local x = X1
     local STEELC = rgb(70, 74, 82)
     box("StaffDoorFrameN", x, 0, SIDE_Z0 - 0.3, x + 0.25, DOOR_H + 0.3, SIDE_Z0, STEELC, M.Metal, b)
@@ -1280,42 +1480,157 @@ function JewelryBuilder:_breakRoom(f, refs)
     return vent
 end
 
--- 🗑 the east alley: dumpster, crates, bin bags, and the roof ladder
-function JewelryBuilder:_alley(f, refs)
+-- 🧱 (v2.0.2) the walled SERVICE YARD: east of the store + a strip behind it.
+-- Brick walls all round (no gaps), a wide sliding vehicle gate onto Ocean
+-- Drive, the getaway car parked nose-to-the-gate, dumpsters / crates / drums /
+-- puddles / lamps. Replaces the open v2.0 alley (you could walk out onto lawn).
+function JewelryBuilder:_yard(f, refs)
     local a = Instance.new("Folder")
-    a.Name = "Alley"
+    a.Name = "ServiceYard"
     a.Parent = f
-    -- asphalt strip so the alley reads as a place, not a gap
-    box("AlleyGround", X1, 0, Z0 + 0.4, X1 + 9, 0.12, Z1, rgb(58, 58, 62), M.Asphalt, a)
+    local BRICK = rgb(122, 66, 56)
+    local CAP = rgb(188, 180, 170)
+    local PLINTH = rgb(74, 70, 70)
+    local H, T = YWALL_H, YWALL_T
+    local EX0 = YARD_X1 - T                 -- inner face of the east wall (-25.6)
+    local NZ1 = YARD_Z0 + T                 -- inner face of the north wall (3.2)
+    local SZ0 = YARD_Z1 - T                 -- inner face of the south wall (43.4)
 
-    -- dumpster (north of the door)
-    local dx0, dx1, dz0, dz1 = X1 + 0.6, X1 + 4.4, 19.6, 23.4
-    box("Dumpster", dx0, 0.4, dz0, dx1, 4.2, dz1, rgb(40, 110, 70), M.Metal, a)
-    box("DumpsterLid", dx0 - 0.1, 4.2, dz0 - 0.1, dx1 + 0.1, 4.45, dz1 + 0.1, rgb(30, 80, 52), M.Metal, a)
-    for _, wx in ipairs({ dx0 + 0.4, dx1 - 0.4 }) do
-        for _, wz in ipairs({ dz0 + 0.4, dz1 - 0.4 }) do
-            part({ Name = "DumpsterWheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 0.8, 0.8),
-                CFrame = CFrame.new(wx, 0.4, wz), Color = STEEL_DK, Material = M.Rubber, CanCollide = false }, a)
+    -- ── ground: asphalt yard, concrete strip behind the store, concrete driveway ──
+    box("YardFloor", X1, 0, YARD_Z0, EX0, 0.1, SZ0, rgb(52, 52, 58), M.Asphalt, a)
+    box("BackStripFloor", BACK_X0 + T, 0, Z1, X1, 0.1, SZ0, rgb(120, 118, 112), M.Concrete, a)
+    box("Driveway", X1, 0, -1.4, GATE_X1 + 0.8, 0.1, YARD_Z0, rgb(150, 148, 142), M.Concrete, a)
+    box("GateTrack", GATE_X0, 0.1, YARD_Z0 + 0.2, GATE_X1, 0.14, YARD_Z0 + 0.4, STEEL, M.Metal, a, nc())
+    -- painted parking bay round the getaway spot
+    local LINE = rgb(236, 196, 48)
+    box("BayLine", CAR_X - 3.4, 0.1, CAR_Z - 6.2, CAR_X - 3.2, 0.12, CAR_Z + 6.4, LINE, M.Plaster, a, nc())
+    box("BayLine", CAR_X + 3.2, 0.1, CAR_Z - 6.2, CAR_X + 3.4, 0.12, CAR_Z + 6.4, LINE, M.Plaster, a, nc())
+    box("BayLine", CAR_X - 3.4, 0.1, CAR_Z + 6.2, CAR_X + 3.4, 0.12, CAR_Z + 6.4, LINE, M.Plaster, a, nc())
+
+    -- ── brick walls (CanCollide, meet the store walls exactly) ──
+    box("YardGatePostE", GATE_X1, 0, YARD_Z0 - 0.2, GATE_X1 + 0.8, H + 1, NZ1 + 0.2, BRICK, M.Brick, a)
+    box("YardWallN", GATE_X1 + 0.8, 0, YARD_Z0, EX0, H, NZ1, BRICK, M.Brick, a)
+    box("YardWallE", EX0, 0, YARD_Z0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
+    box("YardWallS", BACK_X0, 0, SZ0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
+    box("YardWallW", BACK_X0, 0, Z1, BACK_X0 + T, H, SZ0, BRICK, M.Brick, a)
+    -- concrete coping + a dark plinth on the inside faces
+    box("YardCoping", GATE_X1 + 0.8, H, YARD_Z0 - 0.1, YARD_X1 + 0.1, H + 0.35, NZ1 + 0.1, CAP, M.Concrete, a)
+    box("YardCoping", EX0 - 0.1, H, NZ1, YARD_X1 + 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
+    box("YardCoping", BACK_X0 - 0.1, H, SZ0 - 0.1, EX0 - 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
+    box("YardCoping", BACK_X0 - 0.1, H, Z1, BACK_X0 + T + 0.1, H + 0.35, SZ0 - 0.1, CAP, M.Concrete, a)
+    box("PostCap", GATE_X1 - 0.1, H + 1, YARD_Z0 - 0.3, GATE_X1 + 0.9, H + 1.4, NZ1 + 0.3, CAP, M.Concrete, a)
+    box("Plinth", GATE_X1 + 0.8, 0.1, NZ1, EX0, 1.1, NZ1 + 0.08, PLINTH, M.Concrete, a, nc())
+    box("Plinth", EX0 - 0.08, 0.1, NZ1, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
+    box("Plinth", BACK_X0 + T, 0.1, SZ0 - 0.08, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
+
+    -- ── the vehicle gate: chain-link slider parked open along the north wall ──
+    local gx0, gx1, gz, gy0, gy1 = GATE_X1 + 1.0, GATE_X1 + 9.4, NZ1 + 0.15, 0.5, 9.2
+    local GATE_STEEL = rgb(150, 156, 166)
+    bar("GateRail", Vector3.new(gx0, gy1, gz), Vector3.new(gx1, gy1, gz), 0.18, GATE_STEEL, M.Metal, a, nc())
+    bar("GateRail", Vector3.new(gx0, gy0, gz), Vector3.new(gx1, gy0, gz), 0.18, GATE_STEEL, M.Metal, a, nc())
+    for _, vx in ipairs({ gx0, (gx0 + gx1) / 2, gx1 }) do
+        bar("GateStile", Vector3.new(vx, gy0, gz), Vector3.new(vx, gy1, gz), 0.18, GATE_STEEL, M.Metal, a, nc())
+    end
+    local mesh = box("GateMesh", gx0, gy0, gz - 0.02, gx1, gy1, gz + 0.02, GATE_STEEL, M.Metal, a,
+        nc({ Transparency = 1, CastShadow = false, CanQuery = false }))
+    local mg = lit(surface(mesh, Enum.NormalId.Back, 12, 1))
+    local holder = frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ClipsDescendants = true }, mg)
+    for k = -6, 14 do
+        for _, rot in ipairs({ 45, -45 }) do
+            frame({ Size = UDim2.new(0, 2, 2, 0), Position = UDim2.fromScale(k / 8, -0.5), Rotation = rot,
+                BackgroundColor3 = GATE_STEEL }, holder)
         end
     end
-    local dg = surface(box("DumpsterLabel", dx1, 1.6, dz0 + 1, dx1 + 0.05, 2.8, dz1 - 1, rgb(40, 110, 70), M.Metal, a, nc()),
-        Enum.NormalId.Right, 40, 1)
-    text({ Text = "NO DUMPING", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
-        TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
-        TextColor3 = rgb(236, 236, 230) }, dg)
+    for _, wx in ipairs({ gx0 + 0.6, gx1 - 0.6 }) do
+        part({ Name = "GateWheel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, 0.7, 0.7),
+            CFrame = CFrame.new(wx, 0.45, gz) * CFrame.Angles(0, math.rad(90), 0),
+            Color = STEEL_DK, Material = M.Metal, CanCollide = false }, a)
+    end
+    local plate = box("GateSign", gx0 + 2.6, 4.2, gz + 0.1, gx0 + 5.8, 5.8, gz + 0.16, rgb(236, 230, 214), M.Metal, a, nc())
+    lit(printOn(plate, Enum.NormalId.Back, "KEEP CLEAR · GATE", rgb(170, 30, 40), UITheme.F.bold, 40, 1).Parent)
+    -- lantern on the gate post
+    local lantern = box("PostLantern", GATE_X1 + 0.1, H + 1.4, YARD_Z0 + 0.1, GATE_X1 + 0.7, H + 2.3, NZ1 - 0.1,
+        STEEL_DK, M.Metal, a, nc())
+    box("PostLanternGlass", GATE_X1 + 0.18, H + 1.55, YARD_Z0 + 0.18, GATE_X1 + 0.62, H + 2.15, NZ1 - 0.18,
+        rgb(255, 214, 150), M.Neon, a, nc({ CastShadow = false }))
+    point(lantern, rgb(255, 196, 130), 0.9, 12, false)
+
+    -- ── lamps: the yard's key light (shadows) over the car + one on the back strip ──
+    local key = box("YardLamp", EX0 - 0.7, 9.6, CAR_Z - 0.7, EX0, 10.3, CAR_Z + 0.7, STEEL_DK, M.Metal, a, nc())
+    box("YardLampLens", EX0 - 0.65, 9.52, CAR_Z - 0.6, EX0 - 0.05, 9.6, CAR_Z + 0.6, rgb(255, 196, 120), M.Neon, a,
+        nc({ CastShadow = false }))
+    spot(key, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.7, 26, 120, true)
+    local back = box("YardLamp", -62.7, 9.6, SZ0 - 0.7, -61.3, 10.3, SZ0, STEEL_DK, M.Metal, a, nc())
+    box("YardLampLens", -62.6, 9.52, SZ0 - 0.65, -61.4, 9.6, SZ0 - 0.05, rgb(255, 196, 120), M.Neon, a,
+        nc({ CastShadow = false }))
+    spot(back, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.3, 18, 110, false)
+
+    -- ── props (all hard against a wall, well clear of the car and its run to the gate) ──
+    -- green dumpster on the east wall
+    local dx0, dx1, dz0, dz1 = EX0 - 3.9, EX0 - 0.3, 20, 23.8
+    box("Dumpster", dx0, 0.4, dz0, dx1, 4.2, dz1, rgb(40, 110, 70), M.Metal, a)
+    box("DumpsterLid", dx0 - 0.1, 4.2, dz0 - 0.1, dx1 + 0.1, 4.45, dz1 + 0.1, rgb(30, 80, 52), M.Metal, a)
+    box("DumpsterSkid", dx0 + 0.2, 0.1, dz0 + 0.2, dx1 - 0.2, 0.4, dz1 - 0.2, STEEL_DK, M.Metal, a)
+    local dl = box("DumpsterLabel", dx0 - 0.05, 1.6, dz0 + 1, dx0, 2.8, dz1 - 1, rgb(40, 110, 70), M.Metal, a, nc())
+    lit(printOn(dl, Enum.NormalId.Left, "NO DUMPING", rgb(236, 236, 230), UITheme.F.bold, 40, 1).Parent)
     for k = 0, 2 do
         part({ Name = "BinBag", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.3, 1.5),
-            Position = Vector3.new(dx1 + 0.9, 0.7, dz0 + 0.8 + k * 1.1), Color = rgb(24, 24, 28), Material = M.Rubber }, a)
+            Position = Vector3.new(EX0 - 1.1 - (k % 2) * 1.2, 0.75, dz1 + 1 + k * 1.1), Color = rgb(24, 24, 28),
+            Material = M.Rubber }, a)
+    end
+    -- blue recycling dumpster behind the store
+    local rx0, rx1 = -70, -66.2
+    box("Dumpster", rx0, 0.4, SZ0 - 3.8, rx1, 4.2, SZ0 - 0.3, rgb(34, 84, 150), M.Metal, a)
+    box("DumpsterLid", rx0 - 0.1, 4.2, SZ0 - 3.9, rx1 + 0.1, 4.45, SZ0 - 0.2, rgb(24, 60, 110), M.Metal, a)
+    box("DumpsterSkid", rx0 + 0.2, 0.1, SZ0 - 3.6, rx1 - 0.2, 0.4, SZ0 - 0.5, STEEL_DK, M.Metal, a)
+    -- crates stacked in the far corner + two pallets leaning on the wall
+    local cx, cz = EX0 - 2.6, SZ0 - 2.6
+    box("Crate", cx - 1.1, 0.1, cz - 1.1, cx + 1.1, 2.3, cz + 1.1, rgb(150, 110, 70), M.WoodPlanks, a)
+    box("Crate", cx - 3.5, 0.1, cz - 0.9, cx - 1.3, 2.3, cz + 1.3, rgb(140, 102, 64), M.WoodPlanks, a)
+    box("Crate", cx - 0.9, 2.3, cz - 0.9, cx + 0.9, 4.1, cz + 0.9, rgb(160, 120, 78), M.WoodPlanks, a)
+    for k = 0, 1 do
+        local px = -76 + k * 2.4
+        part({ Name = "Pallet", Size = Vector3.new(2.2, 3.6, 0.4),
+            CFrame = CFrame.new(px, 1.9, SZ0 - 0.5) * CFrame.Angles(math.rad(-12), 0, 0),
+            Color = rgb(170, 130, 80), Material = M.WoodPlanks }, a)
+    end
+    -- oil drums by the back door end of the strip
+    for k, d in ipairs({ { -49.2, 39.4 }, { -47.9, 40.9 }, { -49.6, 41.8 } }) do
+        part({ Name = "Drum", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 1.6, 1.6),
+            CFrame = CFrame.new(d[1], 1.4, d[2]) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = (k == 2) and rgb(200, 60, 40) or rgb(40, 90, 150), Material = M.Metal }, a)
+    end
+    -- AC condenser humming on the strip behind the store
+    box("Condenser", -62, 0.1, Z1 + 0.3, -58, 3.1, Z1 + 2.6, rgb(190, 192, 188), M.Metal, a)
+    part({ Name = "CondenserFan", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.1, 1.9, 1.9),
+        CFrame = CFrame.new(-60, 3.12, Z1 + 1.45) * CFrame.Angles(0, 0, math.rad(90)),
+        Color = STEEL_DK, Material = M.DiamondPlate, CanCollide = false }, a)
+    bar("CondenserPipe", Vector3.new(-59, 2.4, Z1 + 0.2), Vector3.new(-59, 9, Z1 + 0.2), 0.2, STEEL_LT, M.Metal, a, nc())
+    -- flattened boxes leaning on the east wall
+    part({ Name = "FlatBoxes", Size = Vector3.new(0.3, 3.4, 2.6),
+        CFrame = CFrame.new(EX0 - 0.5, 1.8, 30) * CFrame.Angles(0, 0, math.rad(10)),
+        Color = rgb(186, 150, 104), Material = M.Cardboard, CanCollide = false }, a)
+    -- puddles: flat, reflective, catch the lamps (no collision)
+    for _, pd in ipairs({ { -40, 23.4, 3.2, 2 }, { -32.6, 10.5, 2.4, 3.8 }, { -57.5, 40.2, 4, 1.8 }, { -31, 31.5, 2, 2.6 } }) do
+        box("Puddle", pd[1] - pd[3] / 2, 0.1, pd[2] - pd[4] / 2, pd[1] + pd[3] / 2, 0.13, pd[2] + pd[4] / 2,
+            rgb(22, 24, 34), M.Glass, a, nc({ Reflectance = 0.45, Transparency = 0.15, CastShadow = false }))
     end
 
-    -- wooden crates stacked south of the door
-    local cz = SIDE_Z1 + 4.4
-    box("Crate", X1 + 0.4, 0, cz, X1 + 2.6, 2.2, cz + 2.2, rgb(150, 110, 70), M.WoodPlanks, a)
-    box("Crate", X1 + 2.8, 0, cz + 0.2, X1 + 5, 2.2, cz + 2.4, rgb(140, 102, 64), M.WoodPlanks, a)
-    box("Crate", X1 + 0.9, 2.2, cz + 0.3, X1 + 2.7, 4.0, cz + 2.1, rgb(160, 120, 78), M.WoodPlanks, a)
+    -- painted words on the walls (they take the lamp light)
+    local sign = box("WallPaint", EX0 - 0.06, 4.4, 5.5, EX0, 6.6, 12.5, rgb(122, 66, 56), M.Brick, a, nc({ Transparency = 1 }))
+    lit(printOn(sign, Enum.NormalId.Left, "DELIVERIES ONLY", rgb(236, 230, 214), UITheme.F.display, 30, 1).Parent)
+    local tag1 = box("Graffiti", -45, 2.2, SZ0 - 0.06, -34, 7.2, SZ0, rgb(122, 66, 56), M.Brick, a, nc({ Transparency = 1 }))
+    local tg = lit(surface(tag1, Enum.NormalId.Front, 20, 1))
+    local tl = text({ Text = "DOLLZ", Size = UDim2.fromScale(0.96, 0.9), Position = UDim2.fromScale(0.02, 0.05),
+        TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, Rotation = -4,
+        FontFace = Font.new("rbxasset://fonts/families/Kalam.json", Enum.FontWeight.Bold), TextColor3 = rgb(255, 110, 200) }, tg)
+    local ts = Instance.new("UIStroke")
+    ts.Color = rgb(40, 220, 240)
+    ts.Thickness = 4
+    ts.Parent = tl
 
-    -- roof ladder: a steel truss you can actually climb, bolted to the wall at z 10.
-    -- Top at y 18.5; the parapet is notched (z 8.5..11.5) so you step onto the roof deck.
+    -- ── roof ladder: a steel truss you can climb, on the store's east wall ──
+    -- Top at y 18; the parapet is notched (NOTCH_Z0..Z1) so you step onto the roof deck.
     local truss = Instance.new("TrussPart")
     truss.Name = "RoofLadder"
     truss.Anchored = true
@@ -1324,15 +1639,11 @@ function JewelryBuilder:_alley(f, refs)
     truss.Color = STEEL_LT
     truss.Material = M.Metal
     truss.Parent = a
-    local sign = box("RoofSign", X1 + 0.02, 2.4, LADDER_Z - 2.6, X1 + 0.12, 3.6, LADDER_Z - 1.2, rgb(250, 204, 21), M.Metal, a, nc())
-    printOn(sign, Enum.NormalId.Right, "ROOF", rgb(30, 30, 30), UITheme.F.display, 50, 1)
+    local rs = box("RoofSign", X1 + 0.02, 2.4, LADDER_Z - 3.9, X1 + 0.12, 3.6, LADDER_Z - 1.3, rgb(250, 204, 21), M.Metal, a, nc())
+    lit(printOn(rs, Enum.NormalId.Right, "ROOF", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
-    -- a shadowy corner by the dumpster (sneak here from the street)
-    table.insert(refs.shadowZones, shadowZone("ShadowAlley", X1 + 0.2, 16, X1 + 7, 25.8, a))
-    box("AlleyPole", X1 + 7.6, 0, 3.6, X1 + 8, 9, 4, STEEL_DK, M.Metal, a)
-    local head = box("AlleyPoleHead", X1 + 6.8, 8.7, 3.4, X1 + 8, 9.1, 4.2, STEEL_DK, M.Metal, a, nc())
-    box("AlleyPoleLens", X1 + 6.9, 8.65, 3.5, X1 + 7.9, 8.7, 4.1, rgb(255, 214, 150), M.Neon, a, nc())
-    spot(head, Enum.NormalId.Bottom, rgb(255, 200, 140), 1.2, 16, 100, false)
+    -- the dark corner by the dumpster (sneak here from the gate)
+    table.insert(refs.shadowZones, shadowZone("ShadowAlley", EX0 - 6.5, 17, EX0, 28.5, a))
 end
 
 -- the roof: hatch (outside end of the roof "vent") above the closet
@@ -1361,7 +1672,7 @@ function JewelryBuilder:_safeRoom(f, refs)
     box("CladW", IX0, FLOOR, SR_Z0, IX0 + 0.1, FLOOR + 7.5, IZ1, STEEL, M.Metal, s)
     box("CladS", IX0, FLOOR, IZ1 - 0.1, -68, FLOOR + 7.5, IZ1, STEEL, M.Metal, s)
     local dep = box("DepositBoxes", IX0 + 0.1, FLOOR + 0.6, SR_Z0 + 1, IX0 + 0.4, FLOOR + 7.2, IZ1 - 1, STEEL_LT, M.Metal, s)
-    local dg = surface(dep, Enum.NormalId.Right, 20, 1)
+    local dg = lit(surface(dep, Enum.NormalId.Right, 20, 1))
     for r = 0, 7 do
         for col = 0, 7 do
             local cell = frame({ Size = UDim2.fromScale(0.115, 0.11), Position = UDim2.fromScale(0.006 + col * 0.124, 0.01 + r * 0.124),
@@ -1393,7 +1704,7 @@ function JewelryBuilder:_safeRoom(f, refs)
     box("SafeShelfLow", sx0 + 0.45, oy0 - 0.1, fz1, sx1 - 0.45, oy0, SAFE_Z1 - 0.55, STEEL_LT, M.Metal, body)
     box("SafeShelfHigh", sx0 + 0.45, SAFE_Y - 0.25, fz1, sx1 - 0.45, SAFE_Y - 0.15, SAFE_Z1 - 0.55, STEEL_LT, M.Metal, body)
     local plate = box("SafeNameplate", SAFE_X - 1, topY - 0.8, fz0 - 0.04, SAFE_X + 1, topY - 0.5, fz0, BRASS, M.Metal, body, nc())
-    printOn(plate, Enum.NormalId.Front, "D.D. SAFE CO.  ·  1986", rgb(60, 36, 14), UITheme.F.display, 60, 1)
+    lit(printOn(plate, Enum.NormalId.Front, "D.D. SAFE CO.  ·  1986", rgb(60, 36, 14), UITheme.F.display, 60, 1).Parent)
 
     -- ── the round door (everything below swings about the hinge) ──
     local dz = fz0 - DISC_T / 2
@@ -1508,10 +1819,10 @@ function JewelryBuilder:_safeRoom(f, refs)
 
     -- 4) Art: a framed Miami sunset on a wooden easel (grab it any time)
     local ex, ez = -69.8, 29.2
-    bar("EaselLeg", Vector3.new(ex - 1.1, FLOOR, ez - 0.3), Vector3.new(ex - 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.WoodPlanks, s)
-    bar("EaselLeg", Vector3.new(ex + 1.1, FLOOR, ez - 0.3), Vector3.new(ex + 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.WoodPlanks, s)
-    bar("EaselLeg", Vector3.new(ex, FLOOR, ez + 1.2), Vector3.new(ex, FLOOR + 6, ez + 0.25), 0.15, WALNUT, M.WoodPlanks, s)
-    box("EaselLedge", ex - 1.4, FLOOR + 2.8, ez - 0.35, ex + 1.4, FLOOR + 2.95, ez + 0.05, WALNUT, M.WoodPlanks, s)
+    bar("EaselLeg", Vector3.new(ex - 1.1, FLOOR, ez - 0.3), Vector3.new(ex - 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.Wood, s)
+    bar("EaselLeg", Vector3.new(ex + 1.1, FLOOR, ez - 0.3), Vector3.new(ex + 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.Wood, s)
+    bar("EaselLeg", Vector3.new(ex, FLOOR, ez + 1.2), Vector3.new(ex, FLOOR + 6, ez + 0.25), 0.15, WALNUT, M.Wood, s)
+    box("EaselLedge", ex - 1.4, FLOOR + 2.8, ez - 0.35, ex + 1.4, FLOOR + 2.95, ez + 0.05, WALNUT, M.Wood, s)
     local art = Instance.new("Model")
     art.Name = "Painting"
     art.Parent = s
@@ -1547,7 +1858,7 @@ function JewelryBuilder:_safeRoom(f, refs)
     canLight(s, SAFE_X, 28.6, WARM, 2.8, 55, true)
     local cage = box("CageLamp", -75.4, CEIL - 0.4, 26.2, -74.6, CEIL, 27, STEEL_DK, M.Metal, s, nc())
     box("CageLampBulb", -75.25, CEIL - 0.5, 26.35, -74.75, CEIL - 0.4, 26.85, COOL, M.Neon, s, nc())
-    point(cage, rgb(200, 215, 255), 0.7, 16, false)
+    point(cage, rgb(200, 215, 255), 0.45, 12, false)
 
     refs.lootSpots = loot
 end
@@ -1593,18 +1904,20 @@ function JewelryBuilder:build(folder)
         -- the crew drops in INSIDE the staff break room, just past the alley
         -- door. No guard route and no camera covers it; the office next door
         -- leads to the back hall.
-        sneakIn = { at = Vector3.new(-51, 3.5, 28.4), face = Vector3.new(-51, 3.5, 24),
+        sneakIn = { at = Vector3.new(-50.7, 3.5, 28.4), face = Vector3.new(-50.7, 3.5, 24),   -- (v2.1) x -50.7: row 1 clear of the fridge
             spread = Vector3.new(0.6, 0, 0) },
         entrances = {
             { kind = "front", at = Vector3.new(CX, 3, -3.5), label = "Front door" },
             { kind = "side", at = Vector3.new(X1 + 3, 3, (SIDE_Z0 + SIDE_Z1) / 2), label = "Staff door (alley)" },
-            { kind = "roof", at = Vector3.new(X1 + 2.5, 3, LADDER_Z), label = "Roof ladder" },
+            { kind = "roof", at = Vector3.new(X1 + 3.2, 3, LADDER_Z), label = "Roof ladder" },
         },
         hideSpots = {},
         shadowZones = {},
         vents = {},
-        policeStop = Vector3.new(CX - 20, 0, -14),   -- west of the store, clear of the getaway spot
-        getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -10), Vector3.new(-30, 0, -10)),
+        policeStop = Vector3.new(CX - 20, 0, -14),   -- west of the store, clear of the gate
+        -- (v2.0.2) parked INSIDE the walled service yard, nose at the vehicle gate
+        -- (x -45.6..-37.4, z 2.6). Straight run north: gate → driveway → Ocean Drive.
+        getawayCFrame = CFrame.lookAt(Vector3.new(CAR_X, 0, CAR_Z), Vector3.new(CAR_X, 0, CAR_Z - 10)),
     }
 
     self:_shell(f)
@@ -1621,7 +1934,7 @@ function JewelryBuilder:build(folder)
     refs.breaker = breaker
     local deskSpot = self:_office(back)
     local breakVent = self:_breakRoom(back, refs)
-    self:_alley(f, refs)
+    self:_yard(f, refs)
     local hatchRoof = self:_roof(f)
     self:_safeRoom(back, refs)
     refs.keycardSpots = { counterSpot, deskSpot, shelfSpot }
@@ -1683,15 +1996,11 @@ function JewelryBuilder:build(folder)
         entry = { CX, Z0 },
     }
 
-    -- soft props (async, never errors)
-    KenneyLoader.placeMany({
-        { kit = "furniture", name = "rugDoormat", pos = Vector3.new(CX, FLOOR, 1.4), facing = Vector3.new(0, 0, -1),
-            opts = { collide = false } },
-        { kit = "furniture", name = "rugRound", pos = Vector3.new(CX, FLOOR, 8), facing = Vector3.new(0, 0, -1),
-            opts = { collide = false, scale = 1.6 } },
-        { kit = "furniture", name = "kitchenMicrowave", pos = Vector3.new(EC_X0 + 1, FLOOR + 3.3, 30.4), facing = Vector3.new(1, 0, 0) },
-        { kit = "furniture", name = "kitchenCoffeeMachine", pos = Vector3.new(EC_X0 + 1, FLOOR + 3.3, 32.6), facing = Vector3.new(1, 0, 0) },
-    }, f)
+    -- soft props (async, never errors) — repainted, they import plain white
+    prop("furniture", "rugDoormat", Vector3.new(CX, FLOOR + 0.03, 1.4), Vector3.new(0, 0, -1), f,
+        { main = { rgb(30, 26, 32), M.Fabric } }, { collide = false })
+    prop("furniture", "rugRound", Vector3.new(CX, FLOOR + 0.03, 8), Vector3.new(0, 0, -1), f,
+        { main = { rgb(120, 22, 76), M.Fabric }, accent = { BRASS, M.Fabric } }, { collide = false, scale = 1.6 })
 
     print("[JewelryBuilder] Diamond Dolls v2 built 💎")
     return refs

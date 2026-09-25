@@ -247,6 +247,10 @@ JobService:init({
     data = PlayerDataService,
 })
 
+local MaskService  = optional("MaskService", nil)
+local RobuxService = optional("RobuxService", nil)
+if MaskService then safe("MaskService", function() MaskService:init({ shop = ShopService, notify = notify, feel = FeelService, jobService = JobService }) end) end
+if RobuxService then safe("RobuxService", function() RobuxService:init({ data = PlayerDataService, economy = EconomyService, notify = notify, feel = FeelService }) end) end
 if JailService then safe("JailService", function() JailService:init({ jail = world.jail, notify = notify, jobService = JobService }) end) end
 if BotService then safe("BotService", function() BotService:init({ jobService = JobService, loot = LootService }) end) end
 if PortalService then safe("PortalService", function() PortalService:init({ hub = hub, jobService = JobService, notify = notify }) end) end

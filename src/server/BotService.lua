@@ -20,8 +20,10 @@
       • bots despawn when the run ends or the job changes.
 
     Model: NpcFactory R15, attribute IsBot = true, BotName, OwnerUserId;
-    tag "BotCrew"; a bright purple crew outfit + the Bandit mask so nobody
-    mistakes them for a guard. No floating name tags (art rule).
+    tag "BotCrew"; (v2.1) a proper crew outfit per bot from NpcFactory
+    (outfitFor / OUTFITS — jacket, denim, biker, hoodie…) + the Bandit mask,
+    falling back to a dark crew outfit — never a guard look, never bright
+    purple. No floating name tags (art rule).
 
     PUBLIC API:
         BotService:init({ jobService = JobService, loot = LootService })
@@ -98,17 +100,70 @@ local function hookPlayerGroup(player)
 end
 
 -- ── building a bot ───────────────────────────────────────────────────
-local BOT_SPEC = {
-    -- no outfit id: a plain R15 in bright crew colours (can't collide with a
-    -- deleted catalog item) + the free Bandit mask everyone owns
-    hats = { (Constants.MASKS and Constants.MASKS[1] and Constants.MASKS[1].assetId) or 93050572 },
-    bodyColors = {
-        head  = Color3.fromRGB(205, 160, 120),
-        torso = Color3.fromRGB(150, 70, 230),    -- crew purple
-        arms  = Color3.fromRGB(150, 70, 230),
-        legs  = Color3.fromRGB(40, 40, 60),
-    },
+local BOT_MASK = (Constants.MASKS and Constants.MASKS[1] and Constants.MASKS[1].assetId) or 93050572
+
+-- Fallback look when NpcFactory has no crew outfits: a dark crew outfit (charcoal
+-- top, black trousers) + the free Bandit mask — reads as "crew", never as a guard.
+local FALLBACK_SKINS = {
+    Color3.fromRGB(234, 192, 160), Color3.fromRGB(198, 140, 100), Color3.fromRGB(141, 94, 64),
+    Color3.fromRGB(95, 62, 42), Color3.fromRGB(255, 214, 180), Color3.fromRGB(176, 120, 84),
 }
+local FALLBACK_TOPS = {
+    Color3.fromRGB(42, 46, 56), Color3.fromRGB(28, 36, 52), Color3.fromRGB(52, 40, 36), Color3.fromRGB(36, 44, 38),
+}
+
+-- v2.1: each bot gets its own proper outfit from NpcFactory (outfitFor / OUTFITS),
+-- coded defensively so an older / newer NpcFactory can never break bot spawning.
+local botCounter = 0
+local function botSpec(name)
+    botCounter = botCounter + 1
+    local i = botCounter
+    local specName = "Bot_" .. name
+    if type(NpcFactory.outfitFor) == "function" then
+        local ok, spec = pcall(NpcFactory.outfitFor, i, { name = specName, mask = BOT_MASK })
+        if ok and type(spec) == "table" then return spec end
+    end
+    if type(NpcFactory.OUTFITS) == "table" then
+        -- pick one entry (map or array); skip anything that smells like a guard / police look
+        local keys = {}
+        for k in pairs(NpcFactory.OUTFITS) do
+            local lk = string.lower(tostring(k))
+            if not (lk:find("guard") or lk:find("police") or lk:find("cop")) then table.insert(keys, k) end
+        end
+        table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+        if #keys > 0 then
+            local key = keys[(i - 1) % #keys + 1]
+            if type(NpcFactory.outfit) == "function" then
+                local ok, spec = pcall(NpcFactory.outfit, key, { name = specName, mask = BOT_MASK, skinIndex = i * 2 - 1 })
+                if ok and type(spec) == "table" then return spec end
+            end
+            local o = NpcFactory.OUTFITS[key]
+            if type(o) == "number" then
+                return { name = specName, outfitId = o, hats = { BOT_MASK } }
+            elseif type(o) == "table" then
+                local skin = FALLBACK_SKINS[(i - 1) % #FALLBACK_SKINS + 1]
+                local bc = type(o.bodyColors) == "table" and o.bodyColors or {}
+                return {
+                    name = specName, outfitId = o.outfitId, shirt = o.shirt, pants = o.pants,
+                    hats = { BOT_MASK },
+                    bodyColors = { head = skin, torso = bc.torso or FALLBACK_TOPS[1], arms = bc.arms or skin,
+                        legs = bc.legs or Color3.fromRGB(24, 24, 30) },
+                }
+            end
+        end
+    end
+    local top = FALLBACK_TOPS[(i - 1) % #FALLBACK_TOPS + 1]
+    return {
+        name = specName,
+        hats = { BOT_MASK },
+        bodyColors = {
+            head  = FALLBACK_SKINS[(i - 1) % #FALLBACK_SKINS + 1],
+            torso = top,
+            arms  = top,
+            legs  = Color3.fromRGB(24, 24, 30),
+        },
+    }
+end
 
 local function ensureFolder()
     if folder and folder.Parent then return folder end
@@ -348,8 +403,7 @@ local function giveBag(bot, player)
 end
 
 local function makeBot(owner, name, pos, faceTo, gen)
-    local spec = table.clone(BOT_SPEC)
-    spec.name = "Bot_" .. name
+    local spec = botSpec(name)
     local ok, model, humanoid, root = pcall(NpcFactory.build, spec)
     if not ok or not model or not humanoid or not root then
         warn("[BotService] could not build bot", name, ok and "" or model)
@@ -429,12 +483,24 @@ function BotService:spawnFor(players, refs)
         -- stand them just behind the crew's drop-in rows
         local away = flat(base - face)
         away = away.Magnitude > 1e-3 and away.Unit or Vector3.new(0, 0, 1)
-        local pos = base + spread * ((i - 1.5) * 3) + away * 5 + Vector3.new(0, 1, 0)
-        if not clearSpot(pos) then
-            -- (v2.0 fix) no room behind the crew (the jewelry back office puts that
-            -- spot inside the wall): stand in front of them instead
-            local alt = base + spread * ((i - 1.5) * 3) - away * 3 + Vector3.new(0, 1, 0)
-            if clearSpot(alt) then pos = alt end
+        local side = spread * ((i - 1.5) * 3)
+        local up = Vector3.new(0, 1, 0)
+        -- (v2.1 fix) Diamond Dolls: "behind" is the vending machine and the south
+        -- wall. Try several spots and NEVER keep a blocked one: the last resort is
+        -- right beside the owner (players always land on a clear drop point).
+        local pos = nil
+        for _, cand in ipairs({
+            base + side + away * 5 + up,        -- behind the crew rows
+            base + side - away * 3 + up,        -- in front of them
+            base + side + away * 2.5 + up,      -- between the two rows
+            base + side * 1.6 + up,             -- off the end of the front row
+        }) do
+            if clearSpot(cand) then pos = cand break end
+        end
+        if not pos then
+            local hrp = rootOf(owner)
+            pos = hrp and (hrp.Position + flat(hrp.CFrame.RightVector) * (i == 1 and -2.5 or 2.5)) or (base + up)
+            if not clearSpot(pos) and hrp then pos = hrp.Position end
         end
         local bot = makeBot(owner, name, pos, face, gen)
         if bot then

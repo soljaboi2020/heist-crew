@@ -13,7 +13,8 @@
     by build() (docs/V1_SPEC.md §4 + docs/V2_SPEC.md §4).
 
     FOOTPRINT x 84..140, z 1..55 (Constants.WORLD.BANK_*). The building is
-    x 84..132; the STAFF ALLEY is the strip x 132..140 inside the lot.
+    x 84..132; the SERVICE YARD (v2.0.2) is
+    x 132..144.4, walled in, with the vehicle gate + getaway bay.
     Raised floor: FLOOR = 2.0 (a real bank sits up on its steps). Ground and
     sidewalk are y 0 / 0.5; three steps climb from the sidewalk to the porch.
     Hall ceiling y 26 (24 tall), back rooms ceiling y 18 (16 tall),
@@ -21,10 +22,10 @@
     hall roof top y 27, front pylons to y 33.
 
         z 1  ┌PYLON─┐ steps · 4 columns · "OCEAN BANK" ┌─PYLON┐ │ ALLEY
-             │84..96│ bronze doors x 104..112 (z 8)    │120.132│ │ x132..140
+             │84..96│ bronze doors x 104..112 (z 8)    │120.132│ │ x132..144
         z 9  ├──────┴──────────────────────────────────┴───────┤ │
-             │[MANAGER]  G1 ········ z 11.5 ········  [LOANS]  │ │ (lamp,
-             │ glass     benches        queue ropes    glass   │ │ dumpster)
+             │[MANAGER]  G1 ········ z 11.5 ········  [LOANS]  │ │ gate +
+             │ glass     benches        queue ropes    glass   │ │ getaway car
              │ 85..97                                 119..131 │ │
         z 20 │ ══════════ TELLER COUNTER x 92..124 ═══════════ │ │
              │ closet  G2 ········ z 25.5 ········ (teller area)│ │
@@ -39,10 +40,21 @@
              x 84                 107     119                132    140
 
     3 WAYS IN: front doors (watched by cam 1 + guard 1) · staff door off the
-    east alley into the break room (sneakIn — no guard, no camera) · the
-    fire-escape ladder in the alley → roof → roof hatch (Vent pair) that
+    east service yard into the break room (sneakIn — no guard, no camera) · the
+    fire-escape ladder in the yard → roof → roof hatch (Vent pair) that
     drops into the security room beside the breaker.
     Crawl vent: manager office ↔ break room (skips the staff corridor).
+
+    v2.0.2 (2026-09-25, from Malachi's Future-lighting playtest): the open
+    alley is now a WALLED SERVICE YARD x 132..144.4 (brick walls 13 tall,
+    gatehouse, 7.4-wide vehicle gate x 132.2..139.6 onto Ocean Drive) and the
+    GETAWAY CAR is parked inside it (armored-car bay, x 135.9 z 15, nose north
+    to the gate). The mart-side gap is walled at z 29.2..30 and the back roof
+    has invisible rails, so no route reaches open lawn. Graphics pass: chandelier
+    pools + sconces + picture lights (shadows on), limestone/black-marble hall
+    walls, door casings, two-tone staff corridor with a dead light, gold-lit
+    vault, z-fight-proof floor overlays, and every Kenney prop repainted
+    (PROP_STYLE) because they arrive as untextured white meshes.
 
     Guard routes are straight a↔b lines kept ≥ 2 studs from props, and none
     enters the break room. Interior doorways are all 7 wide, 10 tall.
@@ -315,6 +327,68 @@ local function fakeWindow(parent, pos, normal, w, h, lit, frameColor)
     return glass
 end
 
+-- ── Kenney prop restyle (v2.0.2) ────────────────────────────────────────
+-- In Studio the Kenney furniture kit arrives as flat untextured WHITE meshes.
+-- Every prop this builder spawns is repainted here, by model name, with a real
+-- Material. `a` = the biggest mesh (or the lower half with split = "y"),
+-- `b` = everything else. Meshes that carry a texture (the factory kit's atlas)
+-- are left alone. { color, material, reflectance? }
+local PROP_STYLE = {
+    chairDesk            = { a = { Color3.fromRGB(30, 30, 34), M.Fabric }, b = { Color3.fromRGB(70, 74, 82), M.Metal } },
+    chair                = { a = { WOOD_DARK, M.Wood }, b = { Color3.fromRGB(34, 64, 60), M.Fabric } },
+    benchCushion         = { a = { Color3.fromRGB(34, 74, 70), M.Fabric }, b = { WOOD_DARK, M.Wood } },
+    computerScreen       = { a = { Color3.fromRGB(28, 30, 34), M.Metal }, b = { Color3.fromRGB(24, 44, 64), M.Glass, 0.2 } },
+    computerKeyboard     = { a = { Color3.fromRGB(40, 42, 48), M.Metal }, b = { Color3.fromRGB(70, 72, 80), M.Metal } },
+    laptop               = { a = { Color3.fromRGB(64, 68, 76), M.Metal, 0.1 }, b = { Color3.fromRGB(24, 44, 64), M.Glass, 0.2 } },
+    trashcan             = { a = { BRASS, M.Metal, 0.15 }, b = { Color3.fromRGB(40, 36, 30), M.Metal } },
+    pottedPlant          = { split = "y", a = { Color3.fromRGB(196, 110, 80), M.Slate }, b = { LEAF, M.Grass } },
+    lampSquareFloor      = { split = "y", a = { BRASS, M.Metal, 0.15 }, b = { Color3.fromRGB(240, 222, 186), M.Fabric } },
+    kitchenFridge        = { a = { Color3.fromRGB(196, 200, 206), M.Metal, 0.1 }, b = { Color3.fromRGB(60, 62, 68), M.Metal } },
+    kitchenCoffeeMachine = { a = { Color3.fromRGB(38, 38, 42), M.Metal }, b = { Color3.fromRGB(170, 174, 180), M.Metal, 0.1 } },
+    kitchenMicrowave     = { a = { Color3.fromRGB(52, 54, 60), M.Metal }, b = { Color3.fromRGB(20, 24, 30), M.Glass, 0.2 } },
+    tableRound           = { a = { WOOD_MID, M.Wood }, b = { Color3.fromRGB(52, 54, 60), M.Metal } },
+    coatRackStanding     = { a = { WOOD_DARK, M.Wood }, b = { BRASS, M.Metal } },
+}
+local DEFAULT_STYLE = { a = { Color3.fromRGB(96, 92, 88), M.Metal }, b = { Color3.fromRGB(60, 58, 56), M.Metal } }
+
+local function paint(p, st)
+    p.Color = st[1]
+    p.Material = st[2]
+    p.Reflectance = st[3] or 0
+end
+
+local function styleProp(model)
+    if not (model and model:IsA("Model")) then return end
+    local st = PROP_STYLE[model.Name] or DEFAULT_STYLE
+    local parts = {}
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("MeshPart") then
+            if d.TextureID == "" then table.insert(parts, d) end
+        elseif d:IsA("BasePart") then
+            table.insert(parts, d)
+        end
+    end
+    if #parts == 0 then return end
+    if #parts == 1 then
+        paint(parts[1], st.a)
+        return
+    end
+    if st.split == "y" then
+        local cf, size = model:GetBoundingBox()
+        local mid = cf.Position.Y - size.Y * 0.15   -- pots / lamp bases sit in the lower part
+        for _, p in ipairs(parts) do
+            paint(p, (p.Position.Y < mid) and st.a or st.b)
+        end
+    else
+        table.sort(parts, function(x, y)
+            return x.Size.X * x.Size.Y * x.Size.Z > y.Size.X * y.Size.Y * y.Size.Z
+        end)
+        for i, p in ipairs(parts) do
+            paint(p, (i == 1) and st.a or st.b)
+        end
+    end
+end
+
 -- ── v2 gameplay markers ─────────────────────────────────────────────────
 local function tagHide(p, label)
     CollectionService:AddTag(p, "HideSpot")
@@ -363,21 +437,31 @@ function BankBuilder:_shell(f)
         { "HallFloor",     85,  9,  131, 28, MARBLE,                        M.Marble },
         { "SecurityFloor", 85,  28, 100, 39, Color3.fromRGB(56, 58, 64),    M.Slate },
         { "CorridorFloor", 100, 28, 131, 39, Color3.fromRGB(188, 190, 186), M.CeramicTiles },
-        { "VaultFloor",    85,  39, 107, 54, Color3.fromRGB(84, 88, 96),    M.DiamondPlate },
-        { "LaserFloor",    107, 39, 119, 54, Color3.fromRGB(44, 46, 52),    M.Metal },
+        { "VaultFloor",    85,  39, 107, 54, Color3.fromRGB(70, 74, 82),    M.DiamondPlate, 0.12 },
+        { "LaserFloor",    107, 39, 119, 54, Color3.fromRGB(34, 36, 42),    M.Metal, 0.1 },
         { "BreakFloor",    119, 39, 131, 54, Color3.fromRGB(214, 206, 188), M.CeramicTiles },
     }
     for _, fl in ipairs(floors) do
-        box(fl[1], fl[2], FLOOR - 0.2, fl[3], fl[4], FLOOR, fl[5], fl[6], fl[7], f)
+        box(fl[1], fl[2], FLOOR - 0.2, fl[3], fl[4], FLOOR, fl[5], fl[6], fl[7], f, { Reflectance = fl[8] or 0 })
     end
-    -- hall floor: black marble border + gold compass rose in the middle of the public area
-    box("HallBorderN", 85, FLOOR, 9, 131, FLOOR + 0.02, 9.8, MARBLE_DK, M.Marble, f, NOSHADOW)
-    box("HallBorderW", 85, FLOOR, 9, 85.8, FLOOR + 0.02, 28, MARBLE_DK, M.Marble, f, NOSHADOW)
-    box("HallBorderE", 130.2, FLOOR, 9, 131, FLOOR + 0.02, 28, MARBLE_DK, M.Marble, f, NOSHADOW)
-    box("TellerCarpet", 85.8, FLOOR, 22.4, 130.2, FLOOR + 0.02, 27.5, Color3.fromRGB(40, 58, 62), M.Fabric, f, NOSHADOW)
-    vcyl("CompassRing", 108, FLOOR, FLOOR + 0.03, 15, 7.6, BRASS, M.Metal, f, NOSHADOW)
-    vcyl("CompassRose", 108, FLOOR, FLOOR + 0.04, 15, 7, MARBLE_DK, M.Marble, f, NOSHADOW)
-    local roseTop = box("CompassStar", 105.2, FLOOR + 0.04, 12.2, 110.8, FLOOR + 0.05, 17.8, MARBLE_DK, M.Marble, f,
+    -- hall floor: black marble border + gold compass rose in the middle of the public area.
+    -- (v2.0.2) every floor overlay now sits ≥ 0.06 above the slab it covers and ≥ 0.04
+    -- above the overlay under it — the old 0.01–0.02 steps z-fought into flickering stripes.
+    box("HallBorderN", 85, FLOOR, 9, 131, FLOOR + 0.06, 9.8, MARBLE_DK, M.Marble, f, NOSHADOW)
+    box("HallBorderW", 85, FLOOR, 9.8, 85.8, FLOOR + 0.06, 28, MARBLE_DK, M.Marble, f, NOSHADOW)
+    box("HallBorderE", 130.2, FLOOR, 9.8, 131, FLOOR + 0.06, 28, MARBLE_DK, M.Marble, f, NOSHADOW)
+    box("TellerCarpet", 85.8, FLOOR, 22.4, 130.2, FLOOR + 0.06, 27.5, Color3.fromRGB(34, 52, 58), M.Fabric, f, NOSHADOW)
+    -- red carpet runner from the bronze doors to the compass rose, brass-edged
+    box("HallRunner", 105, FLOOR, 9.8, 111, FLOOR + 0.06, 11.2, VELVET, M.Fabric, f, NOSHADOW)
+    box("RunnerEdge", 104.8, FLOOR, 9.8, 105, FLOOR + 0.08, 11.2, BRASS, M.Metal, f, NOSHADOW)
+    box("RunnerEdge", 111, FLOOR, 9.8, 111.2, FLOOR + 0.08, 11.2, BRASS, M.Metal, f, NOSHADOW)
+    -- black-marble bands framing the public floor (reads as laid stone, not one flat slab)
+    box("FloorBandN", 85.8, FLOOR, 13.9, 104.2, FLOOR + 0.06, 14.3, MARBLE_DK, M.Marble, f, NOSHADOW)
+    box("FloorBandN", 111.8, FLOOR, 13.9, 130.2, FLOOR + 0.06, 14.3, MARBLE_DK, M.Marble, f, NOSHADOW)
+    box("FloorBandS", 85.8, FLOOR, 19.4, 130.2, FLOOR + 0.06, 19.8, MARBLE_DK, M.Marble, f, NOSHADOW)
+    vcyl("CompassRing", 108, FLOOR, FLOOR + 0.06, 15, 7.6, BRASS, M.Metal, f, merge(NOSHADOW, { Reflectance = 0.15 }))
+    vcyl("CompassRose", 108, FLOOR, FLOOR + 0.1, 15, 7, MARBLE_DK, M.Marble, f, merge(NOSHADOW, { Reflectance = 0.08 }))
+    local roseTop = box("CompassStar", 105.2, FLOOR + 0.1, 12.2, 110.8, FLOOR + 0.14, 17.8, MARBLE_DK, M.Marble, f,
         merge(NOSHADOW, { Transparency = 1 }))
     local rg = surface(roseTop, Enum.NormalId.Top, 30, 1, 1)
     for k = 0, 3 do
@@ -430,9 +514,47 @@ function BankBuilder:_shell(f)
     -- wainscot: dark green marble band round the banking hall
     box("WainscotW", 85, FLOOR, 9, 85.15, FLOOR + 3, 27.5, MARBLE_GRN, M.Marble, f, DECOR)
     box("WainscotE", 130.85, FLOOR, 9, 131, FLOOR + 3, 27.5, MARBLE_GRN, M.Marble, f, DECOR)
-    box("WainscotS", 85, FLOOR, 27.35, 131, FLOOR + 3, 27.5, MARBLE_GRN, M.Marble, f, DECOR)
+    -- (v2.0.2) the south band used to run straight across both doorways
+    for _, seg in ipairs({ { 85, 88 }, { 95, 121 }, { 128, 131 } }) do
+        box("WainscotS", seg[1], FLOOR, 27.35, seg[2], FLOOR + 3, 27.5, MARBLE_GRN, M.Marble, f, DECOR)
+        box("ChairRailS", seg[1], FLOOR + 3, 27.3, seg[2], FLOOR + 3.25, 27.5, BRASS, M.Metal, f, NOSHADOW)
+    end
     box("WainscotN", 85, FLOOR, 9, 104, FLOOR + 3, 9.15, MARBLE_GRN, M.Marble, f, DECOR)
     box("WainscotN", 112, FLOOR, 9, 131, FLOOR + 3, 9.15, MARBLE_GRN, M.Marble, f, DECOR)
+    -- brass chair rail capping the green marble (W / E)
+    box("ChairRailW", 85, FLOOR + 3, 9, 85.2, FLOOR + 3.25, 27.3, BRASS, M.Metal, f, NOSHADOW)
+    box("ChairRailE", 130.8, FLOOR + 3, 9, 131, FLOOR + 3.25, 27.3, BRASS, M.Metal, f, NOSHADOW)
+
+    -- ── hall wall treatment (v2.0.2): warm limestone upper walls, a black-marble
+    --    frieze under the cornice — the hall no longer reads as one flat colour ──
+    local LINING = Color3.fromRGB(222, 206, 178)
+    box("HallLiningW", 85, FLOOR + 3.25, 9.15, 85.1, HALL_CEIL - 3, 27.35, LINING, M.Limestone, f, DECOR)
+    box("HallLiningE", 130.9, FLOOR + 3.25, 9.15, 131, HALL_CEIL - 3, 27.35, LINING, M.Limestone, f, DECOR)
+    box("HallLiningS", 95, DOOR_TOP + 0.5, 27.4, 121, HALL_CEIL - 3, 27.5, LINING, M.Limestone, f, DECOR)
+    box("HallFriezeW", 85, HALL_CEIL - 3, 9.15, 85.25, HALL_CEIL - 1.2, 27.35, MARBLE_DK, M.Marble, f, DECOR)
+    box("HallFriezeE", 130.75, HALL_CEIL - 3, 9.15, 131, HALL_CEIL - 1.2, 27.35, MARBLE_DK, M.Marble, f, DECOR)
+    box("HallFriezeS", 85, HALL_CEIL - 3, 27.25, 131, HALL_CEIL - 1.2, 27.5, MARBLE_DK, M.Marble, f, DECOR)
+    box("HallFriezeN", 85, HALL_CEIL - 3, 9, 131, HALL_CEIL - 1.2, 9.25, MARBLE_DK, M.Marble, f, DECOR)
+
+    -- ── door casings: every interior doorway gets a proper frame (both faces) ──
+    -- dark marble + brass in the public hall, brushed steel in the staff wing.
+    -- Deliberately NOT wood: thin stretched wood-grain parts are what made the
+    -- stripy, glitchy door frames in the other buildings.
+    -- (trim only: CanCollide off so guard paths + doorways keep their v2.0 clearances)
+    local function casingZ(x0, x1, zc, color, mat)   -- doorway in a wall running along X
+        box("DoorCasing", x0 - 0.45, FLOOR, zc - 0.65, x0, DOOR_TOP + 0.45, zc + 0.65, color, mat, f, DECOR)
+        box("DoorCasing", x1, FLOOR, zc - 0.65, x1 + 0.45, DOOR_TOP + 0.45, zc + 0.65, color, mat, f, DECOR)
+        box("DoorCasingHead", x0, DOOR_TOP, zc - 0.65, x1, DOOR_TOP + 0.45, zc + 0.65, color, mat, f, DECOR)
+    end
+    local function casingX(z0, z1, xc, color, mat)   -- doorway in a wall running along Z
+        box("DoorCasing", xc - 0.65, FLOOR, z0 - 0.45, xc + 0.65, DOOR_TOP + 0.45, z0, color, mat, f, DECOR)
+        box("DoorCasing", xc - 0.65, FLOOR, z1, xc + 0.65, DOOR_TOP + 0.45, z1 + 0.45, color, mat, f, DECOR)
+        box("DoorCasingHead", xc - 0.65, DOOR_TOP, z0, xc + 0.65, DOOR_TOP + 0.45, z1, color, mat, f, DECOR)
+    end
+    casingZ(88, 95, 28, MARBLE_DK, M.Marble)
+    casingZ(121, 128, 28, MARBLE_DK, M.Marble)
+    casingX(30.5, 37.5, 100, STEEL_LITE, M.Metal)
+    casingZ(122, 129, 39, STEEL_LITE, M.Metal)
 
     -- ── ceilings + roofs ──
     box("HallRoof", 84, HALL_CEIL, 8, 132, HALL_CEIL + 1, 28.5, Color3.fromRGB(196, 188, 176), M.Concrete, f)
@@ -448,6 +570,8 @@ function BankBuilder:_shell(f)
     end
     box("CorniceGoldN", 85, HALL_CEIL - 1.2, 9, 131, HALL_CEIL - 1, 9.4, GOLD, M.Metal, f, NOSHADOW)
     box("CorniceGoldS", 85, HALL_CEIL - 1.2, 27.1, 131, HALL_CEIL - 1, 27.5, GOLD, M.Metal, f, NOSHADOW)
+    box("CorniceGoldW", 85, HALL_CEIL - 1.2, 9.4, 85.4, HALL_CEIL - 1, 27.1, GOLD, M.Metal, f, NOSHADOW)
+    box("CorniceGoldE", 130.6, HALL_CEIL - 1.2, 9.4, 131, HALL_CEIL - 1, 27.1, GOLD, M.Metal, f, NOSHADOW)
 
     -- ── parapets ──
     box("HallParapetW", 84, HALL_CEIL + 1, 9, 85, HALL_CEIL + 2.5, 28.5, SAND, M.Plaster, f)
@@ -500,7 +624,7 @@ function BankBuilder:_facade(f, refs)
             CFrame.new(x, 1.15, 1.5) * CFrame.Angles(math.rad(18), 0, 0), STEEL, M.Metal, f, DECOR)
         spotLight(up, Enum.NormalId.Top, WARM, 2.2, 26, 40, false)
     end
-    box("PorchInlay", 104, FLOOR, 5, 112, FLOOR + 0.02, 8, VELVET, M.Fabric, f, NOSHADOW)
+    box("PorchInlay", 104, FLOOR, 5, 112, FLOOR + 0.06, 8, VELVET, M.Fabric, f, NOSHADOW)
 
     -- ── the two corner pylons (x 84..96 and 120..132) ──
     for _, cx in ipairs({ 90, 126 }) do
@@ -671,13 +795,32 @@ function BankBuilder:_hall(f, props, spots, loot, hides, shadows)
         vcyl("PendantTier2", x, 19.2, 20.2, cz, 2.6, Color3.fromRGB(255, 236, 214), M.Glass, f, merge(NOSHADOW, { Transparency = 0.15 }))
         vcyl("PendantTier3", x, 18.6, 19.2, cz, 1.6, BRASS, M.Metal, f, DECOR)
         local bulb = ball("PendantBulb", Vector3.new(x, 19.6, cz), 0.8, WARM, M.Neon, f, NOSHADOW)
-        pointLight(bulb, WARM, 1.1, 30, true)
+        -- (v2.0.2) crystal drop ring + brass crown: a real chandelier, not a lamp
+        vcyl("ChandelierCrystals", x, 17.6, 18.6, cz, 3.0, Color3.fromRGB(255, 244, 228), M.Glass, f,
+            merge(NOSHADOW, { Transparency = 0.35, Reflectance = 0.3 }))
+        vcyl("ChandelierCrown", x, 20.5, 21.1, cz, 1.6, GOLD, M.Metal, f, merge(DECOR, { Reflectance = 0.2 }))
+        -- glow on the fixture itself + a tight warm pool on the marble below.
+        -- Pools with darker floor between them, not one flat wash (ART_DIRECTION rule 2).
+        pointLight(bulb, WARM, 0.9, 12, true)
+        spotLight(bulb, Enum.NormalId.Bottom, WARM, 2.4, 26, 62, true)
     end
 
-    -- pilasters on the long walls
+    -- pilasters on the long walls: dark marble with a brass capital + base, and a
+    -- brass wall sconce on the middle pair (small warm pools up the walls)
     for _, z in ipairs({ 12, 18, 24 }) do
-        box("PilasterW", 85, FLOOR, z - 0.7, 85.5, HALL_CEIL - 1, z + 0.7, MARBLE_DK, M.Marble, f)
-        box("PilasterE", 130.5, FLOOR, z - 0.7, 131, HALL_CEIL - 1, z + 0.7, MARBLE_DK, M.Marble, f)
+        box("PilasterW", 85, FLOOR, z - 0.7, 85.5, HALL_CEIL - 1, z + 0.7, MARBLE_DK, M.Marble, f, { Reflectance = 0.06 })
+        box("PilasterE", 130.5, FLOOR, z - 0.7, 131, HALL_CEIL - 1, z + 0.7, MARBLE_DK, M.Marble, f, { Reflectance = 0.06 })
+        box("PilasterCapW", 85, HALL_CEIL - 3.6, z - 0.9, 85.7, HALL_CEIL - 3, z + 0.9, BRASS, M.Metal, f, NOSHADOW)
+        box("PilasterCapE", 130.3, HALL_CEIL - 3.6, z - 0.9, 131, HALL_CEIL - 3, z + 0.9, BRASS, M.Metal, f, NOSHADOW)
+    end
+    for _, s in ipairs({ { 85.5, 1 }, { 130.5, -1 } }) do
+        for _, z in ipairs({ 12, 24 }) do
+            local sx = s[1] + s[2] * 0.35
+            local shade = cpart("SconceShade", Vector3.new(0.7, 1.1, 0.9), CFrame.new(sx, FLOOR + 9.2, z),
+                Color3.fromRGB(255, 226, 180), M.Glass, f, merge(NOSHADOW, { Transparency = 0.2 }))
+            cpart("SconceBack", Vector3.new(0.12, 1.8, 0.6), CFrame.new(s[1] + s[2] * 0.06, FLOOR + 9, z), BRASS, M.Metal, f, NOSHADOW)
+            pointLight(shade, WARM, 0.9, 10, true)
+        end
     end
     -- inside faces of the tall windows (night blue)
     for _, z in ipairs({ 15, 21 }) do
@@ -755,6 +898,12 @@ function BankBuilder:_hall(f, props, spots, loot, hides, shadows)
         TextColor3 = GOLD }, crg)
     painting(f, Vector3.new(97, 14.5, 27.5), Vector3.new(0, 0, -1), 5, 3.4, 71)
     painting(f, Vector3.new(119, 14.5, 27.5), Vector3.new(0, 0, -1), 5, 3.4, 72)
+    -- brass picture lights: the clock and both paintings are lit, the wall between is not
+    for _, x in ipairs({ 97, 108, 119 }) do
+        local bar = box("PictureLight", x - 1.4, (x == 108) and 20.1 or 16.9, 26.7, x + 1.4, ((x == 108) and 20.1 or 16.9) + 0.25, 27.3,
+            BRASS, M.Metal, f, NOSHADOW)
+        spotLight(bar, Enum.NormalId.Bottom, Color3.fromRGB(255, 214, 160), 1.6, 9, 70, true)
+    end
 
     -- supply closet at the west end of the teller area (HIDE SPOT)
     local closet = box("SupplyCloset", 85, FLOOR, 22.6, 87.5, FLOOR + 8, 27.5, WOOD_MID, M.Wood, f)
@@ -823,7 +972,7 @@ function BankBuilder:_hall(f, props, spots, loot, hides, shadows)
     -- manager office furniture (desk part-built so the keycard spot is exact)
     local function officeDesk(x0, x1, z0, z1)
         local dtop = FLOOR + 3.1
-        box("OfficeDesk", x0, dtop - 0.3, z0, x1, dtop, z1, WOOD_DARK, M.WoodPlanks, f)
+        box("OfficeDesk", x0, dtop - 0.3, z0, x1, dtop, z1, WOOD_DARK, M.Wood, f)
         box("OfficeDeskPanel", x0 + 0.1, FLOOR, z1 - 0.3, x1 - 0.1, dtop - 0.3, z1 - 0.1, WOOD_DARK, M.Wood, f)
         box("OfficeDeskLeg", x0 + 0.1, FLOOR, z0 + 0.1, x0 + 0.5, dtop - 0.3, z1 - 0.1, WOOD_DARK, M.Wood, f)
         box("OfficeDeskLeg", x1 - 0.5, FLOOR, z0 + 0.1, x1 - 0.1, dtop - 0.3, z1 - 0.1, WOOD_DARK, M.Wood, f)
@@ -958,6 +1107,10 @@ function BankBuilder:_security(f, props, spots, hides, shadows)
     vcyl("SecLampShade", 92.75, 14.9, 15.5, 33.25, 1.6, STEEL, M.Metal, f, DECOR)
     local b = ball("SecLampBulb", Vector3.new(92.75, 14.8, 33.25), 0.35, COOL, M.Neon, f, NOSHADOW)
     pointLight(b, COOL, 0.6, 14, true)
+    -- (v2.0.2) dark acoustic wall panels + a steel skirting: a control room, not a plain box
+    box("AcousticPanelW", 85, FLOOR + 2.5, 32.4, 85.15, FLOOR + 10, 35.6, Color3.fromRGB(44, 52, 64), M.Fabric, f, DECOR)
+    box("AcousticPanelS", 97.6 - 9.4, FLOOR + 6.2, 38.35, 97.4, FLOOR + 11, 38.5, Color3.fromRGB(44, 52, 64), M.Fabric, f, DECOR)
+    box("SecSkirtN", 85, FLOOR, 28.5, 87.55, FLOOR + 0.5, 28.65, STEEL, M.Metal, f, DECOR)
 
     -- coat closet in the SW corner (HIDE SPOT)
     local closet = box("CoatCloset", 85, FLOOR, 35.8, 87.6, FLOOR + 8, 38.5, Color3.fromRGB(110, 116, 124), M.Metal, f)
@@ -993,19 +1146,32 @@ end
 -- ──────────────────────────────────────────────
 function BankBuilder:_corridor(f, props, hides, shadows)
     -- fluorescent panels (dim — this is after hours)
+    -- (v2.0.2) after hours: the middle tube is dead, so the corridor goes
+    -- lit · DARK · lit — a real gap for sneaking, and contrast instead of a flat wash
     for _, x in ipairs({ 106, 116, 126 }) do
-        local panel = box("CeilingPanel", x - 1.6, BACK_CEIL - 0.12, 33, x + 1.6, BACK_CEIL, 34, Color3.fromRGB(236, 240, 245), M.Glass, f, NOSHADOW)
-        local sl = Instance.new("SurfaceLight")
-        sl.Face = Enum.NormalId.Bottom
-        sl.Color = COOL
-        sl.Brightness = 0.7
-        sl.Range = 14
-        sl.Angle = 110
-        sl.Parent = panel
+        local dead = (x == 116)
+        local panel = box("CeilingPanel", x - 1.6, BACK_CEIL - 0.12, 33, x + 1.6, BACK_CEIL, 34,
+            dead and Color3.fromRGB(120, 124, 130) or Color3.fromRGB(236, 240, 245), M.Glass, f, NOSHADOW)
+        if not dead then
+            local sl = Instance.new("SurfaceLight")
+            sl.Face = Enum.NormalId.Bottom
+            sl.Color = COOL
+            sl.Brightness = 0.55
+            sl.Range = 13
+            sl.Angle = 100
+            sl.Shadows = true
+            sl.Parent = panel
+        end
     end
-    -- dado rail + skirting
-    box("DadoN", 100.5, FLOOR + 3.4, 28.5, 121, FLOOR + 3.6, 28.65, TEAL_DARK, M.Wood, f, DECOR)
-    box("DadoS", 100.5, FLOOR + 3.4, 38.35, 109.5, FLOOR + 3.6, 38.5, TEAL_DARK, M.Wood, f, DECOR)
+    -- two-tone walls: darker scuff-proof lower band, dado rail, dark skirting
+    local LOWER = Color3.fromRGB(92, 110, 108)
+    box("LowerWallN", 100.65, FLOOR, 28.5, 120.55, FLOOR + 3.4, 28.6, LOWER, M.Plaster, f, DECOR)
+    box("LowerWallS", 100.65, FLOOR, 38.4, 109.2, FLOOR + 3.4, 38.5, LOWER, M.Plaster, f, DECOR)
+    box("DadoN", 100.65, FLOOR + 3.4, 28.5, 120.55, FLOOR + 3.6, 28.7, TEAL_DARK, M.Metal, f, DECOR)
+    box("DadoS", 100.65, FLOOR + 3.4, 38.3, 109.2, FLOOR + 3.6, 38.5, TEAL_DARK, M.Metal, f, DECOR)
+    box("SkirtingN", 100.65, FLOOR, 28.5, 120.55, FLOOR + 0.5, 28.7, MARBLE_DK, M.Slate, f, DECOR)
+    box("SkirtingS", 100.65, FLOOR, 38.3, 109.2, FLOOR + 0.5, 38.5, MARBLE_DK, M.Slate, f, DECOR)
+    shadowZone(f, shadows, 112, FLOOR, 30.5, 120, FLOOR + 10, 36.5)
 
     -- water cooler + noticeboard on the north wall, well clear of G3's line (z 33.5)
     box("WaterCooler", 103.6, FLOOR, 28.6, 104.9, FLOOR + 3, 29.8, Color3.fromRGB(230, 232, 236), M.Metal, f)
@@ -1028,7 +1194,7 @@ function BankBuilder:_corridor(f, props, hides, shadows)
         Color3.fromRGB(230, 230, 230))
     signPlate(f, "SignVault", 110, FLOOR + 10.3, 38.35, 116, FLOOR + 11.5, 38.5, Enum.NormalId.Front, "VAULT · AUTHORISED STAFF ONLY",
         Color3.fromRGB(255, 90, 90))
-    signPlate(f, "SignBreak", 122.5, FLOOR + 10.3, 38.35, 128.5, FLOOR + 11.5, 38.5, Enum.NormalId.Front, "BREAK ROOM",
+    signPlate(f, "SignBreak", 122.5, FLOOR + 10.7, 38.35, 128.5, FLOOR + 11.9, 38.5, Enum.NormalId.Front, "BREAK ROOM",
         Color3.fromRGB(230, 230, 230), Color3.fromRGB(34, 80, 76))
     painting(f, Vector3.new(118.5, 8, 28.5), Vector3.new(0, 0, 1), 3.2, 2.2, 75)
     -- fire extinguisher
@@ -1058,7 +1224,7 @@ function BankBuilder:_corridor(f, props, hides, shadows)
     box("KeycardJamb", 116.5, FLOOR, 38.3, 116.8, DOOR_TOP + 0.3, 38.5, STEEL_LITE, M.Metal, f)
     box("KeycardHead", 109.2, DOOR_TOP, 38.3, 116.8, DOOR_TOP + 0.3, 38.5, STEEL_LITE, M.Metal, f)
     -- hazard stripe on the floor in front of it
-    local hz = box("HazardStripe", 109.5, FLOOR, 36.9, 116.5, FLOOR + 0.02, 38.3, Color3.fromRGB(230, 180, 40), M.Concrete, f, NOSHADOW)
+    local hz = box("HazardStripe", 109.5, FLOOR, 36.9, 116.5, FLOOR + 0.06, 38.3, Color3.fromRGB(230, 180, 40), M.Concrete, f, NOSHADOW)
     local hzg = surface(hz, Enum.NormalId.Top, 20, 1, 1)
     for k = 0, 9 do
         frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.05 + k * 0.1, 0.5), Size = UDim2.fromScale(0.04, 2),
@@ -1126,7 +1292,7 @@ function BankBuilder:_breakRoom(f, props)
             TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold,
             TextColor3 = Color3.fromRGB(220, 230, 240) }, door)
     end
-    box("LockerBench", 124, FLOOR + 1.3, 51.4, 131, FLOOR + 1.6, 52.3, WOOD_MID, M.WoodPlanks, f)
+    box("LockerBench", 124, FLOOR + 1.3, 51.4, 131, FLOOR + 1.6, 52.3, WOOD_MID, M.Wood, f)
     box("LockerBenchLeg", 124.3, FLOOR, 51.6, 124.6, FLOOR + 1.3, 52.1, STEEL, M.Metal, f, DECOR)
     box("LockerBenchLeg", 130.4, FLOOR, 51.6, 130.7, FLOOR + 1.3, 52.1, STEEL, M.Metal, f, DECOR)
 
@@ -1278,8 +1444,25 @@ function BankBuilder:_vault(f)
     box("VaultLiningS", 85, FLOOR, 53.8, 106.5, FLOOR + 14, 54, VSTEEL, M.Metal, f, DECOR)
     for _, x in ipairs({ 90, 101 }) do
         local fx = box("VaultLight", x - 1, FLOOR + 13.85, 46.3, x + 1, FLOOR + 14, 47.7, BRASS, M.Metal, f, DECOR)
-        pointLight(fx, Color3.fromRGB(255, 200, 110), 1.2, 18, true)
+        pointLight(fx, Color3.fromRGB(255, 200, 110), 0.5, 14, true)   -- (v2.0.2) dim fill; the spots do the work
     end
+    -- (v2.0.2) THE GLEAM: a gold-rimmed downlight over every loot row, hard
+    -- shadows, so the gold / cash / diamonds sit in bright pools in a dark steel room
+    for _, spot in ipairs({ { 90.75, 41.4 }, { 92.4, 46.8 }, { 92, 52.2 } }) do
+        local x, z = spot[1], spot[2]
+        vcyl("VaultSpotRim", x, FLOOR + 13.6, FLOOR + 14, z, 1.6, GOLD, M.Metal, f, merge(NOSHADOW, { Reflectance = 0.3 }))
+        local lens = vcyl("VaultSpotLens", x, FLOOR + 13.5, FLOOR + 13.6, z, 1.0, Color3.fromRGB(255, 236, 190), M.Glass, f, NOSHADOW)
+        spotLight(lens, Enum.NormalId.Left, Color3.fromRGB(255, 214, 140), 3.2, 18, 58, true)
+    end
+    -- polished gold trim band + brass skirting round the steel room
+    box("VaultTrimN", 85.5, FLOOR + 11.3, 39.7, 106.5, FLOOR + 11.7, 39.9, GOLD, M.Metal, f, merge(NOSHADOW, { Reflectance = 0.3 }))
+    box("VaultTrimS", 85.5, FLOOR + 11.3, 53.6, 106.5, FLOOR + 11.7, 53.8, GOLD, M.Metal, f, merge(NOSHADOW, { Reflectance = 0.3 }))
+    box("VaultTrimW", 85.5, FLOOR + 11.3, 39.9, 85.7, FLOOR + 11.7, 53.6, GOLD, M.Metal, f, merge(NOSHADOW, { Reflectance = 0.3 }))
+    box("VaultSkirtN", 85.5, FLOOR, 39.7, 106.5, FLOOR + 0.5, 39.85, BRASS, M.Metal, f, NOSHADOW)
+    box("VaultSkirtS", 85.5, FLOOR, 53.65, 106.5, FLOOR + 0.5, 53.8, BRASS, M.Metal, f, NOSHADOW)
+    -- a black-marble plinth strip down the middle aisle (where you stand to grab loot)
+    box("VaultAisle", 86.5, FLOOR, 43.9, 97.5, FLOOR + 0.06, 44.9, MARBLE_DK, M.Marble, f, merge(NOSHADOW, { Reflectance = 0.1 }))
+    box("VaultAisle", 86.5, FLOOR, 49.4, 97.5, FLOOR + 0.06, 50.4, MARBLE_DK, M.Marble, f, merge(NOSHADOW, { Reflectance = 0.1 }))
     -- safe-deposit wall: the whole west wall + the west half of the north wall
     local function depositWall(p, face, cols, rows)
         local g = surface(p, face, 16, 1, 1)
@@ -1356,7 +1539,7 @@ local function goldPile(f, loot, cx, cz, standPos)
         for _, dx in ipairs(L.xs) do
             for _, dz in ipairs(L.zs) do
                 box("GoldBar", cx + dx - 0.5, y0, cz + dz - 0.25, cx + dx + 0.5, y0 + 0.36, cz + dz + 0.25,
-                    GOLD, M.Metal, m, { Reflectance = 0.25 })
+                    GOLD, M.Metal, m, { Reflectance = 0.4 })
             end
         end
     end
@@ -1404,24 +1587,145 @@ function BankBuilder:_vaultLoot(f, loot)
         ball("TrolleyWheel", Vector3.new(x, FLOOR + 0.3, 40.7), 0.55, STEEL, M.Metal, f, DECOR)
     end
     for i = 0, 3 do
-        box("TrolleyBar", 98.8 + i * 0.7, FLOOR + 0.9, 40.2, 99.4 + i * 0.7, FLOOR + 1.25, 41.2, GOLD, M.Metal, f, { Reflectance = 0.25 })
+        box("TrolleyBar", 98.8 + i * 0.7, FLOOR + 0.9, 40.2, 99.4 + i * 0.7, FLOOR + 1.25, 41.2, GOLD, M.Metal, f, { Reflectance = 0.4 })
     end
 end
 
 -- ──────────────────────────────────────────────
--- 🗑 STAFF ALLEY (x 132..140) + staff door + fire escape + roof
+-- 🚚 SERVICE YARD (v2.0.2) — x 132..144.4, z -1.4..55, street level (y 0.25)
+--   Replaces the open staff alley. Walled on every side (13 tall, no gaps):
+--   bank east wall on the west, brick walls east + south, the gatehouse and a
+--   7.4-wide VEHICLE GATE (x 132.2..139.6) onto Ocean Drive on the north.
+--   The getaway car waits in the armored-car bay facing the gate, so the
+--   crew walks out of the staff door, loads the trunk and drives straight out.
+--   Also closes the gap between the bank and Sunny's Mart (z 29.2..30) and
+--   caps the back roof with invisible rails, so nobody reaches open lawn.
 -- ──────────────────────────────────────────────
+local YARD_X0, YARD_X1 = 132, 144.4      -- walkable yard (east wall is 144.4..145.2)
+local YARD_Y = 0.25                      -- top of the yard paving
+local YARD_WALL_H = 13
+local GATE_X0, GATE_X1 = 132.2, 139.6    -- clear opening of the vehicle gate
+local CAR_X, CAR_Z = 135.9, 15           -- getaway parking: car spans z 9.4..20.6, x 133.55..138.25
+BankBuilder.YARD = { x0 = YARD_X0, x1 = YARD_X1, gate = { GATE_X0, GATE_X1 }, car = Vector3.new(CAR_X, YARD_Y, CAR_Z) }
+
+-- an invisible, un-queryable collision wall (keeps players in; cameras + raycasts ignore it)
+local function barrier(parent, name, x0, y0, z0, x1, y1, z1)
+    return box(name, x0, y0, z0, x1, y1, z1, Color3.new(0, 0, 0), M.SmoothPlastic, parent, {
+        Transparency = 1, CanCollide = true, CanQuery = false, CanTouch = false, CastShadow = false,
+    })
+end
+
+-- a sodium floodlight: fixture on a wall, aimed at `target`
+local SODIUM = Color3.fromRGB(255, 196, 128)
+local function floodlight(parent, pos, target, brightness, range)
+    local fx = cpart("Floodlight", Vector3.new(1.4, 0.8, 1.0), CFrame.lookAt(pos, target), Color3.fromRGB(40, 42, 46), M.Metal, parent, DECOR)
+    local lens = cpart("FloodLens", Vector3.new(1.2, 0.6, 0.08), CFrame.lookAt(pos, target) * CFrame.new(0, 0, -0.52),
+        Color3.fromRGB(255, 226, 180), M.Neon, parent, NOSHADOW)
+    spotLight(lens, Enum.NormalId.Front, SODIUM, brightness or 2.4, range or 30, 75, true)
+    return fx
+end
+
 function BankBuilder:_alley(f, props, shadows)
-    box("AlleyPaving", 132, 0, 1, 140, 0.25, 55, ASPHALT, M.Asphalt, f)
-    box("AlleyDrain", 135.6, 0.25, 1, 136.4, 0.27, 55, Color3.fromRGB(40, 40, 44), M.Concrete, f, NOSHADOW)
-    -- neighbour's brick wall closes the alley on the east
-    box("NeighbourWall", 139.4, 0, 1, 140, 11, 55, BRICK, M.Brick, f)
-    box("NeighbourCoping", 139.3, 11, 1, 140, 11.3, 55, Color3.fromRGB(150, 146, 140), M.Concrete, f)
+    local WALL = BRICK
+    local CONC = Color3.fromRGB(158, 154, 146)
+    local H = YARD_WALL_H
+
+    -- ── ground: concrete yard + paved forecourt so no grass shows at the street ──
+    box("YardPaving", YARD_X0, 0, -1.4, 145.2, YARD_Y, 55, Color3.fromRGB(122, 120, 116), M.Concrete, f)
+    box("Forecourt", 84, 0, -1.4, 95, 0.5, 1, LIMESTONE, M.Limestone, f)
+    box("Forecourt", 121, 0, -1.4, 132, 0.5, 1, LIMESTONE, M.Limestone, f)
+    box("WestStrip", 83, 0, -1.4, 84, 0.12, 29.2, ASPHALT, M.Asphalt, f)
+    box("TrenchDrain", YARD_X0 + 0.2, YARD_Y, 26, YARD_X1, YARD_Y + 0.05, 26.5, Color3.fromRGB(38, 38, 42), M.DiamondPlate, f, NOSHADOW)
+
+    -- armored-car bay: yellow box round the parking spot + a painted legend
+    local YEL = Color3.fromRGB(236, 190, 40)
+    local bx0, bx1, bz0, bz1 = CAR_X - 3.1, CAR_X + 3.1, CAR_Z - 6.4, CAR_Z + 6.4
+    box("BayLine", bx0, YARD_Y, bz0, bx0 + 0.3, YARD_Y + 0.06, bz1, YEL, M.SmoothPlastic, f, NOSHADOW)
+    box("BayLine", bx1 - 0.3, YARD_Y, bz0, bx1, YARD_Y + 0.06, bz1, YEL, M.SmoothPlastic, f, NOSHADOW)
+    box("BayLine", bx0, YARD_Y, bz1 - 0.3, bx1, YARD_Y + 0.06, bz1, YEL, M.SmoothPlastic, f, NOSHADOW)
+    local legend = box("BayLegend", bx0 + 0.4, YARD_Y, bz1 + 0.4, bx1 - 0.4, YARD_Y + 0.06, bz1 + 2.2, YEL, M.SmoothPlastic, f,
+        merge(NOSHADOW, { Transparency = 1 }))
+    local lg = surface(legend, Enum.NormalId.Top, 30, 1, 1)
+    text({ Text = "ARMORED CAR BAY", Size = UDim2.fromScale(0.96, 0.8), Position = UDim2.fromScale(0.02, 0.1),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display, TextColor3 = YEL }, lg)
+    -- hazard hatching across the gate line
+    local hatch = box("GateHatch", GATE_X0, YARD_Y, -0.3, GATE_X1, YARD_Y + 0.06, 1.1, YEL, M.SmoothPlastic, f, NOSHADOW)
+    local hg = surface(hatch, Enum.NormalId.Top, 20, 1, 1)
+    local stripes = frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ClipsDescendants = true }, hg)
+    for k = 0, 11 do
+        frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.04 + k * 0.085, 0.5), Size = UDim2.fromScale(0.035, 3),
+            Rotation = 40, BackgroundColor3 = Color3.fromRGB(30, 30, 30) }, stripes)
+    end
+
+    -- ── perimeter walls (brick, concrete coping, pilasters, razor wire) ──
+    box("YardWallE", YARD_X1, 0, 5.5, 145.2, H, 56, WALL, M.Brick, f)
+    box("YardWallS", 131, 0, 55, 144.4, H, 56, WALL, M.Brick, f)
+    box("YardCopingE", YARD_X1 - 0.2, H, 5.3, 145.4, H + 0.35, 56.2, CONC, M.Concrete, f)
+    box("YardCopingS", 131, H, 54.8, YARD_X1 - 0.2, H + 0.35, 56.2, CONC, M.Concrete, f)
+    for _, z in ipairs({ 18, 32, 44 }) do
+        box("YardPier", YARD_X1 - 0.5, 0, z - 0.6, YARD_X1, H + 0.35, z + 0.6, CONC, M.Concrete, f)
+    end
+    rod("RazorWire", Vector3.new(144.8, H + 0.75, 5.6), Vector3.new(144.8, H + 0.75, 56), 0.5, STEEL_LITE, M.Metal, f, NOSHADOW)
+    rod("RazorWire", Vector3.new(131.2, H + 0.75, 55.5), Vector3.new(144.8, H + 0.75, 55.5), 0.5, STEEL_LITE, M.Metal, f, NOSHADOW)
+    -- the gap between the bank and Sunny's Mart: a locked service wall at the back of the mart alley
+    box("SideGapWall", 74, 0, 29.2, 84, H, 30, WALL, M.Brick, f)
+    box("SideGapCoping", 74, H, 29, 84, H + 0.35, 30.2, CONC, M.Concrete, f)
+
+    -- ── the gatehouse (NE corner) — solid, lit, watching the gate ──
+    box("Gatehouse", 140.8, 0, -0.2, 145.2, 8.6, 5.5, Color3.fromRGB(226, 214, 190), M.Plaster, f)
+    box("GatehouseBase", 140.7, 0, -0.3, 145.2, 1.2, 5.6, MARBLE_DK, M.Granite, f)
+    box("GatehouseRoof", 140.4, 8.6, -0.6, 145.2, 9.2, 5.9, TEAL_DARK, M.Metal, f)
+    fakeWindow(f, Vector3.new(140.8, 5, 2.6), Vector3.new(-1, 0, 0), 3.6, 2.6, true, STEEL)
+    fakeWindow(f, Vector3.new(143, 5, -0.2), Vector3.new(0, 0, -1), 2.6, 2.6, true, STEEL)
+    signPlate(f, "GateSign", 141.1, 6.9, -0.36, 144.9, 7.9, -0.2, Enum.NormalId.Front, "ALL VEHICLES STOP",
+        Color3.fromRGB(250, 250, 250), Color3.fromRGB(150, 30, 36), 50)
+    local go = ball("GateSignal", Vector3.new(141.4, 8.25, -0.5), 0.45, Color3.fromRGB(80, 255, 140), M.Neon, f, NOSHADOW)
+    pointLight(go, Color3.fromRGB(80, 255, 140), 0.6, 6, false)
+    pointLight(lightHolder(f, Vector3.new(143, 6.5, 2.6)), WARM, 0.6, 7, false)
+
+    -- ── the vehicle gate: posts, gantry with the bank's name, two leaves swung open ──
+    box("GatePostW", 131.4, 0, -0.4, GATE_X0, H + 0.4, 1.3, CONC, M.Concrete, f)
+    box("GatePostE", GATE_X1, 0, -0.4, 140.8, H + 0.4, 1.2, CONC, M.Concrete, f)
+    box("GateGantry", 131.4, H - 0.8, -0.3, 140.8, H + 0.4, 1.1, Color3.fromRGB(40, 42, 46), M.Metal, f)
+    local gs = box("GantrySign", 133, H - 0.7, -0.36, 139, H + 0.3, -0.3, Color3.fromRGB(26, 28, 34), M.Metal, f, DECOR)
+    local gsg = surface(gs, Enum.NormalId.Front, 40, 0, 1.4)
+    text({ Text = "OCEAN BANK  ·  SECURE DELIVERIES", Size = UDim2.fromScale(0.96, 0.7), Position = UDim2.fromScale(0.02, 0.15),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold, TextColor3 = GOLD }, gsg)
+    local function gateLeaf(x0, x1, z0, z1)
+        local leaf = box("GateLeaf", x0, YARD_Y + 0.2, z0, x1, 9, z1, Color3.fromRGB(36, 40, 44), M.Metal, f, { Transparency = 1 })
+        for _, face in ipairs({ Enum.NormalId.Left, Enum.NormalId.Right }) do
+            local g = surface(leaf, face, 16, 1, 1)
+            frame({ Size = UDim2.fromScale(1, 0.05), BackgroundColor3 = Color3.fromRGB(36, 40, 44) }, g)
+            frame({ Size = UDim2.fromScale(1, 0.05), Position = UDim2.fromScale(0, 0.95), BackgroundColor3 = Color3.fromRGB(36, 40, 44) }, g)
+            frame({ Size = UDim2.fromScale(1, 0.04), Position = UDim2.fromScale(0, 0.5), BackgroundColor3 = Color3.fromRGB(36, 40, 44) }, g)
+            for k = 0, 8 do
+                frame({ Size = UDim2.fromScale(0.05, 1), Position = UDim2.fromScale(k * 0.119, 0), BackgroundColor3 = Color3.fromRGB(36, 40, 44) }, g)
+            end
+        end
+        return leaf
+    end
+    gateLeaf(132.2, 132.55, 1.4, 5.1)     -- west leaf folded back against the pylon
+    gateLeaf(139.2, 139.55, 1.3, 5.0)     -- east leaf folded back beside the gatehouse
+    floodlight(f, Vector3.new(136, H - 1.3, 1.4), Vector3.new(136, 0, 9), 2.2, 26)
+
+    -- ── the bank's yard-facing wall: speed lines, downspouts, bay sign, wall packs ──
+    for i, y in ipairs({ 15.6, 16.3, 17.0 }) do
+        box("SpeedLineE" .. i, 132, y, 28.5, 132.2, y + 0.35, 55, TEAL, M.Plaster, f, DECOR)
+    end
+    for _, z in ipairs({ 29, 39.9 }) do
+        vcyl("Downspout", 132.35, 0, BACK_CEIL + 1, z, 0.45, STEEL, M.Metal, f, DECOR)
+    end
+    signPlate(f, "BaySign", 132.02, 7, 11.5, 132.12, 8.6, 18.5, Enum.NormalId.Right, "ARMORED CARS ONLY · NO PARKING",
+        Color3.fromRGB(30, 28, 20), YEL, 40)
+    floodlight(f, Vector3.new(132.6, 10.5, 15), Vector3.new(139, 0, 15), 2.0, 24)
+    floodlight(f, Vector3.new(YARD_X1 - 0.6, 10.5, 30), Vector3.new(135, 0, 31), 2.2, 28)
+    floodlight(f, Vector3.new(YARD_X1 - 0.6, 10.5, 47), Vector3.new(135, 0, 48), 2.0, 26)
 
     -- ── staff door (east wall z 44.5..51.5): stoop + steps, doors propped open ──
     box("Stoop", 131, 0, 40.5, 134.5, FLOOR, 55, Color3.fromRGB(150, 146, 140), M.Concrete, f)
     box("StoopStep", 134.5, 0, 44.5, 135.5, 1.35, 51.5, Color3.fromRGB(150, 146, 140), M.Concrete, f)
     box("StoopStep", 135.5, 0, 44.5, 136.5, 0.7, 51.5, Color3.fromRGB(150, 146, 140), M.Concrete, f)
+    box("StoopNosing", 134.4, FLOOR - 0.05, 44.5, 134.55, FLOOR + 0.02, 51.5, YEL, M.Metal, f, NOSHADOW)
     for _, z in ipairs({ 40.6, 54.9 }) do
         box("StoopRailPost", 134.3, FLOOR, z - 0.08, 134.45, FLOOR + 3, z + 0.08, STEEL, M.Metal, f, DECOR)
     end
@@ -1439,13 +1743,29 @@ function BankBuilder:_alley(f, props, shadows)
     -- caged lamp over the door
     box("DoorLampCage", 132.25, top + 2.2, 47.6, 132.85, top + 2.9, 48.4, STEEL, M.Metal, f, DECOR)
     local lamp = box("DoorLamp", 132.3, top + 2.3, 47.7, 132.75, top + 2.8, 48.3, Color3.fromRGB(255, 214, 150), M.Neon, f, NOSHADOW)
-    pointLight(lamp, Color3.fromRGB(255, 200, 140), 0.9, 14, true)
+    pointLight(lamp, Color3.fromRGB(255, 200, 140), 1.1, 16, true)
+    -- bollards guarding the stoop from reversing trucks
+    for _, z in ipairs({ 42.4, 53.4 }) do
+        vcyl("Bollard", 137.2, YARD_Y, YARD_Y + 3, z, 0.7, YEL, M.Metal, f)
+    end
+    -- cash-in-transit cage by the stoop
+    local cage = box("CashCage", 137.4, YARD_Y, 51.8, 140.2, YARD_Y + 4.2, 54.8, Color3.fromRGB(70, 74, 82), M.Metal, f, { Transparency = 1 })
+    for _, face in ipairs({ Enum.NormalId.Left, Enum.NormalId.Front, Enum.NormalId.Right, Enum.NormalId.Back, Enum.NormalId.Top }) do
+        local g = surface(cage, face, 12, 1, 1)
+        local grid = Instance.new("UIGridLayout")
+        grid.CellSize = UDim2.fromScale(0.1, 0.1)
+        grid.CellPadding = UDim2.fromScale(0.012, 0.012)
+        grid.Parent = g
+        for _ = 1, 9 do frame({ BackgroundTransparency = 1 }, g) end
+        stroke(frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, g), Color3.fromRGB(90, 94, 102), 3, 0)
+    end
+    box("CageStrongbox", 137.9, YARD_Y, 52.4, 139.7, YARD_Y + 1.4, 54.2, Color3.fromRGB(40, 44, 52), M.DiamondPlate, f)
 
-    -- dumpster + trash + crates (up the alley, toward the street)
-    local dx0, dx1, dz0, dz1 = 136.2, 139.3, 18, 23.5
-    box("Dumpster", dx0, 0.6, dz0, dx1, 4.2, dz1, Color3.fromRGB(40, 92, 60), M.Metal, f)
-    box("DumpsterLid", dx0 - 0.1, 4.2, dz0 - 0.1, dx1 + 0.1, 4.45, dz1 + 0.1, Color3.fromRGB(30, 30, 34), M.Fabric, f)
-    box("DumpsterRim", dx0 - 0.1, 3.9, dz0 - 0.1, dx1 + 0.1, 4.2, dz1 + 0.1, Color3.fromRGB(36, 78, 52), M.Metal, f, DECOR)
+    -- dumpsters against the east wall (clear of the car bay and the walking lane)
+    local dx0, dx1, dz0, dz1 = 141.2, YARD_X1 - 0.1, 21.8, 27.4
+    box("Dumpster", dx0, YARD_Y + 0.35, dz0, dx1, 4.2, dz1, Color3.fromRGB(40, 92, 60), M.Metal, f)
+    box("DumpsterLid", dx0 - 0.1, 4.2, dz0 - 0.1, dx1, 4.45, dz1 + 0.1, Color3.fromRGB(30, 30, 34), M.Fabric, f)
+    box("DumpsterRim", dx0 - 0.1, 3.9, dz0 - 0.1, dx1, 4.2, dz1 + 0.1, Color3.fromRGB(36, 78, 52), M.Metal, f, DECOR)
     for _, z in ipairs({ dz0 + 0.5, dz1 - 0.5 }) do
         for _, x in ipairs({ dx0 + 0.4, dx1 - 0.4 }) do
             ball("DumpsterWheel", Vector3.new(x, 0.55, z), 0.6, STEEL, M.Metal, f, DECOR)
@@ -1456,19 +1776,23 @@ function BankBuilder:_alley(f, props, shadows)
     text({ Text = "OCEAN WASTE CO.", Size = UDim2.fromScale(0.94, 0.7), Position = UDim2.fromScale(0.03, 0.15),
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold,
         TextColor3 = Color3.fromRGB(230, 230, 220) }, dsg)
-    ball("TrashBag", Vector3.new(135.6, 0.9, 24.6), 1.5, Color3.fromRGB(24, 24, 28), M.Fabric, f, DECOR)
-    ball("TrashBag", Vector3.new(136.6, 0.8, 25.4), 1.3, Color3.fromRGB(24, 24, 28), M.Fabric, f, DECOR)
-    table.insert(props, { kit = "factory", name = "box-large", pos = Vector3.new(137.6, 0.25, 29), facing = Vector3.new(-1, 0, 0) })
-    table.insert(props, { kit = "factory", name = "box-small", pos = Vector3.new(137.9, 0.25, 31.8), facing = Vector3.new(-1, 0, 0) })
-    table.insert(props, { kit = "factory", name = "box-small", pos = Vector3.new(137.9, 2.25, 29.4), facing = Vector3.new(-1, 0, 0) })
-    shadowZone(f, shadows, 132.3, 0, 16, 139.4, 8, 27)
+    box("RecycleBin", 141.8, YARD_Y, 28.4, YARD_X1 - 0.1, 3.6, 31.4, Color3.fromRGB(40, 70, 130), M.Metal, f)
+    box("RecycleLid", 141.7, 3.6, 28.3, YARD_X1 - 0.1, 3.85, 31.5, Color3.fromRGB(28, 30, 36), M.Fabric, f)
+    ball("TrashBag", Vector3.new(140.4, 0.95, 27.9), 1.5, Color3.fromRGB(24, 24, 28), M.Fabric, f, DECOR)
+    ball("TrashBag", Vector3.new(140.8, 0.85, 29.2), 1.3, Color3.fromRGB(24, 24, 28), M.Fabric, f, DECOR)
+    table.insert(props, { kit = "factory", name = "box-large", pos = Vector3.new(142.4, YARD_Y, 38), facing = Vector3.new(-1, 0, 0) })
+    table.insert(props, { kit = "factory", name = "box-small", pos = Vector3.new(142.6, YARD_Y, 40.8), facing = Vector3.new(-1, 0, 0) })
+    table.insert(props, { kit = "factory", name = "box-small", pos = Vector3.new(142.6, YARD_Y + 2, 38.4), facing = Vector3.new(-1, 0, 0) })
+    shadowZone(f, shadows, 140, 0, 21, YARD_X1, 8, 33)
 
-    -- alley light halfway up (on the neighbour's wall)
-    box("AlleyLampArm", 138.2, 9, 35.8, 139.4, 9.2, 36.2, STEEL, M.Metal, f, DECOR)
-    local al = box("AlleyLamp", 137.8, 8.6, 35.6, 138.6, 9.0, 36.4, WARM, M.Neon, f, NOSHADOW)
-    pointLight(al, WARM, 0.8, 16, true)
+    -- ── keep everyone in: invisible rails over the yard walls + the back roof edges ──
+    barrier(f, "YardBarrierE", YARD_X1, 9.2, -0.6, 145.4, 36, 56.2)
+    barrier(f, "YardBarrierS", 131, H + 0.35, 54.8, 145.4, 36, 56.2)
+    barrier(f, "SideGapBarrier", 74, H + 0.35, 29, 84, 36, 30.2)
+    barrier(f, "RoofBarrierW", 84, BACK_CEIL + 2.5, 28.5, 85, 36, 55)
+    barrier(f, "RoofBarrierS", 84, BACK_CEIL + 2.5, 54, 132, 36, 55)
 
-    -- ── fire-escape ladder (TrussPart = climbable) from the alley to the back roof ──
+    -- ── fire-escape ladder (TrussPart = climbable) from the yard to the back roof ──
     local truss = Instance.new("TrussPart")
     truss.Name = "FireEscapeLadder"
     truss.Anchored = true
@@ -1603,8 +1927,15 @@ function BankBuilder:build(folder)
         pairVents(ventOffice, ventBreak),   -- manager's office ↔ break room (crawl vent)
     }
 
-    -- Kenney props load async and never error
-    KenneyLoader.placeMany(props, sub(root, "Props"))
+    -- Kenney props load async and never error. (v2.0.2) Each one is repainted
+    -- the moment KenneyLoader parents it (it parents only once it's placed).
+    local propFolder = sub(root, "Props")
+    pcall(function()
+        propFolder.ChildAdded:Connect(function(m)
+            pcall(styleProp, m)
+        end)
+    end)
+    KenneyLoader.placeMany(props, propFolder)
 
     local plaques = facadeRefs.plaques or {}
     local sign = facadeRefs.sign
@@ -1635,7 +1966,10 @@ function BankBuilder:build(folder)
         root = root,
         entryPoint = Vector3.new(108, 3, 1.5),
         policeStop = Vector3.new(62, 0, -18),
-        getawayCFrame = CFrame.lookAt(Vector3.new(80, 0, -10), Vector3.new(90, 0, -10)),
+        -- (v2.0.2) parked INSIDE the walled service yard, in the armored-car bay,
+        -- nose to the vehicle gate (x 132.2..139.6, z ≈ 0.5): drive straight north
+        -- through the gate, over the sidewalk and into the eastbound lane.
+        getawayCFrame = CFrame.lookAt(Vector3.new(CAR_X, YARD_Y, CAR_Z), Vector3.new(CAR_X, YARD_Y, CAR_Z - 10)),
         openSign = openSign,
 
         -- v2: the crew drops into the break room, just inside the staff door.
@@ -1645,6 +1979,7 @@ function BankBuilder:build(folder)
             { kind = "front", at = Vector3.new(108, 2.5, 2), label = "Front doors" },
             { kind = "side",  at = Vector3.new(136, 1.5, 48), label = "Staff door" },
             { kind = "roof",  at = Vector3.new(135.5, 1.5, 34), label = "Roof ladder" },
+            -- (v2.0.2) side + roof are reached through the service-yard gate (x 132.2..139.6)
         },
         hideSpots = hideSpots,
         shadowZones = shadowZones,
@@ -1669,7 +2004,7 @@ function BankBuilder:build(folder)
             { name = "Guard_D", spawn = Vector3.new(97, GY, 31.3), a = Vector3.new(88.5, GY, 31.3), b = Vector3.new(97, GY, 31.3) },
         },
         plan = {
-            bounds = { 84, 1, 140, 55 },
+            bounds = { 84, 1, 145, 56 },
             rooms = {
                 { 85, 9, 131, 28, "BANKING HALL" },
                 { 85, 9, 97, 15.5, "MANAGER" },
@@ -1679,7 +2014,7 @@ function BankBuilder:build(folder)
                 { 107, 39, 119, 54, "LASERS" },
                 { 85, 39, 107, 54, "VAULT" },
                 { 119, 39, 131, 54, "BREAK ROOM" },
-                { 132, 1, 140, 55, "ALLEY" },
+                { 132, 1, 144.4, 55, "YARD" },
             },
             vault = { 96, 47 },
             entry = { 108, 1 },

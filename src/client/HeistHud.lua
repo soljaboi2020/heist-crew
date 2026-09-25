@@ -5,8 +5,8 @@
 
       1. ALARM — a red glow that breathes in from the screen edges (a soft
          vignette, not the old four solid red bars).
-      2. VAULT CRACK — bottom-centre card: "CRACKING VAULT" + live percent,
-         thin gold bar that fills smoothly.
+      2. VAULT DRILL — card in the UITheme bottomCenter slot: drill icon,
+         "DRILLING THE VAULT" + live percent, a thick gold bar (v2.1).
       3. RESULT — centre card when a run ends: HEIST COMPLETE / BUSTED and how
          many of the crew got out. Pops in, holds, fades.
 
@@ -74,35 +74,40 @@ function HeistHud:_buildUi()
     edgeGlow(vignette, 0, UDim2.fromScale(0.16, 1), UDim2.fromScale(0, 0), Vector2.new(0, 0))      -- left
     edgeGlow(vignette, 180, UDim2.fromScale(0.16, 1), UDim2.fromScale(1, 0), Vector2.new(1, 0))    -- right
 
-    -- 2. vault crack card
-    local crack = UITheme.panel({
+    -- 2. vault drill card (v2.1: bottomCenter slot — stacks with the carry row, never overlaps)
+    local crack = UITheme.card({
         Name = "VaultCrack",
-        AnchorPoint = Vector2.new(0.5, 1),
-        Position = UDim2.new(0.5, 0, 1, -96),
-        Size = UDim2.fromOffset(380, 64),
+        LayoutOrder = 30,
+        Size = UDim2.fromOffset(400, 72),
         Visible = false,
-        radius = 14,
+        radius = 18,
+        accent = T.gold,
     })
-    crack.Parent = screen
-    UITheme.caption("Drill", { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -36, 0, 14),
-        TextColor3 = T.gold }).Parent = crack
-    local pct = UITheme.label({ Text = "0%", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 8),
-        Size = UDim2.fromOffset(80, 22), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.mono, TextSize = 18 })
+    crack.Parent = UITheme.slot("bottomCenter")
+    local badge = UITheme.badge(UITheme.ICON.drill, T.gold, 46)
+    badge.AnchorPoint = Vector2.new(0, 0.5)
+    badge.Position = UDim2.new(0, 12, 0.5, 0)
+    badge.Parent = crack
+    UITheme.label({ Text = "DRILLING THE VAULT", Position = UDim2.fromOffset(70, 10), Size = UDim2.new(1, -170, 0, 24),
+        FontFace = UITheme.F.display, TextSize = 19 }).Parent = crack
+    local pct = UITheme.label({ Text = "0%", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 8),
+        Size = UDim2.fromOffset(90, 28), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display,
+        TextSize = 24, TextColor3 = T.gold })
     pct.Parent = crack
     local track = Instance.new("Frame")
-    track.Position = UDim2.new(0, 18, 0, 40)
-    track.Size = UDim2.new(1, -36, 0, 8)
+    track.Position = UDim2.new(0, 70, 0, 42)
+    track.Size = UDim2.new(1, -86, 0, 14)
     track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    track.BackgroundTransparency = 0.88
+    track.BackgroundTransparency = 0.86
     track.BorderSizePixel = 0
     track.Parent = crack
-    UITheme.corner(track, 4)
+    UITheme.corner(track, 7)
     local fill = Instance.new("Frame")
     fill.Size = UDim2.fromScale(0, 1)
     fill.BackgroundColor3 = T.gold
     fill.BorderSizePixel = 0
     fill.Parent = track
-    UITheme.corner(fill, 4)
+    UITheme.corner(fill, 7)
     local fg = Instance.new("UIGradient")
     fg.Color = ColorSequence.new(Color3.fromRGB(245, 158, 11), Color3.fromRGB(253, 224, 71))
     fg.Parent = fill
@@ -173,7 +178,7 @@ function HeistHud:setVaultProgress(progress)
         self._pct.TextColor3 = T.money
         task.delay(0.9, function()
             card.Visible = false
-            self._pct.TextColor3 = T.text
+            self._pct.TextColor3 = T.gold
         end)
     end
 end

@@ -1,10 +1,11 @@
 --[[
     HEIST CREW — Notifications (toasts)
     ────────────────────────────────────────────────
-    v0.7.0 redesign (UITheme). Toasts stack top-centre, just under the
-    objective pill: smoked-glass card, a thin coloured accent on the left for
-    meaning (green = money, red = danger, gold = heads-up), white text.
-    They fade + slide in and fade out as one piece (CanvasGroup).
+    v0.7.0, v2.1 UI overhaul. Toasts stack in the topCenter slot, directly
+    under the objective bar (so they can never cover it): a chunky rounded
+    card, a coloured accent + dot for meaning (green = money, red = danger,
+    gold = heads-up), big white text. Max 3 at once; the oldest goes first.
+    They fade + pop in and fade out as one piece (CanvasGroup).
 
     Server fires:  Notify:FireClient(player, {text=..., color="green"|"red"|"gold"|"white", duration=3})
 
@@ -28,35 +29,28 @@ local ACCENT = {
     green = T.money,
     red   = T.danger,
     gold  = T.gold,
-    white = T.muted,
+    white = T.info,
 }
 
-local MAX_TOASTS = 4
+local MAX_TOASTS = 3
 
 function Notifications:_buildContainer()
     local playerGui = localPlayer:WaitForChild("PlayerGui")
     local existing = playerGui:FindFirstChild("ToastNotifications")
     if existing then existing:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "ToastNotifications"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.DisplayOrder = 5
-    screen.Parent = playerGui
-
     local container = Instance.new("Frame")
-    container.Name = "Stack"
-    container.AnchorPoint = Vector2.new(0.5, 0)
-    container.Position = UDim2.new(0.5, 0, 0, 68)
-    container.Size = UDim2.new(0, 520, 1, -68)
+    container.Name = "Toasts"
+    container.LayoutOrder = 2
     container.BackgroundTransparency = 1
-    container.Parent = screen
+    container.Size = UDim2.fromOffset(0, 0)
+    container.AutomaticSize = Enum.AutomaticSize.XY
+    container.Parent = UITheme.slot("topCenter")
 
     local layout = Instance.new("UIListLayout")
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 8)
+    layout.Padding = UDim.new(0, 6)
     layout.Parent = container
 
     self._container = container
@@ -85,19 +79,22 @@ function Notifications:show(text, colorName, duration)
     toast.AutomaticSize = Enum.AutomaticSize.X
     toast.Size = UDim2.fromOffset(0, 44)
     toast.BackgroundColor3 = T.bg
-    toast.BackgroundTransparency = 0.12
+    toast.BackgroundTransparency = 0.06
     toast.GroupTransparency = 1
     toast.Parent = self._container
-    UITheme.corner(toast, 12)
-    UITheme.stroke(toast)
+    UITheme.corner(toast, 14)
+    local g = Instance.new("UIGradient")
+    g.Rotation = 90
+    g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(160, 165, 180))
+    g.Parent = toast
 
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(0, 4, 1, -16)
-    bar.Position = UDim2.fromOffset(10, 8)
+    bar.Size = UDim2.new(0, 5, 1, -14)
+    bar.Position = UDim2.fromOffset(9, 7)
     bar.BackgroundColor3 = accent
     bar.BorderSizePixel = 0
     bar.Parent = toast
-    UITheme.corner(bar, 2)
+    UITheme.corner(bar, 3)
 
     local label = UITheme.label({
         Text = text,
@@ -105,7 +102,7 @@ function Notifications:show(text, colorName, duration)
         Size = UDim2.new(0, 0, 1, 0),
         Position = UDim2.fromOffset(24, 0),
         FontFace = UITheme.F.bold,
-        TextSize = 17,
+        TextSize = 18,
         TextColor3 = T.text,
     })
     label.Parent = toast
@@ -114,7 +111,7 @@ function Notifications:show(text, colorName, duration)
     pad.Parent = toast
 
     local scale = Instance.new("UIScale")
-    scale.Scale = 0.92
+    scale.Scale = 0.9
     scale.Parent = toast
     TweenService:Create(toast, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
         { GroupTransparency = 0 }):Play()
@@ -134,9 +131,12 @@ end
 function Notifications:start()
     self:_buildContainer()
     local notifyRemote = Remotes.getRemote(Remotes.NAMES.Notify, "RemoteEvent")
-    notifyRemote.OnClientEvent:Connect(function(payload)
-        self:show(payload.text or "", payload.color or "white", payload.duration or 3)
-    end)
+    if notifyRemote then
+        notifyRemote.OnClientEvent:Connect(function(payload)
+            payload = type(payload) == "table" and payload or {}
+            self:show(payload.text or "", payload.color or "white", payload.duration or 3)
+        end)
+    end
     print("[HEIST CREW] Notifications mounted ✅")
 end
 

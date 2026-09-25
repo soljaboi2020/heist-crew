@@ -41,30 +41,31 @@ function DetectionHud:start()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.62)   -- (v1.1) below the crosshair, clear of the toast stack
-    card.Size = UDim2.fromOffset(220, 58)
+    card.Size = UDim2.fromOffset(260, 66)
     card.BackgroundTransparency = 1
     card.GroupTransparency = 1
     card.Parent = screen
-    local eye = UITheme.label({ Text = "SPOTTING…", Size = UDim2.new(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Center,
-        FontFace = UITheme.F.display, TextSize = 17, TextStrokeTransparency = 0.5, TextStrokeColor3 = Color3.new() })
+    UITheme.autoScale(card)     -- v2.1: readable on 1440p and phones
+    local eye = UITheme.label({ Text = "SPOTTING…", Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextSize = 21, TextStrokeTransparency = 0.4, TextStrokeColor3 = Color3.new() })
     eye.Parent = card
     local track = Instance.new("Frame")
-    track.Position = UDim2.fromOffset(20, 26)
-    track.Size = UDim2.new(1, -40, 0, 6)
+    track.Position = UDim2.fromOffset(20, 29)
+    track.Size = UDim2.new(1, -40, 0, 9)
     track.BackgroundColor3 = Color3.new(0, 0, 0)
     track.BackgroundTransparency = 0.4
     track.BorderSizePixel = 0
     track.Parent = card
-    UITheme.corner(track, 3)
+    UITheme.corner(track, 5)
     local fill = Instance.new("Frame")
     fill.Size = UDim2.fromScale(0, 1)
     fill.BorderSizePixel = 0
     fill.Parent = track
-    UITheme.corner(fill, 3)
+    UITheme.corner(fill, 5)
 
     -- (v2.0) why you're safer: "sneaking · in the dark" / "hidden"
-    local why = UITheme.label({ Name = "Why", Position = UDim2.fromOffset(0, 37), Size = UDim2.new(1, 0, 0, 16),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextSize = 13,
+    local why = UITheme.label({ Name = "Why", Position = UDim2.fromOffset(0, 43), Size = UDim2.new(1, 0, 0, 18),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextSize = 15,
         TextColor3 = T.info, TextStrokeTransparency = 0.6, TextStrokeColor3 = Color3.new(), Text = "" })
     why.Parent = card
 
@@ -72,6 +73,7 @@ function DetectionHud:start()
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 30,
         TextStrokeTransparency = 0.4, TextStrokeColor3 = Color3.new(), Visible = false })
     arrow.Parent = screen
+    UITheme.autoScale(arrow)
 
     local shown = 0
     RunService.RenderStepped:Connect(function(dt)

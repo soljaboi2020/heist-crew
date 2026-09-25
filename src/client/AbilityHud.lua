@@ -3,11 +3,12 @@
     ────────────────────────────────────────────────
     v1.0 (2026-09-25). Makes the crew roles FEEL different on your screen:
 
-      • PERKS CHIP (bottom-left, right of the role card) — the role's perks from
-        Constants.ROLES, split onto two tidy lines. Hidden with no role.
+      • (v2.1) the old PERKS chip is gone — the perks are printed on the role
+        card itself (CrewHud), one compact card instead of two.
       • LOOKOUT MARK (Q / gamepad L1 / touch "MARK" button) — fires UseAbility.
-        A round button next to the perks chip shows a 30s recharge ring. The
-        server is authoritative; the ring is just the client's honest guess.
+        A card in the bottomLeft slot, stacked right above the role card, with
+        a 30s recharge ring. The server is authoritative; the ring is just the
+        client's honest guess.
       • VISION — guards (tag "Guard") and cameras (tag "SecurityCamera") get a
         see-through-walls Highlight on THIS client only, when:
             your Role is Lookout  OR  your Gear includes Thermal
@@ -38,11 +39,9 @@ local localPlayer = Players.LocalPlayer
 local MARK_ACTION = "HC_Mark"
 local MARK_COOLDOWN = 30
 local VISION_RATE = 0.25
-local PERKS_X = 16 + 240 + 8          -- role card: x 16, width 240
-local PERKS_W = 270
-local CARD_H = 62                     -- same height as the role card, bottom edges line up
-local ABILITY_W = 136
-local RING = 40
+local CARD_H = 60
+local ABILITY_W = 190
+local RING = 42
 -- touch button spot inside Roblox's context-button frame (see LootHud for the throw button)
 local TOUCH_POS = UDim2.new(0.5, 0, 0.02, 0)
 
@@ -82,11 +81,6 @@ local function round(obj)
     c.CornerRadius = UDim.new(0.5, 0)
     c.Parent = obj
     return c
-end
-
-local function capFirst(s)
-    s = (s or ""):gsub("^%s+", ""):gsub("%s+$", "")
-    return (s:gsub("^%l", string.upper))
 end
 
 local function hasGear(id)
@@ -192,36 +186,19 @@ function AbilityHud:_buildUi()
     screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screen.Parent = playerGui
 
-    -- perks chip
-    local perks = UITheme.panel({ Name = "Perks", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, PERKS_X, 1, -16),
-        Size = UDim2.fromOffset(PERKS_W, CARD_H), radius = 14, Visible = false })
-    perks.Parent = screen
-    local perksScale = Instance.new("UIScale")
-    perksScale.Parent = perks
-    local perksCap = UITheme.caption("Perks", { Position = UDim2.fromOffset(14, 9), Size = UDim2.new(1, -28, 0, 14),
-        TextSize = 12 })
-    perksCap.Parent = perks
-    local line1 = UITheme.label({ Position = UDim2.fromOffset(14, 24), Size = UDim2.new(1, -28, 0, 16),
-        FontFace = UITheme.F.medium, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd })
-    line1.Parent = perks
-    local line2 = UITheme.label({ Position = UDim2.fromOffset(14, 40), Size = UDim2.new(1, -28, 0, 16),
-        FontFace = UITheme.F.medium, TextSize = 13, TextColor3 = T.muted, TextTruncate = Enum.TextTruncate.AtEnd })
-    line2.Parent = perks
-
-    -- Lookout mark button (the whole card is tappable/clickable too)
-    local ability = UITheme.panel({ Name = "Mark", AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.new(0, PERKS_X + PERKS_W + 8, 1, -16), Size = UDim2.fromOffset(ABILITY_W, CARD_H),
-        radius = 14, Visible = false })
-    ability.Parent = screen
+    -- Lookout mark button (the whole card is tappable/clickable too) — bottomLeft slot, above the role card
+    local ability = UITheme.card({ Name = "Mark", LayoutOrder = 5, Size = UDim2.fromOffset(ABILITY_W, CARD_H),
+        radius = 16, Visible = false })
+    ability.Parent = UITheme.slot("bottomLeft")
     local abilityScale = Instance.new("UIScale")
     abilityScale.Parent = ability
     local ring = makeRing(ability, RING, 3)
     ring.holder.Position = UDim2.fromOffset(11, (CARD_H - RING) / 2)
-    local title = UITheme.label({ Position = UDim2.fromOffset(RING + 21, 12), Size = UDim2.new(1, -(RING + 29), 0, 20),
-        FontFace = UITheme.F.display, TextSize = 17, Text = "MARK" })
+    local title = UITheme.label({ Position = UDim2.fromOffset(RING + 21, 9), Size = UDim2.new(1, -(RING + 29), 0, 22),
+        FontFace = UITheme.F.display, TextSize = 19, Text = "MARK GUARDS" })
     title.Parent = ability
-    local sub = UITheme.label({ Position = UDim2.fromOffset(RING + 21, 32), Size = UDim2.new(1, -(RING + 29), 0, 16),
-        FontFace = UITheme.F.bold, TextSize = 12, Text = "READY" })
+    local sub = UITheme.label({ Position = UDim2.fromOffset(RING + 21, 31), Size = UDim2.new(1, -(RING + 29), 0, 18),
+        FontFace = UITheme.F.bold, TextSize = 14, Text = "READY" })
     sub.Parent = ability
     local hit = Instance.new("TextButton")
     hit.Name = "Hit"
@@ -240,44 +217,23 @@ function AbilityHud:_buildUi()
 
     -- client-only highlights live under the tagged model itself, so nothing replicates
     self._screen = screen
-    self._perks, self._perksScale, self._perksCap, self._line1, self._line2 = perks, perksScale, perksCap, line1, line2
     self._ability, self._abilityScale, self._ring, self._title, self._sub = ability, abilityScale, ring, title, sub
     self._highlights = {}
 end
 
--- ── perks ──────────────────────────────────────────────────────────────
+-- ── role → ability ─────────────────────────────────────────────────────
 function AbilityHud:_renderRole()
     local roleId = localPlayer:GetAttribute("Role")
     local def = roleId and ROLE[roleId]
     local changed = roleId ~= self._role
     self._role = roleId
 
-    if def then
-        local color = UITheme.rgb(def.color)
-        local parts = {}
-        for piece in (def.perks or ""):gmatch("[^·]+") do
-            local s = capFirst(piece)
-            if s ~= "" then table.insert(parts, s) end
-        end
-        self._perksCap.TextColor3 = color
-        self._perksCap.Text = string.upper(roleId) .. " PERKS"
-        self._line1.Text = parts[1] or ""
-        self._line2.Text = #parts > 1 and table.concat(parts, " · ", 2) or ""
-        if not self._perks.Visible or changed then
-            self._perks.Visible = true
-            self._perksScale.Scale = 0.92
-            tween(self._perksScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
-        end
-    else
-        self._perks.Visible = false
-    end
-
     -- Lookout ability
     local lookout = roleId == "Lookout"
     self:_setMarkBound(lookout)
     self._ability.Visible = lookout
     if lookout then
-        local color = UITheme.rgb(def.color)
+        local color = def and UITheme.rgb(def.color) or T.money
         self._markColor = color
         if not self._cooling then
             self._ring.color(color)
@@ -324,10 +280,9 @@ end
 function AbilityHud:_useMark()
     if localPlayer:GetAttribute("Role") ~= "Lookout" then return end
     if self._cooling then
-        -- nudge: still recharging
-        local home = UDim2.new(0, PERKS_X + PERKS_W + 8, 1, -16)
-        tween(self._ability, 0.05, { Position = home + UDim2.fromOffset(4, 0) }).Completed:Connect(function()
-            tween(self._ability, 0.12, { Position = home }, Enum.EasingStyle.Back)
+        -- nudge: still recharging (a quick shrink-bounce; the slot owns the position)
+        tween(self._abilityScale, 0.05, { Scale = 0.94 }).Completed:Connect(function()
+            tween(self._abilityScale, 0.2, { Scale = 1 }, Enum.EasingStyle.Back)
         end)
         return
     end

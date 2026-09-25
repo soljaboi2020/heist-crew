@@ -214,7 +214,8 @@ function ClubBuilder:_shell(f)
     end
     -- soft fill so it's moody, not pitch black
     local fill = box("Fill", -1, TOP - 3, CZ - 1, 1, TOP - 2.5, CZ + 1, STEEL, Enum.Material.Metal, f, { Transparency = 1, CanCollide = false })
-    light("PointLight", fill, { Brightness = 0.5, Range = 60, Color = Color3.fromRGB(150, 120, 200) })
+    -- (v2.0.2) a touch lower under Future: the neon + truss spots do the work
+    light("PointLight", fill, { Brightness = 0.4, Range = 60, Color = Color3.fromRGB(150, 120, 200) })
 end
 
 -- ──────────────────────────────────────────────
@@ -1011,7 +1012,7 @@ function ClubBuilder:_lobbyShell(f)
     chandelier(f, 0, 101, LTOP - 5)
     chandelier(f, -22, 79, LTOP - 6)
     local fill = box("LobbyFill", -1, LTOP - 3, 91, 1, LTOP - 2.5, 93, STEEL, Enum.Material.Metal, f, { Transparency = 1, CanCollide = false })
-    light("PointLight", fill, { Brightness = 0.7, Range = 60, Color = Color3.fromRGB(255, 222, 190) })
+    light("PointLight", fill, { Brightness = 0.6, Range = 60, Color = Color3.fromRGB(255, 222, 190) })
 end
 
 -- ──────────────────────────────────────────────
@@ -1320,26 +1321,95 @@ function ClubBuilder:_portal(f, id, index, c)
     local z0, z1 = c - PORTAL_HW, c + PORTAL_HW
     local trim = Color3.fromRGB(64, 66, 76)
 
-    -- frame round the opening + thin job-colour light strips on its inner edge
-    box("DoorPostN", WX - 0.4, F, z0 - 0.8, WX, F + PORTAL_H + 0.8, z0, trim, Enum.Material.Metal, f)
-    box("DoorPostS", WX - 0.4, F, z1, WX, F + PORTAL_H + 0.8, z1 + 0.8, trim, Enum.Material.Metal, f)
-    box("DoorLintel", WX - 0.4, F + PORTAL_H, z0, WX, F + PORTAL_H + 0.8, z1, trim, Enum.Material.Metal, f)
-    neon("DoorStripN", WX - 0.46, F, z0 - 0.22, WX - 0.4, F + PORTAL_H, z0 - 0.06, col, f)
-    neon("DoorStripS", WX - 0.46, F, z1 + 0.06, WX - 0.4, F + PORTAL_H, z1 + 0.22, col, f)
-    neon("DoorStripTop", WX - 0.46, F + PORTAL_H + 0.06, z0, WX - 0.4, F + PORTAL_H + 0.22, z1, col, f)
+    -- (v2.0.2) A REAL elevator / vault door, not a white slab (Malachi,
+    -- Future lighting: "very simple / bad"). Gunmetal frame proud of the wall
+    -- with bolt heads, steel-lined reveal, brass name plate + a floor-number
+    -- display in the head, a call button, and brushed-steel leaves with a
+    -- rubber centre seam, a raised panel, a kick plate and a thin job-colour
+    -- light line. Every leaf detail slides with its leaf.
+    local GUN = Color3.fromRGB(58, 60, 70)
+    local BRUSHED = Color3.fromRGB(168, 172, 182)
+    local BRUSHED_DK = Color3.fromRGB(138, 142, 152)
+    local BOLT = Color3.fromRGB(196, 198, 206)
+    local FX0 = WX - 0.9                                -- frame front face (x 43.1)
+    local HEAD0, HEAD1 = F + PORTAL_H, F + PORTAL_H + 1.2
 
-    -- sliding elevator doors (open while the heist counts down)
+    box("DoorPostN", FX0, F, z0 - 1.1, WX, HEAD1, z0, GUN, Enum.Material.Metal, f)
+    box("DoorPostS", FX0, F, z1, WX, HEAD1, z1 + 1.1, GUN, Enum.Material.Metal, f)
+    box("DoorLintel", FX0, HEAD0, z0, WX, HEAD1, z1, GUN, Enum.Material.Metal, f)
+    -- plinth blocks at the foot of each post (breaks up the silhouette)
+    box("DoorPlinthN", FX0 - 0.12, F, z0 - 1.22, WX, F + 1.1, z0 + 0.02, Color3.fromRGB(40, 42, 50), Enum.Material.DiamondPlate, f)
+    box("DoorPlinthS", FX0 - 0.12, F, z1 - 0.02, WX, F + 1.1, z1 + 1.22, Color3.fromRGB(40, 42, 50), Enum.Material.DiamondPlate, f)
+    -- steel-lined reveal from the wall face back to the leaves
+    local REVEAL = Color3.fromRGB(120, 124, 134)
+    box("RevealN", WX, F, z0, 46.6, F + PORTAL_H, z0 + 0.15, REVEAL, Enum.Material.Metal, f)
+    box("RevealS", WX, F, z1 - 0.15, 46.6, F + PORTAL_H, z1, REVEAL, Enum.Material.Metal, f)
+    box("RevealTop", WX, F + PORTAL_H - 0.15, z0, 46.6, F + PORTAL_H, z1, REVEAL, Enum.Material.Metal, f)
+    box("Sill", FX0, F, z0, 47.2, F + 0.06, z1, Color3.fromRGB(150, 154, 162), Enum.Material.DiamondPlate, f,
+        { CanCollide = false })
+    -- thin job-colour light line on the inside edge of the frame
+    neon("DoorStripN", FX0 - 0.04, F + 1.1, z0 - 0.26, FX0, F + PORTAL_H, z0 - 0.12, col, f)
+    neon("DoorStripS", FX0 - 0.04, F + 1.1, z1 + 0.12, FX0, F + PORTAL_H, z1 + 0.26, col, f)
+    neon("DoorStripTop", FX0 - 0.04, HEAD0 + 0.12, z0 - 0.26, FX0, HEAD0 + 0.26, z1 + 0.26, col, f)
+    -- bolt heads up both posts and along the head
+    local function bolt(y, z)
+        part({ Name = "Bolt", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 0.3, 0.3),
+            CFrame = CFrame.new(FX0 - 0.06, y, z), Color = BOLT, Material = Enum.Material.Metal,
+            CanCollide = false, CanQuery = false, CastShadow = false }, f)
+    end
+    for y = F + 1.8, F + PORTAL_H - 0.4, 1.7 do
+        bolt(y, z0 - 0.7)
+        bolt(y, z1 + 0.7)
+    end
+    for _, zz in ipairs({ z0 - 0.7, z1 + 0.7 }) do bolt(HEAD0 + 0.6, zz) end
+
+    -- floor-number display (dark glass, amber digits) + brass name plate in the head
+    local disp = box("FloorDisplay", FX0 - 0.1, HEAD0 + 0.2, c + 1.2, FX0, HEAD1 - 0.2, c + 3.7,
+        Color3.fromRGB(12, 10, 10), Enum.Material.Glass, f, { CanCollide = false })
+    local dg = surface(disp, Enum.NormalId.Left, 50)
+    dg.Brightness = 2
+    local dispText = text({ Text = "▲ " .. index, Size = UDim2.fromScale(1, 1),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.mono, TextScaled = true,
+        TextColor3 = Color3.fromRGB(255, 176, 60) }, dg)
+    local plate = box("NamePlate", FX0 - 0.08, HEAD0 + 0.25, c - 3.8, FX0, HEAD1 - 0.25, c + 0.9,
+        Color3.fromRGB(196, 158, 84), Enum.Material.Metal, f, { CanCollide = false })
+    local pg = surface(plate, Enum.NormalId.Left, 50)
+    pg.LightInfluence = 1
+    pg.Brightness = 1
+    text({ Text = cfg.name or string.upper(id), Size = UDim2.fromScale(0.94, 0.8), Position = UDim2.fromScale(0.03, 0.1),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = Color3.fromRGB(36, 26, 14) }, pg)
+    -- call button on the north post
+    box("CallPanel", FX0 - 0.06, F + 4.3, z0 - 0.95, FX0, F + 5.7, z0 - 0.35, Color3.fromRGB(24, 24, 28), Enum.Material.Metal, f,
+        { CanCollide = false })
+    part({ Name = "CallButton", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.08, 0.36, 0.36),
+        CFrame = CFrame.new(FX0 - 0.09, F + 5.0, z0 - 0.65), Color = col, Material = Enum.Material.Neon,
+        CanCollide = false, CanQuery = false }, f)
+
+    -- sliding elevator doors (open only as the heist leaves — v2.0.1)
     local leaves = {}
+    local function slide(pt, s)
+        local closed = pt.CFrame
+        table.insert(leaves, { part = pt, closed = closed, open = closed + Vector3.new(0, 0, s * (PORTAL_HW - 0.3)) })
+    end
     for _, s in ipairs({ -1, 1 }) do
-        local zb = c + s * PORTAL_HW
-        local leaf = box("DoorLeaf", 46.6, F, c, 47.1, F + PORTAL_H, zb, Color3.fromRGB(150, 156, 168),
-            Enum.Material.Metal, f, { Reflectance = 0.15 })
-        local lg = surface(leaf, Enum.NormalId.Left, 20)
-        lg.LightInfluence = 1
-        local lbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, lg)
-        frame({ Position = UDim2.fromScale(0, 0.47), Size = UDim2.new(1, 0, 0, 8), BackgroundColor3 = col }, lbg)
-        local closed = leaf.CFrame
-        table.insert(leaves, { part = leaf, closed = closed, open = closed + Vector3.new(0, 0, s * (PORTAL_HW - 0.3)) })
+        local zb = c + s * PORTAL_HW                    -- outer edge; c = the seam
+        local zlo, zhi = math.min(c, zb), math.max(c, zb)
+        slide(box("DoorLeaf", 46.6, F, zlo, 47.1, F + PORTAL_H, zhi, BRUSHED, Enum.Material.Metal, f,
+            { Reflectance = 0.12 }), s)
+        local deco = { CanCollide = false, CanQuery = false }
+        -- raised centre panel (slightly darker brushed steel)
+        slide(box("LeafPanel", 46.5, F + 1.4, zlo + 0.45, 46.6, F + PORTAL_H - 0.6, zhi - 0.45, BRUSHED_DK,
+            Enum.Material.Metal, f, deco), s)
+        -- kick plate
+        slide(box("LeafKick", 46.5, F, zlo + 0.1, 46.6, F + 1.1, zhi - 0.1, Color3.fromRGB(86, 88, 96),
+            Enum.Material.DiamondPlate, f, deco), s)
+        -- thin job-colour light line at hand height
+        slide(box("LeafLine", 46.44, F + 5.2, zlo + 0.45, 46.5, F + 5.36, zhi - 0.45, col, Enum.Material.Neon, f, deco), s)
+        -- rubber seam where the two leaves meet
+        local sz0, sz1 = (s < 0) and (c - 0.12) or c, (s < 0) and c or (c + 0.12)
+        slide(box("LeafSeam", 46.48, F, sz0, 46.62, F + PORTAL_H, sz1, Color3.fromRGB(16, 16, 18),
+            Enum.Material.Rubber, f, deco), s)
     end
     local shaft = box("ShaftLight", 48.6, F + 5, c - 0.2, 49, F + 5.4, c + 0.2, STEEL, Enum.Material.Metal, f,
         { Transparency = 1, CanCollide = false })
@@ -1416,12 +1486,16 @@ function ClubBuilder:_portal(f, id, index, c)
             status.Text = (type(locked) == "number") and string.format("LOCKED — level %d", locked) or "Heist in progress…"
             status.TextColor3 = T.danger
             glow:SetAttribute("State", "locked")
+            dispText.Text = "✕"
+            dispText.TextColor3 = Color3.fromRGB(255, 70, 70)
             pad.Transparency = 0.85
             setDoors(false)
         elseif launchIn and launchIn > 0 then
             status.Text = string.format("Starting in %d…", math.ceil(launchIn))
             status.TextColor3 = T.money
             glow:SetAttribute("State", "launch")
+            dispText.Text = (launchIn <= 1.2) and "▲▲" or tostring(math.ceil(launchIn))
+            dispText.TextColor3 = Color3.fromRGB(120, 255, 150)
             pad.Transparency = 0.2
             -- (v2.0.1) Malachi: "don't open the door till it's leaving"
             setDoors(launchIn <= 1.2)
@@ -1433,12 +1507,16 @@ function ClubBuilder:_portal(f, id, index, c)
             end
             status.TextColor3 = T.gold
             glow:SetAttribute("State", "busy")
+            dispText.Text = "▲ " .. index
+            dispText.TextColor3 = Color3.fromRGB(255, 200, 80)
             pad.Transparency = 0.3
             setDoors(false)
         else
             status.Text = "Walk in to play!"
             status.TextColor3 = T.text
             glow:SetAttribute("State", "idle")
+            dispText.Text = "▲ " .. index
+            dispText.TextColor3 = Color3.fromRGB(255, 176, 60)
             pad.Transparency = 0.45
             setDoors(false)
         end
@@ -1479,6 +1557,81 @@ function ClubBuilder:_heistHall(f, refs)
 end
 
 -- ──────────────────────────────────────────────
+-- ✨ POLISH (v2.0.2) — fewer flat surfaces for Future lighting:
+-- coffered lobby ceiling, gold floor inlay, baseboards, wall sconces
+-- (pools of light on the walls), ribbed steel cladding on the door wall.
+-- ──────────────────────────────────────────────
+function ClubBuilder:_polish(f)
+    local DARKWOOD = Color3.fromRGB(46, 30, 24)
+    local deco = { CanCollide = false, CanQuery = false }
+
+    -- lobby: coffered ceiling (beams on a 12-stud grid, gold edge on the underside)
+    for _, x in ipairs({ -26, -14, -2, 10 }) do
+        box("CofferBeamZ", x - 0.6, LTOP - 1.4, LZ0 + 0.2, x + 0.6, LTOP, LZ1, DARKWOOD, Enum.Material.WoodPlanks, f, deco)
+        box("CofferTrimZ", x - 0.65, LTOP - 1.5, LZ0 + 0.2, x + 0.65, LTOP - 1.4, LZ1, GOLD, Enum.Material.Metal, f, deco)
+    end
+    for _, z in ipairs({ 71, 83, 95, 107 }) do
+        box("CofferBeamX", LX0, LTOP - 1.4, z - 0.6, 16, LTOP, z + 0.6, DARKWOOD, Enum.Material.WoodPlanks, f, deco)
+        box("CofferTrimX", LX0, LTOP - 1.5, z - 0.65, 16, LTOP - 1.4, z + 0.65, GOLD, Enum.Material.Metal, f, deco)
+    end
+
+    -- lobby: thin gold inlay lines in the marble (under the carpet + medallion)
+    local INLAY = Color3.fromRGB(176, 140, 66)
+    for _, x in ipairs({ -24, -16, -8, 8 }) do
+        box("FloorInlay", x - 0.1, F, LZ0 + 0.5, x + 0.1, F + 0.02, LZ1 - 0.5, INLAY, Enum.Material.Metal, f, deco)
+    end
+    for _, z in ipairs({ 72, 80, 88, 96, 104, 112 }) do
+        box("FloorInlay", LX0 + 0.5, F, z - 0.1, 15.5, F + 0.02, z + 0.1, INLAY, Enum.Material.Metal, f, deco)
+    end
+    -- a dark border band where the lobby marble meets the hall slate
+    box("FloorBorder", 15.2, F, LZ0 + 0.2, 16, F + 0.03, LZ1, Color3.fromRGB(20, 18, 22), Enum.Material.Marble, f, deco)
+
+    -- club: dark metal baseboards (the walls met the floor with no line at all)
+    local BASE = Color3.fromRGB(20, 20, 26)
+    box("BaseboardN", X0, F, Z0, X1, F + 0.7, Z0 + 0.15, BASE, Enum.Material.Metal, f, deco)
+    box("BaseboardW", X0, F, Z0, X0 + 0.15, F + 0.7, Z1, BASE, Enum.Material.Metal, f, deco)
+    box("BaseboardE", X1 - 0.15, F, Z0, X1, F + 0.7, Z1, BASE, Enum.Material.Metal, f, deco)
+    box("BaseboardSW", X0, F, Z1 - 0.15, -ARCH_HW - 0.8, F + 0.7, Z1, BASE, Enum.Material.Metal, f, deco)
+    box("BaseboardSE", ARCH_HW + 0.8, F, Z1 - 0.15, X1, F + 0.7, Z1, BASE, Enum.Material.Metal, f, deco)
+
+    -- lobby: gold wall sconces → warm pools of light on the plaster
+    local function sconce(pos, out)
+        local base = part({ Name = "SconcePlate", Size = Vector3.new(0.9, 1.4, 0.15),
+            CFrame = CFrame.lookAt(pos, pos + out), Color = GOLD, Material = Enum.Material.Metal }, f)
+        base.CanCollide = false
+        local shade = part({ Name = "SconceShade", Size = Vector3.new(0.9, 0.7, 0.6),
+            CFrame = CFrame.lookAt(pos + out * 0.4 + Vector3.new(0, 0.35, 0), pos + out * 2 + Vector3.new(0, 0.35, 0)),
+            Color = Color3.fromRGB(240, 214, 170), Material = Enum.Material.Fabric, CanCollide = false }, f)
+        light("SpotLight", shade, { Face = Enum.NormalId.Top, Angle = 70, Brightness = 1.2, Range = 10,
+            Color = Color3.fromRGB(255, 206, 150) })
+        light("SpotLight", base, { Face = Enum.NormalId.Bottom, Angle = 60, Brightness = 0.6, Range = 7,
+            Color = Color3.fromRGB(255, 206, 150) })
+    end
+    sconce(Vector3.new(-12, F + 7.5, LZ1 - 0.1), Vector3.new(0, 0, -1))
+    sconce(Vector3.new(10, F + 7.5, LZ1 - 0.1), Vector3.new(0, 0, -1))
+    sconce(Vector3.new(LX0 + 0.1, F + 7.5, 95), Vector3.new(1, 0, 0))
+    sconce(Vector3.new(-24, F + 7.5, LZ0 + 0.3), Vector3.new(0, 0, 1))
+
+    -- heist hall: ribbed steel cladding on the piers between the doors, a
+    -- dark skirting, and a light trough along the ceiling (no extra lights)
+    local zPrev = LZ0
+    local RIB = Color3.fromRGB(70, 72, 82)
+    for i = 1, #PORTAL_Z + 1 do
+        local zEnd = (i <= #PORTAL_Z) and (PORTAL_Z[i] - PORTAL_HW - 1.3) or LZ1
+        local zStart = (i == 1) and zPrev or (PORTAL_Z[i - 1] + PORTAL_HW + 1.3)
+        if zEnd - zStart > 0.6 then
+            box("HallSkirting", LX1 - 0.35, F, zStart, LX1, F + 0.8, zEnd, BASE, Enum.Material.Metal, f, deco)
+            for z = zStart + 0.3, zEnd - 0.3, 0.9 do
+                box("WallRib", LX1 - 0.25, F + 0.8, z - 0.15, LX1, F + 11.8, z + 0.15, RIB, Enum.Material.Metal, f, deco)
+            end
+        end
+    end
+    box("HallTrough", 30, LTOP - 0.6, LZ0 + 1, 32, LTOP, LZ1 - 1, Color3.fromRGB(26, 26, 32), Enum.Material.Metal, f, deco)
+    box("HallTroughGlow", 30.3, LTOP - 0.65, LZ0 + 1.2, 31.7, LTOP - 0.6, LZ1 - 1.2, Color3.fromRGB(255, 236, 210),
+        Enum.Material.Neon, f, deco)
+end
+
+-- ──────────────────────────────────────────────
 -- 🎥 first-join fly-over: street → auto shop lift → club → heist doors → spawn
 -- ──────────────────────────────────────────────
 function ClubBuilder:_introPath(refs)
@@ -1516,6 +1669,7 @@ function ClubBuilder:build(folder)
         { "lobby west", function() self:_lobbyWest(sub(f, "LobbyWest"), refs) end },
         { "bouncer", function() self:_bouncer(sub(f, "Bouncer")) end },
         { "heist hall", function() self:_heistHall(sub(f, "HeistHall"), refs) end },
+        { "polish", function() self:_polish(sub(f, "Polish")) end },
         { "intro path", function() self:_introPath(refs) end },
     }
     for _, s in ipairs(steps) do

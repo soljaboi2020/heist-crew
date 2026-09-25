@@ -186,12 +186,16 @@ end
 local function screenPop(text, color)
     if not screen then return nil end
     screenPopY = (screenPopY + 1) % 3
+    -- (v2.1) just LEFT of the cash card (topRight slot), so it never lands on THE JOB card
+    local sc = UITheme.scale()
+    local L = UITheme.L
     local holder = Instance.new("Frame")
     holder.BackgroundTransparency = 1
     holder.AnchorPoint = Vector2.new(1, 0)
-    holder.Position = UDim2.new(1, -24, 0, 92 + screenPopY * 30)   -- just under the cash card
+    holder.Position = UDim2.new(1, -(L.MARGIN + (L.CASH_W + 14) * sc), 0, L.MARGIN + (8 + screenPopY * 30) * sc)
     holder.Size = UDim2.fromOffset(200, 36)
     holder.Parent = screen
+    UITheme.autoScale(holder)
     local label = popLabel(text, color, 26)
     label.TextXAlignment = Enum.TextXAlignment.Right
     label.Parent = holder
@@ -305,6 +309,7 @@ function FeelFX:start()
     bannerHolder.Position = UDim2.fromScale(0.5, 0.3)
     bannerHolder.Size = UDim2.fromOffset(640, 110)
     bannerHolder.Parent = screen
+    UITheme.autoScale(bannerHolder)   -- v2.1: scales with the screen like the rest of the HUD
 
     local remote = Remotes.getRemote(Remotes.NAMES.FeelFX)
     if remote then

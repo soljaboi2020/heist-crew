@@ -7,7 +7,7 @@
         toggles crouch → fires the Crouch remote. The SERVER (FeelService)
         owns the "Crouching" attribute + the slower walk; we only react to it.
       • While crouching: the camera drops (Humanoid.CameraOffset y −1.2) and a
-        small "SNEAKING" chip shows bottom-centre.
+        "SNEAKING" chip shows in the bottomCenter slot.
       • While the "Hidden" attribute is true (HideService): a "HIDDEN" chip.
       • Hide-spot prompts someone else is already in are hidden for you (the
         server marks them with an "Occupant" attribute = that player's UserId).
@@ -32,7 +32,6 @@ local localPlayer = Players.LocalPlayer
 
 local ACTION = "HC_Crouch"
 local CAMERA_DROP = Vector3.new(0, -1.2, 0)
-local CHIP_Y = -226              -- above LootHud's carrying pill (y −170, 50 tall)
 local TOUCH_POS = UDim2.new(0.05, 0, 0.62, 0)
 
 local function tween(obj, t, props)
@@ -41,16 +40,11 @@ local function tween(obj, t, props)
     return tw
 end
 
-local function makeChip(parent, name, text, color, order)
-    local chip = UITheme.panel({ Name = name, LayoutOrder = order, Size = UDim2.fromOffset(0, 30),
-        AutomaticSize = Enum.AutomaticSize.X, radius = 15, Visible = false })
-    local s = chip:FindFirstChildOfClass("UIStroke")
-    if s then
-        s.Color = color
-        s.Transparency = 0.45
-    end
+local function makeChip(parent, name, text, icon, color, order)
+    local chip = UITheme.card({ Name = name, LayoutOrder = order, Size = UDim2.fromOffset(0, 40),
+        AutomaticSize = Enum.AutomaticSize.X, radius = 20, accent = color, noHighlight = true, Visible = false })
     local pad = Instance.new("UIPadding")
-    pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 11), UDim.new(0, 13)
+    pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 5), UDim.new(0, 15)
     pad.Parent = chip
     local row = Instance.new("UIListLayout")
     row.FillDirection = Enum.FillDirection.Horizontal
@@ -58,15 +52,9 @@ local function makeChip(parent, name, text, color, order)
     row.SortOrder = Enum.SortOrder.LayoutOrder
     row.Padding = UDim.new(0, 8)
     row.Parent = chip
-    local dot = Instance.new("Frame")
-    dot.LayoutOrder = 1
-    dot.Size = UDim2.fromOffset(8, 8)
-    dot.BackgroundColor3 = color
-    dot.BorderSizePixel = 0
-    UITheme.corner(dot, 4)
-    dot.Parent = chip
-    UITheme.label({ LayoutOrder = 2, Text = text, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 30),
-        FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.text }).Parent = chip
+    UITheme.badge(icon, color, 30, { LayoutOrder = 1 }).Parent = chip
+    UITheme.label({ LayoutOrder = 2, Text = text, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 40),
+        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.text }).Parent = chip
     local scale = Instance.new("UIScale")
     scale.Parent = chip
     chip.Parent = parent
@@ -131,19 +119,14 @@ function CrouchController:start()
     local old = pg:FindFirstChild("CrouchHud")
     if old then old:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "CrouchHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.Parent = pg
-
+    -- (v2.1) chips live in the UITheme bottomCenter slot, above the carry row
     local row = Instance.new("Frame")
-    row.Name = "Chips"
+    row.Name = "CrouchChips"
+    row.LayoutOrder = 10
     row.BackgroundTransparency = 1
-    row.AnchorPoint = Vector2.new(0.5, 1)
-    row.Position = UDim2.new(0.5, 0, 1, CHIP_Y)
-    row.Size = UDim2.fromOffset(300, 30)
-    row.Parent = screen
+    row.Size = UDim2.fromOffset(0, 0)
+    row.AutomaticSize = Enum.AutomaticSize.XY
+    row.Parent = UITheme.slot("bottomCenter")
     local layout = Instance.new("UIListLayout")
     layout.FillDirection = Enum.FillDirection.Horizontal
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -151,8 +134,8 @@ function CrouchController:start()
     layout.Padding = UDim.new(0, 8)
     layout.Parent = row
 
-    local sneakChip, sneakScale = makeChip(row, "Sneaking", "SNEAKING", T.info, 1)
-    local hiddenChip, hiddenScale = makeChip(row, "Hidden", "HIDDEN", T.money, 2)
+    local sneakChip, sneakScale = makeChip(row, "Sneaking", "SNEAKING", UITheme.ICON.sneak, T.info, 1)
+    local hiddenChip, hiddenScale = makeChip(row, "Hidden", "HIDDEN", UITheme.ICON.hidden, T.money, 2)
 
     -- ── camera + chips follow the server's attributes ──
     local camTween = nil

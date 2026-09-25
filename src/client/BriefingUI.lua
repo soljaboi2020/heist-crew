@@ -79,17 +79,23 @@ function BriefingUI:_build()
     end
 
     -- subtitle
-    local sub = UITheme.panel({ Name = "Subtitle", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110),
-        Size = UDim2.fromOffset(760, 96), Visible = false, radius = 16, transparency = 0.1 })
+    -- (v2.1) chunky card + the Boss's hat badge, scaled with the HUD
+    local sub = UITheme.card({ Name = "Subtitle", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -90),
+        Size = UDim2.fromOffset(760, 104), Visible = false, radius = 18, transparency = 0.06, accent = T.gold })
     sub.ZIndex = 6
     sub.Parent = screen
-    UITheme.caption("The Boss", { Position = UDim2.fromOffset(22, 12), Size = UDim2.new(1, -44, 0, 14),
-        TextColor3 = T.gold, ZIndex = 7 }).Parent = sub
-    local line = UITheme.label({ Position = UDim2.fromOffset(22, 30), Size = UDim2.new(1, -44, 0, 56),
-        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.bold, TextSize = 21, ZIndex = 7 })
+    UITheme.autoScale(sub)
+    local hat = UITheme.badge(UITheme.ICON.boss, T.gold, 56)
+    hat.Position = UDim2.fromOffset(16, 22)
+    hat.ZIndex = 7
+    hat.Parent = sub
+    UITheme.caption("The Boss", { Position = UDim2.fromOffset(86, 12), Size = UDim2.new(1, -106, 0, 16),
+        TextSize = 13, TextColor3 = T.gold, ZIndex = 7 }).Parent = sub
+    local line = UITheme.label({ Position = UDim2.fromOffset(86, 30), Size = UDim2.new(1, -106, 0, 64),
+        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.bold, TextSize = 22, ZIndex = 7 })
     line.Parent = sub
     local cons = Instance.new("UISizeConstraint")
-    cons.MaxSize = Vector2.new(760, 96)
+    cons.MaxSize = Vector2.new(760, 104)
     cons.Parent = sub
 
     local skip = Instance.new("TextButton")
@@ -108,19 +114,21 @@ function BriefingUI:_build()
     skip.ZIndex = 8
     skip.Parent = screen
     UITheme.corner(skip, 18)
-    UITheme.stroke(skip)
+    UITheme.stroke(skip, T.line, 0.6, 1.5)
+    UITheme.autoScale(skip)
 
     -- READY UP card after the briefing
-    local readyCard = UITheme.panel({ Name = "Ready", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110),
-        Size = UDim2.fromOffset(470, 160), Visible = false, radius = 18, transparency = 0.08 })
+    local readyCard = UITheme.card({ Name = "Ready", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -90),
+        Size = UDim2.fromOffset(500, 170), Visible = false, radius = 20, transparency = 0.04, accent = T.money })
     readyCard.ZIndex = 6
     readyCard.Parent = screen
+    UITheme.autoScale(readyCard)
     local rTitle = UITheme.label({ Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 30),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 26, ZIndex = 7 })
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 27, ZIndex = 7 })
     rTitle.Parent = readyCard
     local rBody = UITheme.label({ Position = UDim2.fromOffset(20, 48), Size = UDim2.new(1, -40, 0, 36),
         TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, FontFace = UITheme.F.medium,
-        TextSize = 15, TextColor3 = T.muted, ZIndex = 7 })
+        TextSize = 17, TextColor3 = T.text, ZIndex = 7 })
     rBody.Parent = readyCard
     local readyBtn = Instance.new("TextButton")
     readyBtn.AnchorPoint = Vector2.new(0.5, 1)
@@ -163,6 +171,7 @@ function BriefingUI:_build()
     title.GroupTransparency = 1
     title.ZIndex = 21
     title.Parent = screen
+    UITheme.autoScale(title)
     local tName = UITheme.label({ Size = UDim2.new(1, 0, 0, 100), TextXAlignment = Enum.TextXAlignment.Center,
         FontFace = UITheme.F.display, TextSize = 96, TextStrokeTransparency = 0.6, TextStrokeColor3 = Color3.new(), ZIndex = 22 })
     tName.Parent = title

@@ -1,15 +1,15 @@
 --[[
     HEIST CREW — CashHud (client UI)
     ────────────────────────────────────────────────
-    v0.7.0 redesign (UITheme). Top-right smoked-glass card:
+    v0.7.0, v2.1 UI overhaul. First card in the topRight slot (THE JOB card
+    stacks under it):
 
-        CASH
-        $12,450          ← rolls up to the new number instead of jumping
-                +$3,000  ← little green delta that drifts down and fades
+        [$]  CASH
+             $12,450          ← rolls up to the new number instead of jumping
+    +$3,000                    ← green delta just left of the card, drifts + fades
 
     Reads the "Cash" player attribute the server sets (EconomyService), so it
-    shows the right number the instant it loads. The old version waited for a
-    remote event and sat at "$0" if it missed the first one.
+    shows the right number the instant it loads.
 
     PUBLIC API:
         CashHud:start()
@@ -21,6 +21,7 @@ local TweenService = game:GetService("TweenService")
 
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local T = UITheme.C
+local L = UITheme.L
 
 local CashHud = {}
 local localPlayer = Players.LocalPlayer
@@ -35,51 +36,49 @@ function CashHud:_buildUi()
     local existing = playerGui:FindFirstChild("CashHud")
     if existing then existing:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "CashHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = playerGui
-
-    local card = UITheme.panel({
-        Name = "Card",
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -16, 0, 14),
-        Size = UDim2.fromOffset(200, 62),
-        radius = 14,
+    local card = UITheme.card({
+        Name = "CashCard",
+        LayoutOrder = 1,
+        Size = UDim2.fromOffset(L.CASH_W, L.CASH_H),
+        radius = 16,
     })
-    card.Parent = screen
+    card.Parent = UITheme.slot("topRight")
     local scale = Instance.new("UIScale")
     scale.Parent = card
 
-    UITheme.caption("Cash", { Position = UDim2.fromOffset(16, 9), Size = UDim2.new(1, -32, 0, 14) }).Parent = card
+    local badge = UITheme.badge(UITheme.ICON.cash, T.money, 38)
+    badge.AnchorPoint = Vector2.new(0, 0.5)
+    badge.Position = UDim2.new(0, 10, 0.5, 0)
+    badge.Parent = card
+
+    UITheme.caption("Cash", { Position = UDim2.fromOffset(58, 7), Size = UDim2.new(1, -66, 0, 14) }).Parent = card
 
     local amount = UITheme.label({
         Name = "Amount",
         RichText = true,
-        Position = UDim2.fromOffset(16, 22),
-        Size = UDim2.new(1, -32, 0, 32),
+        Position = UDim2.fromOffset(58, 19),
+        Size = UDim2.new(1, -66, 0, 34),
         FontFace = UITheme.F.display,
-        TextSize = 28,
+        TextSize = UITheme.T.hero - 2,
         TextColor3 = T.text,
     })
     amount.Parent = card
 
+    -- "+$X" floats just left of the card (child of the card so it scales + follows it)
     local delta = UITheme.label({
         Name = "Delta",
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -228, 0, 34),   -- (v1.1) left of the cash card, clear of the JOB card
-        Size = UDim2.fromOffset(160, 22),
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(0, -10, 0.5, 0),
+        Size = UDim2.fromOffset(170, 26),
         TextXAlignment = Enum.TextXAlignment.Right,
         FontFace = UITheme.F.display,
-        TextSize = 20,
+        TextSize = 24,
         TextColor3 = T.money,
         TextTransparency = 1,
         TextStrokeTransparency = 1,
         TextStrokeColor3 = Color3.new(0, 0, 0),
     })
-    delta.Parent = screen
+    delta.Parent = card
 
     self._amount, self._delta, self._scale = amount, delta, scale
     self._shown = Instance.new("NumberValue")
@@ -101,17 +100,17 @@ function CashHud:setCash(newAmount, animate)
 
     if newAmount > old then
         -- little pop on the card
-        self._scale.Scale = 1.06
+        self._scale.Scale = 1.08
         TweenService:Create(self._scale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
             { Scale = 1 }):Play()
         -- "+$X" drifts down and fades
         local d = self._delta
         d.Text = "+" .. UITheme.money(newAmount - old)
-        d.Position = UDim2.new(1, -228, 0, 34)
+        d.Position = UDim2.new(0, -10, 0.5, 0)
         d.TextTransparency = 0
-        d.TextStrokeTransparency = 0.6
+        d.TextStrokeTransparency = 0.5
         TweenService:Create(d, TweenInfo.new(1.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = UDim2.new(1, -228, 0, 50),
+            Position = UDim2.new(0, -10, 0.5, 18),
             TextTransparency = 1,
             TextStrokeTransparency = 1,
         }):Play()

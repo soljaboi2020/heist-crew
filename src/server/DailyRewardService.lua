@@ -114,10 +114,16 @@ function DailyRewardService:status(player)
     local d = PlayerData and PlayerData:getData(player)
     if not d then return reply(false, nil, "Loading your save...") end
     local c = compute(d, os.time())
+    local r
     if c.claimable then
-        return reply(true, c, string.format("DAY %d — %s — CLAIM!", c.day, money(c.amount)))
+        r = reply(true, c, string.format("DAY %d — %s — CLAIM!", c.day, money(c.amount)))
+    else
+        r = reply(true, c, "Next reward in " .. fmtWait(c.secondsLeft))
     end
-    return reply(true, c, "Next reward in " .. fmtWait(c.secondsLeft))
+    -- (v2.1) tell the client up front when the save didn't load (Studio without API access)
+    local okF, failed = pcall(function() return PlayerData.loadFailed and PlayerData:loadFailed(player) end)
+    r.saveFailed = okF and failed == true or false
+    return r
 end
 
 function DailyRewardService:claim(player)

@@ -1,11 +1,17 @@
 --[[
-    HEIST CREW — TipHud  (v1.1)
+    HEIST CREW — TipHud  (v1.1, v2.1 UI overhaul)
     ────────────────────────────────────────────────
     First-run coaching from the Boss. Only while the player is a "Rookie"
     (server attribute: hasn't finished a heist yet). Each tip shows ONCE per
-    session, at the moment it's useful, in a card on the left side of the
-    screen (clear of every other HUD). Dismiss with the ✕ or it fades after
-    a while.
+    session, at the moment it's useful.
+
+    v2.1 (Malachi: the tip card was hard to read + sat on top of other cards):
+      • lives in the UITheme "left" slot — nothing else goes there, so it can't
+        overlap anything
+      • tips are SHORT (one line of heading, one short sentence)
+      • ONE at a time: a new tip waits in a queue until the current one is
+        gone; urgent ones (alarm / spotted / jail) jump the queue
+      • auto-dismiss after 7 s (or the ✕)
 
     Triggers: joining (after the IntroCam fly-over, if it plays) · first time
     standing in a heist door · first run starting · first time being spotted ·
@@ -20,101 +26,148 @@ local TweenService = game:GetService("TweenService")
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local T = UITheme.C
+local I = UITheme.ICON
 
 local TipHud = {}
 local localPlayer = Players.LocalPlayer
 
+local SHOW_TIME = 7
+local GAP_TIME = 0.8
+local URGENT = { alarm = true, spotted = true, jail = true }
+
 local TIPS = {
-    welcome = { "Welcome to The Vault!", "1. Stand on a colored circle to pick a role (you can skip this).\n2. Talk to the Boss (press F) to hear the plan.\n3. Walk into a heist door to start!" },
-    portal  = { "Heist door", "Stay in the glowing square. When your crew is in too, the heist starts!" },
-    jail    = { "Busted!", "The police got you. A friend can hold E at your cell door to break you out." },
-    start   = { "You're in!", "You snuck in! Stay out of flashlights and red camera beams, or you'll get caught." },
-    spotted = { "Someone sees you!", "Hide! If the meter fills up, the guard sends you back to the door." },
-    bag     = { "Heavy bag!", "Bags make you slow. Take it to the car and press E at the trunk. Or press G to throw it to a friend." },
-    trunk   = { "Load it up", "Hold E at the back of the car to put the bag in. Bags in the car = money at the end." },
-    alarm   = { "The alarm is on!", "Forget the rest! Jump in the car and drive to the marina before time runs out." },
-    drive   = { "You're driving", "Use WASD to drive. Follow the marker to the marina. Drivers: press Shift to go super fast." },
-    vault   = { "The vault", "Put the drill on the vault and stay close. If it gets stuck, hold E to fix it." },
-    lasers  = { "Lasers!", "The red beams blink on and off. Walk through when they're off." },
+    welcome = { "Welcome to The Vault!", "Follow the gold bar at the top. It always says what to do next.", I.boss },
+    portal  = { "Heist door", "Stay here. When your crew is in too, the heist starts!", I.door },
+    jail    = { "Busted!", "A friend can hold E at your cell door to get you out.", I.jail },
+    start   = { "You're in!", "Stay out of flashlights and red camera beams.", I.eye },
+    spotted = { "They see you!", "Hide! If the meter fills up, you go back to the door.", I.eye },
+    bag     = { "Heavy bag!", "Take it to the car. G throws it to a friend.", I.bag },
+    trunk   = { "Load it up", "Hold E at the back of the car.", I.car },
+    alarm   = { "Alarm!", "Jump in the car and drive to the marina. Fast!", I.alarm },
+    drive   = { "You're driving", "Follow the marker to the boats.", I.car },
+    vault   = { "The vault", "Put the drill on it and stay close. Stuck? Hold E.", I.drill },
+    lasers  = { "Lasers!", "They blink. Walk through when they're off.", I.alarm },
 }
 
 function TipHud:_build()
     local pg = localPlayer:WaitForChild("PlayerGui")
     local old = pg:FindFirstChild("TipHud")
     if old then old:Destroy() end
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "TipHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.DisplayOrder = 6
-    screen.Parent = pg
 
     local card = Instance.new("CanvasGroup")
-    card.AnchorPoint = Vector2.new(0, 0.5)
-    card.Position = UDim2.new(0, 16, 0.5, 0)
-    card.Size = UDim2.fromOffset(320, 156)
+    card.Name = "BossTip"
+    card.LayoutOrder = 1
+    card.Size = UDim2.fromOffset(UITheme.L.TIP_W, 0)
+    card.AutomaticSize = Enum.AutomaticSize.Y
     card.BackgroundColor3 = T.bg
-    card.BackgroundTransparency = 0.12
+    card.BackgroundTransparency = 0.06
     card.GroupTransparency = 1
     card.Visible = false
-    card.Parent = screen
-    UITheme.corner(card, 14)
-    UITheme.stroke(card, T.gold, 0.6, 1)
-    local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(0, 4, 1, -24)
-    bar.Position = UDim2.fromOffset(12, 12)
-    bar.BackgroundColor3 = T.gold
-    bar.BorderSizePixel = 0
-    bar.Parent = card
-    UITheme.caption("The Boss says", { Position = UDim2.fromOffset(26, 12), Size = UDim2.new(1, -60, 0, 14),
-        TextColor3 = T.gold }).Parent = card
-    local head = UITheme.label({ Position = UDim2.fromOffset(26, 28), Size = UDim2.new(1, -44, 0, 22),
-        FontFace = UITheme.F.display, TextSize = 19 })
-    head.Parent = card
-    local body = UITheme.label({ Position = UDim2.fromOffset(26, 52), Size = UDim2.new(1, -40, 0, 94), TextWrapped = true,
-        TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium, TextSize = 14, TextColor3 = T.muted })
-    body.Parent = card
+    card.Parent = UITheme.slot("left")
+    UITheme.corner(card, 16)
+    UITheme.stroke(card, T.gold, 0.35, 2)
+    local g = Instance.new("UIGradient")
+    g.Rotation = 90
+    g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(160, 165, 180))
+    g.Parent = card
+    UITheme.padding(card, 12, 12)
+    local scale = Instance.new("UIScale")
+    scale.Parent = card
+
+    local badge = UITheme.badge(I.boss, T.gold, 44)
+    badge.Parent = card
+    local col = Instance.new("Frame")
+    col.BackgroundTransparency = 1
+    col.Position = UDim2.fromOffset(54, 0)
+    col.Size = UDim2.new(1, -54, 0, 0)
+    col.AutomaticSize = Enum.AutomaticSize.Y
+    col.Parent = card
+    local list = Instance.new("UIListLayout")
+    list.SortOrder = Enum.SortOrder.LayoutOrder
+    list.Padding = UDim.new(0, 2)
+    list.Parent = col
+    UITheme.caption("The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, -24, 0, 14), TextColor3 = T.gold }).Parent = col
+    local head = UITheme.label({ LayoutOrder = 2, Size = UDim2.new(1, -24, 0, 24), FontFace = UITheme.F.display,
+        TextSize = 20, TextTruncate = Enum.TextTruncate.AtEnd })
+    head.Parent = col
+    local body = UITheme.label({ LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium,
+        TextSize = UITheme.T.body, TextColor3 = T.text })
+    body.Parent = col
+
     local close = Instance.new("TextButton")
     close.AnchorPoint = Vector2.new(1, 0)
-    close.Position = UDim2.new(1, -8, 0, 6)
-    close.Size = UDim2.fromOffset(26, 26)
+    close.Position = UDim2.new(1, 4, 0, -4)
+    close.Size = UDim2.fromOffset(28, 28)
     close.BackgroundTransparency = 1
     close.Text = "✕"
     close.TextColor3 = T.muted
     close.FontFace = UITheme.F.bold
-    close.TextSize = 15
+    close.TextSize = 17
+    close.ZIndex = 3
     close.Parent = card
     close.Activated:Connect(function() self:_hide() end)
-    self._u = { card = card, head = head, body = body }
+    self._u = { card = card, head = head, body = body, badge = badge, scale = scale }
 end
 
 function TipHud:_hide()
-    local c = self._u.card
+    local u = self._u
+    if not self._showing then return end
+    self._showing = nil
+    self._token = {}
+    local c = u.card
     local out = TweenService:Create(c, TweenInfo.new(0.3), { GroupTransparency = 1 })
     out:Play()
-    out.Completed:Connect(function() if c.GroupTransparency > 0.95 then c.Visible = false end end)
+    out.Completed:Connect(function()
+        if not self._showing then c.Visible = false end
+    end)
+    task.delay(GAP_TIME, function() self:_next() end)
+end
+
+function TipHud:_next()
+    if self._showing then return end
+    local key = table.remove(self._queue, 1)
+    if key then self:_display(key) end
+end
+
+function TipHud:_display(key)
+    local tip = TIPS[key]
+    if not tip then return end
+    local u = self._u
+    self._showing = key
+    u.head.Text = tip[1]
+    u.body.Text = tip[2]
+    UITheme.setBadge(u.badge, tip[3] or I.boss, URGENT[key] and T.danger or T.gold)
+    u.card.Visible = true
+    u.card.GroupTransparency = 1
+    u.scale.Scale = 0.9
+    TweenService:Create(u.card, TweenInfo.new(0.3, Enum.EasingStyle.Quad), { GroupTransparency = 0 }):Play()
+    TweenService:Create(u.scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+    local token = {}
+    self._token = token
+    task.delay(SHOW_TIME, function() if self._token == token then self:_hide() end end)
 end
 
 function TipHud:show(key)
     if self._seen[key] then return end
     if not localPlayer:GetAttribute("Rookie") then return end
-    local tip = TIPS[key]
-    if not tip then return end
+    if not TIPS[key] then return end
     self._seen[key] = true
-    local u = self._u
-    u.head.Text = tip[1]
-    u.body.Text = tip[2]
-    u.card.Visible = true
-    u.card.GroupTransparency = 1
-    u.card.Position = UDim2.new(0, -20, 0.5, 0)
-    TweenService:Create(u.card, TweenInfo.new(0.35, Enum.EasingStyle.Quad), { GroupTransparency = 0, Position = UDim2.new(0, 16, 0.5, 0) }):Play()
-    local token = {}
-    self._token = token
-    task.delay(12, function() if self._token == token then self:_hide() end end)
+    if not self._showing then
+        self:_display(key)
+    elseif URGENT[key] and not URGENT[self._showing] then
+        -- urgent: swap straight in
+        table.insert(self._queue, 1, key)
+        self:_hide()
+    else
+        table.insert(self._queue, key)
+        while #self._queue > 3 do table.remove(self._queue, 1) end
+    end
 end
 
 function TipHud:start()
     self._seen = {}
+    self._queue = {}
     self:_build()
 
     -- v2.0: wait for the first-join fly-over (IntroCam) to finish first

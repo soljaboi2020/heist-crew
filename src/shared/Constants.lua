@@ -330,15 +330,48 @@ Constants.GEAR = {
 
 -- ───── Shop: masks (worn automatically when a job starts) ─────
 -- All are Roblox-made catalog accessories (InsertService can load them).
+-- (v2.0 masks agent) Every mask has a POWER while you wear it in a heist
+-- (MaskService). `ability.id` is what MaskService:has(player, id) checks and what
+-- the player attribute `MaskPower` holds (the HUD shows `name` + `desc`).
+-- Words are for a 7-year-old. Keep them that way.
 Constants.MASKS = {
-    { id = "Bandit",    assetId = 93050572,   name = "Bandit",          price = 0 },
-    { id = "Goalie",    assetId = 22151737,   name = "Goalie",          price = 1500 },
-    { id = "Owl",       assetId = 28944404,   name = "Night Owl",       price = 3000 },
-    { id = "Kitsune",   assetId = 3210207381, name = "Kitsune",         price = 5000 },
-    { id = "Pixel",     assetId = 1744163817, name = "8-Bit Skull",     price = 7500 },
-    { id = "Catrina",   assetId = 2528067691, name = "Catrina",         price = 10000 },
-    { id = "Mystery",   assetId = 125377979,  name = "Mystery",         price = 15000 },
-    { id = "Cyber",     assetId = 7466060125, name = "Cyber",           price = 25000 },
+    { id = "Bandit",    assetId = 93050572,   name = "Bandit",          price = 0,
+      ability = { id = "lucky",       name = "LUCKY",       desc = "+10% cash from every bag" } },
+    { id = "Goalie",    assetId = 22151737,   name = "Goalie",          price = 1500,
+      ability = { id = "toughguy",    name = "TOUGH GUY",   desc = "The first time a guard catches you, you break free!" } },
+    { id = "Owl",       assetId = 28944404,   name = "Night Owl",       price = 3000,
+      ability = { id = "nightvision", name = "NIGHT VISION", desc = "Dark spots hide you even better" } },
+    { id = "Kitsune",   assetId = 3210207381, name = "Kitsune",         price = 5000,
+      ability = { id = "foxspeed",    name = "FOX SPEED",   desc = "You run 20% faster" } },
+    { id = "Pixel",     assetId = 1744163817, name = "8-Bit Skull",     price = 7500,
+      ability = { id = "powerthrow",  name = "POWER THROW", desc = "Throw bags twice as far" } },
+    { id = "Catrina",   assetId = 2528067691, name = "Catrina",         price = 10000,
+      ability = { id = "ghost",       name = "GHOST",       desc = "Cameras take 2x longer to see you" } },
+    { id = "Mystery",   assetId = 125377979,  name = "Mystery",         price = 15000,
+      ability = { id = "surprise",    name = "SURPRISE!",   desc = "A random power every heist!" } },
+    { id = "Cyber",     assetId = 7466060125, name = "Cyber",           price = 25000,
+      ability = { id = "hackchip",    name = "HACK CHIP",   desc = "Cut cameras and hack keypads 2x faster" } },
+}
+
+-- Tuning for the mask powers (MaskService + the small hooks in Guard/Security/Loot/JobService)
+Constants.MASK_POWERS = {
+    LUCKY_BONUS      = 0.10,   -- lucky: +10% of the crew's take, paid to you on top
+    NIGHT_SHADOW     = 2.0,    -- nightvision: shadow zones slow guards 2x (normal 1.6x)
+    FOX_SPEED        = 1.20,   -- foxspeed: WalkSpeed x1.2 (attribute SpeedMult)
+    THROW_MULT       = 2.0,    -- powerthrow: bag flies twice as far
+    GHOST_CAMERA     = 0.5,    -- ghost: camera meter fills at half speed (2x longer)
+    HACK_SPEED       = 2.0,    -- hackchip: breaker + keypad holds finish in half the time
+}
+
+-- ───── Robux → cash packs (Developer Products, RobuxService) ─────
+-- ⚠️ productId 0 = NOT CREATED YET (the pack is hidden / can't be bought).
+-- How to create them: see the header of src/server/RobuxService.lua.
+-- Developer Products created 2026-09-25 on universe 10127256584 (Open Cloud, key in ~/.claude/roblox-opencloud-key)
+Constants.ROBUX_PACKS = {
+    { id = "small",  name = "Pocket Cash",  cash = 5000,   robux = 25,  productId = 3714635306 },
+    { id = "medium", name = "Bag of Cash",  cash = 30000,  robux = 99,  productId = 3714635777 },
+    { id = "large",  name = "Cash Stack",   cash = 100000, robux = 249, productId = 3714635779 },
+    { id = "huge",   name = "Money Truck",  cash = 500000, robux = 799, productId = 3714635781 },
 }
 
 -- ───── Trophy room (v1.2): unlocks by the best heistsCompleted in the server ─────

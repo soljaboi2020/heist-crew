@@ -1,30 +1,33 @@
 --[[
     HEIST CREW — JobHud
     ────────────────────────────────────────────────
-    v1.0 (2026-09-25). "THE JOB" card, top-right, directly under the cash card:
+    v1.0 (2026-09-25), v2.1 UI overhaul. "THE JOB" card, second card in the
+    topRight slot (right under the cash card):
 
-        THE JOB                        LIVE
-        VILLA ROSA
-        (o) Cut the cameras   optional
-        (v) ~~Find the keycard~~
-        ( ) Crack the vault
+        [🎯] THE JOB · 2 OF 5 DONE        LIVE  ▾
+             VILLA ROSA
+        (o) Find the keycard              ← only the NEXT 3 unfinished steps,
+        ( ) Open the locked door             the first one bold (it's also in
+        ( ) Crack the vault                  the big objective bar up top)
+            +2 more
         ─────────────────────────────────
-        TAKE                          BAGS
-        $4,500                       3 / 6
-        [ ALARM 0:42 ]  [ SILENT ALARM ]
+        MONEY                        BAGS
+        $4,500                      3 / 6
+        [ ALARM 0:42 ]  [ SECRET ALARM ]
         ─────────────────────────────────
         LVL 4                 320 / 1,600 XP
         ▬▬▬▬▬▬▬───────────────────────────
 
-    Collapses to "Next heist: VILLA ROSA" + the level line while the job is
-    IDLE. Everything animates: steps pop when they complete, the take rolls
-    up, the XP bar slides, and a LEVEL UP flash plays when Level goes up.
+    COLLAPSIBLE: click / tap the header (or press J) to fold it down to the
+    header + money row. Starts folded on phones (the objective bar already
+    says the next step). A finished step flashes green, then leaves the list.
 
-    v2.0: works for every job in Constants.JOBS (mart / villa / jewelry / bank —
-    the server only sends the steps a job has). A red JAIL box shows while
-    you're in a cell ("In jail — a teammate can break you out  0:24"), and your
-    crew sees "Bob is in jail — go break them out!". Bot crewmates are listed
-    under the job name.
+    Idle (no run): "Next heist: VILLA ROSA" + the level line.
+
+    v2.0: works for every job in Constants.JOBS. A red JAIL box shows while
+    you're in a cell ("In jail — a teammate can break you out  0:24"), your
+    crew sees "Bob is in jail — go break them out!", and bot crewmates are
+    listed under the job name.
 
     Listens to:
         JobInfo remote (spec §5, + v2 fields jailed = {names}, bots = {names})
@@ -40,18 +43,23 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local T = UITheme.C
+local I = UITheme.ICON
+local L = UITheme.L
 
 local JobHud = {}
 local localPlayer = Players.LocalPlayer
 
-local WIDTH = 240
-local TOP = 88            -- cash card is y 14..76; its "+$X" delta drifts to ~y 96 and fades
-local CIRCLE = 16
+local WIDTH = L.JOB_W
+local CIRCLE = 18
+local SHOW_STEPS = 3          -- only the next 3 unfinished steps are listed
+local DONE_FLASH = 0.9        -- a finished step stays (green) this long before it leaves
+local TOGGLE_ACTION = "HC_JobToggle"
 
 local JOB_NAME = {}
 for _, j in ipairs(Constants.JOBS or {}) do JOB_NAME[j.id] = j.name end
@@ -82,25 +90,25 @@ local function frame(props)
     local f = Instance.new("Frame")
     f.BackgroundTransparency = 1
     f.BorderSizePixel = 0
-    for k, v in pairs(props or {}) do f[k] = v end
+    for k, v in pairs(props or {}) do (f :: any)[k] = v end
     return f
 end
 
 local function hairline(order)
     return frame({ Name = "Divider", LayoutOrder = order, Size = UDim2.new(1, 0, 0, 1),
-        BackgroundColor3 = T.line, BackgroundTransparency = 0.9 })
+        BackgroundColor3 = T.line, BackgroundTransparency = 0.88 })
 end
 
--- A small rounded chip with a dot + text. Returns chip, dot, label, (timer label).
+-- A rounded chip with a dot + text. Returns chip, dot, label, (timer label).
 local function makeChip(color, text, withTimer, order)
-    local chip = frame({ Name = "Chip", LayoutOrder = order, Size = UDim2.fromOffset(0, 26),
-        AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = color, BackgroundTransparency = 0.82,
+    local chip = frame({ Name = "Chip", LayoutOrder = order, Size = UDim2.fromOffset(0, 30),
+        AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = color, BackgroundTransparency = 0.8,
         Visible = false })
-    UITheme.corner(chip, 13)
-    UITheme.stroke(chip, color, 0.45)
+    UITheme.corner(chip, 15)
+    UITheme.stroke(chip, color, 0.3, 1.5)
     local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 9)
-    pad.PaddingRight = UDim.new(0, 11)
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 12)
     pad.Parent = chip
     local row = Instance.new("UIListLayout")
     row.FillDirection = Enum.FillDirection.Horizontal
@@ -108,17 +116,17 @@ local function makeChip(color, text, withTimer, order)
     row.SortOrder = Enum.SortOrder.LayoutOrder
     row.Padding = UDim.new(0, 6)
     row.Parent = chip
-    local dot = frame({ LayoutOrder = 1, Size = UDim2.fromOffset(7, 7), BackgroundColor3 = color,
+    local dot = frame({ LayoutOrder = 1, Size = UDim2.fromOffset(8, 8), BackgroundColor3 = color,
         BackgroundTransparency = 0 })
     UITheme.corner(dot, 4)
     dot.Parent = chip
     local label = UITheme.label({ LayoutOrder = 2, Text = text, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 26), FontFace = UITheme.F.bold, TextSize = 12, TextColor3 = color })
+        Size = UDim2.fromOffset(0, 30), FontFace = UITheme.F.display, TextSize = 14, TextColor3 = color })
     label.Parent = chip
     local timer
     if withTimer then
         timer = UITheme.label({ LayoutOrder = 3, Text = "0:00", AutomaticSize = Enum.AutomaticSize.X,
-            Size = UDim2.fromOffset(0, 26), FontFace = UITheme.F.mono, TextSize = 13, TextColor3 = T.text })
+            Size = UDim2.fromOffset(0, 30), FontFace = UITheme.F.mono, TextSize = 15, TextColor3 = T.text })
         timer.Parent = chip
     end
     return chip, dot, label, timer
@@ -134,7 +142,7 @@ local function makeCircle(parent)
     local disc = frame({ Name = "Disc", Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.money })
     UITheme.corner(disc, CIRCLE)
     disc.Parent = holder
-    local ring = UITheme.stroke(disc, T.muted, 0.25, 1.5)
+    local ring = UITheme.stroke(disc, T.muted, 0.25, 2)
 
     -- dashed ring for optional steps: 8 short dots around the edge
     local dashes = frame({ Name = "Dashes", Size = UDim2.fromScale(1, 1), Visible = false })
@@ -154,12 +162,12 @@ local function makeCircle(parent)
     check.Parent = holder
     local k = CIRCLE / 14
     local short = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(2, 4.5 * k),
-        Position = UDim2.fromOffset(4.75 * k, 8.6 * k), Rotation = -45, BackgroundColor3 = T.bg,
+        Position = UDim2.fromOffset(4.75 * k, 8.6 * k), Rotation = -45, BackgroundColor3 = T.bgDeep,
         BackgroundTransparency = 0 })
     UITheme.corner(short, 1)
     short.Parent = check
     local long = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(2, 8 * k),
-        Position = UDim2.fromOffset(8.3 * k, 7.2 * k), Rotation = 39, BackgroundColor3 = T.bg,
+        Position = UDim2.fromOffset(8.3 * k, 7.2 * k), Rotation = 39, BackgroundColor3 = T.bgDeep,
         BackgroundTransparency = 0 })
     UITheme.corner(long, 1)
     long.Parent = check
@@ -167,7 +175,7 @@ local function makeCircle(parent)
     return { holder = holder, scale = scale, disc = disc, ring = ring, dashes = dashes, check = check }
 end
 
-local function paintCircle(c, done, optional)
+local function paintCircle(c, done, optional, current)
     if done then
         c.disc.BackgroundTransparency = 0
         c.ring.Transparency = 1
@@ -180,7 +188,8 @@ local function paintCircle(c, done, optional)
         c.check.Visible = false
     else
         c.disc.BackgroundTransparency = 1
-        c.ring.Transparency = 0.25
+        c.ring.Transparency = current and 0 or 0.3
+        c.ring.Color = current and T.gold or T.muted
         c.dashes.Visible = false
         c.check.Visible = false
     end
@@ -191,15 +200,9 @@ local function stepText(step)
     if step.done then
         return "<s>" .. label .. "</s>"
     elseif step.optional then
-        return string.format('%s  <font size="12" color="%s">optional</font>', label, hex(T.faint))
+        return string.format('%s  <font size="13" color="%s">(extra)</font>', label, hex(T.faint))
     end
     return label
-end
-
-local function stepColor(step)
-    if step.done then return T.muted end
-    if step.optional then return T.muted end
-    return T.text
 end
 
 -- ── build ──────────────────────────────────────────────────────────────
@@ -208,57 +211,65 @@ function JobHud:_buildUi()
     local existing = playerGui:FindFirstChild("JobHud")
     if existing then existing:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "JobHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = playerGui
-
-    local card = UITheme.panel({
+    local card = UITheme.card({
         Name = "JobCard",
-        AnchorPoint = Vector2.new(1, 0),
-        Position = UDim2.new(1, -16, 0, TOP),
+        LayoutOrder = 2,
         Size = UDim2.fromOffset(WIDTH, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        radius = 14,
+        radius = 16,
     })
-    card.Parent = screen
+    card.Parent = UITheme.slot("topRight")
     local cardScale = Instance.new("UIScale")
     cardScale.Parent = card
     local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 16)
-    pad.PaddingRight = UDim.new(0, 16)
-    pad.PaddingTop = UDim.new(0, 12)
-    pad.PaddingBottom = UDim.new(0, 14)
+    pad.PaddingLeft = UDim.new(0, 14)
+    pad.PaddingRight = UDim.new(0, 14)
+    pad.PaddingTop = UDim.new(0, 10)
+    pad.PaddingBottom = UDim.new(0, 12)
     pad.Parent = card
     local list = Instance.new("UIListLayout")
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Padding = UDim.new(0, 8)
     list.Parent = card
 
-    -- 1. header: THE JOB ··· [READY]
-    local header = frame({ Name = "Header", LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 18) })
+    -- 1. header: [badge] THE JOB · x OF y DONE ··· [LIVE] [▾]   (the whole header toggles)
+    local header = frame({ Name = "Header", LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 40) })
     header.Parent = card
-    UITheme.caption("The job", { Size = UDim2.new(1, -70, 1, 0), TextSize = 12 }).Parent = header
-    local stage = UITheme.label({ Name = "Stage", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
-        Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, Text = "READY",
-        FontFace = UITheme.F.bold, TextSize = 12, TextColor3 = T.muted,
-        BackgroundColor3 = T.muted, BackgroundTransparency = 0.88 })
-    UITheme.corner(stage, 9)
+    local badge = UITheme.badge(I.target, T.gold, 36)
+    badge.AnchorPoint = Vector2.new(0, 0.5)
+    badge.Position = UDim2.new(0, 0, 0.5, 0)
+    badge.Parent = header
+    local cap = UITheme.caption("The job", { Position = UDim2.fromOffset(46, 1), Size = UDim2.new(1, -110, 0, 14),
+        TextSize = 12 })
+    cap.Parent = header
+    local name = UITheme.label({ Name = "JobName", RichText = true, Position = UDim2.fromOffset(46, 15),
+        Size = UDim2.new(1, -110, 0, 24), FontFace = UITheme.F.display, TextSize = 19,
+        TextTruncate = Enum.TextTruncate.AtEnd, Text = "" })
+    name.Parent = header
+    local stage = UITheme.label({ Name = "Stage", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -28, 0.5, 0),
+        Size = UDim2.fromOffset(0, 22), AutomaticSize = Enum.AutomaticSize.X, Text = "READY",
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 12, TextColor3 = T.muted,
+        BackgroundColor3 = T.muted, BackgroundTransparency = 0.85 })
+    UITheme.corner(stage, 11)
     local sp = Instance.new("UIPadding")
-    sp.PaddingLeft = UDim.new(0, 8)
-    sp.PaddingRight = UDim.new(0, 8)
+    sp.PaddingLeft = UDim.new(0, 9)
+    sp.PaddingRight = UDim.new(0, 9)
     sp.Parent = stage
     stage.Parent = header
+    local chevron = UITheme.label({ Name = "Chevron", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.fromOffset(22, 22), Text = "▾", TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.bold, TextSize = 18, TextColor3 = T.muted })
+    chevron.Parent = header
+    local hit = Instance.new("TextButton")
+    hit.Name = "Toggle"
+    hit.Text = ""
+    hit.BackgroundTransparency = 1
+    hit.Size = UDim2.fromScale(1, 1)
+    hit.ZIndex = 5
+    hit.Parent = header
+    hit.Activated:Connect(function() self:_toggle() end)
 
-    -- 2. job name
-    local name = UITheme.label({ Name = "JobName", LayoutOrder = 2, RichText = true, Size = UDim2.new(1, 0, 0, 24),
-        FontFace = UITheme.F.display, TextSize = 20, TextTruncate = Enum.TextTruncate.AtEnd, Text = "" })
-    name.Parent = card
-
-    -- 3. steps
-    -- 3. v2.0 notes: jail box / crew-in-jail line / bot crew line
+    -- 2. v2.0 notes: jail box / crew-in-jail line / bot crew line
     local notes = frame({ Name = "Notes", LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y, Visible = false })
     notes.Parent = card
@@ -269,7 +280,7 @@ function JobHud:_buildUi()
     local jailBox = frame({ Name = "JailBox", LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.danger, BackgroundTransparency = 0.8, Visible = false })
     UITheme.corner(jailBox, 10)
-    UITheme.stroke(jailBox, T.danger, 0.4)
+    UITheme.stroke(jailBox, T.danger, 0.3, 1.5)
     local jp = Instance.new("UIPadding")
     jp.PaddingLeft = UDim.new(0, 10)
     jp.PaddingRight = UDim.new(0, 10)
@@ -277,54 +288,61 @@ function JobHud:_buildUi()
     jp.PaddingBottom = UDim.new(0, 6)
     jp.Parent = jailBox
     jailBox.Parent = notes
-    local jailTitle = UITheme.label({ Name = "Title", Size = UDim2.new(1, -44, 0, 20), Text = "IN JAIL",
-        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.danger })
+    local jailTitle = UITheme.label({ Name = "Title", Size = UDim2.new(1, -50, 0, 22), Text = "IN JAIL",
+        FontFace = UITheme.F.display, TextSize = 18, TextColor3 = T.danger })
     jailTitle.Parent = jailBox
     local jailTimer = UITheme.label({ Name = "Timer", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-        Size = UDim2.fromOffset(44, 20), TextXAlignment = Enum.TextXAlignment.Right, Text = "0:30",
-        FontFace = UITheme.F.mono, TextSize = 15, TextColor3 = T.text })
+        Size = UDim2.fromOffset(50, 22), TextXAlignment = Enum.TextXAlignment.Right, Text = "0:30",
+        FontFace = UITheme.F.mono, TextSize = 17, TextColor3 = T.text })
     jailTimer.Parent = jailBox
-    local jailHint = UITheme.label({ Name = "Hint", Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, 0, 0, 16),
+    local jailHint = UITheme.label({ Name = "Hint", Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 18),
         AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, Text = "A teammate can break you out!",
-        FontFace = UITheme.F.medium, TextSize = 13, TextColor3 = T.text })
+        FontFace = UITheme.F.medium, TextSize = 15, TextColor3 = T.text })
     jailHint.Parent = jailBox
-    local crewJail = UITheme.label({ Name = "CrewJail", LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16),
+    local crewJail = UITheme.label({ Name = "CrewJail", LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 18),
         AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, RichText = true, Visible = false,
-        FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.danger, Text = "" })
+        FontFace = UITheme.F.bold, TextSize = 15, TextColor3 = T.danger, Text = "" })
     crewJail.Parent = notes
     local botLine = UITheme.label({ Name = "Bots", LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 16),
         AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, RichText = true, Visible = false,
-        FontFace = UITheme.F.medium, TextSize = 12, TextColor3 = T.muted, Text = "" })
+        FontFace = UITheme.F.medium, TextSize = 14, TextColor3 = T.muted, Text = "" })
     botLine.Parent = notes
 
-    -- 4. steps
+    -- 4. steps (the next 3) + "+N more"
     local steps = frame({ Name = "Steps", LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y })
     steps.Parent = card
     local sl = Instance.new("UIListLayout")
     sl.SortOrder = Enum.SortOrder.LayoutOrder
-    sl.Padding = UDim.new(0, 6)
+    sl.Padding = UDim.new(0, 7)
     sl.Parent = steps
+    local more = UITheme.label({ Name = "More", LayoutOrder = 999, Size = UDim2.new(1, 0, 0, 16),
+        Position = UDim2.fromOffset(CIRCLE + 10, 0), FontFace = UITheme.F.bold, TextSize = 13,
+        TextColor3 = T.faint, Visible = false })
+    local morePad = Instance.new("UIPadding")
+    morePad.PaddingLeft = UDim.new(0, CIRCLE + 10)
+    morePad.Parent = more
+    more.Parent = steps
 
     local takeDivider = hairline(5)
     takeDivider.Parent = card
 
     -- 6. take + bags
-    local takeRow = frame({ Name = "Take", LayoutOrder = 6, Size = UDim2.new(1, 0, 0, 42) })
+    local takeRow = frame({ Name = "Take", LayoutOrder = 6, Size = UDim2.new(1, 0, 0, 46) })
     takeRow.Parent = card
-    UITheme.caption("Money", { Size = UDim2.new(0.6, 0, 0, 14), TextSize = 12 }).Parent = takeRow
-    local take = UITheme.label({ Name = "Amount", Position = UDim2.fromOffset(0, 14), Size = UDim2.new(0.65, 0, 0, 28),
-        FontFace = UITheme.F.display, TextSize = 24, TextColor3 = T.money, Text = "$0" })
+    UITheme.caption("Money", { Size = UDim2.new(0.6, 0, 0, 14) }).Parent = takeRow
+    local take = UITheme.label({ Name = "Amount", Position = UDim2.fromOffset(0, 14), Size = UDim2.new(0.65, 0, 0, 32),
+        FontFace = UITheme.F.display, TextSize = 27, TextColor3 = T.money, Text = "$0" })
     take.Parent = takeRow
     UITheme.caption("Bags", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-        Size = UDim2.new(0.35, 0, 0, 14), TextSize = 12, TextXAlignment = Enum.TextXAlignment.Right }).Parent = takeRow
+        Size = UDim2.new(0.35, 0, 0, 14), TextXAlignment = Enum.TextXAlignment.Right }).Parent = takeRow
     local bags = UITheme.label({ Name = "Bags", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 14),
-        Size = UDim2.new(0.35, 0, 0, 28), TextXAlignment = Enum.TextXAlignment.Right, RichText = true,
-        FontFace = UITheme.F.mono, TextSize = 18, Text = "0 / 0" })
+        Size = UDim2.new(0.35, 0, 0, 32), TextXAlignment = Enum.TextXAlignment.Right, RichText = true,
+        FontFace = UITheme.F.display, TextSize = 22, Text = "0 / 0" })
     bags.Parent = takeRow
 
     -- 7. alarm chips
-    local chips = frame({ Name = "Chips", LayoutOrder = 7, Size = UDim2.new(1, 0, 0, 26), Visible = false })
+    local chips = frame({ Name = "Chips", LayoutOrder = 7, Size = UDim2.new(1, 0, 0, 30), Visible = false })
     chips.Parent = card
     local cl = Instance.new("UIListLayout")
     cl.FillDirection = Enum.FillDirection.Horizontal
@@ -341,36 +359,38 @@ function JobHud:_buildUi()
     levelDivider.Parent = card
 
     -- 9. level + XP bar
-    local levelRow = frame({ Name = "Level", LayoutOrder = 9, Size = UDim2.new(1, 0, 0, 28) })
+    local levelRow = frame({ Name = "Level", LayoutOrder = 9, Size = UDim2.new(1, 0, 0, 30) })
     levelRow.Parent = card
-    local lvl = UITheme.label({ Name = "Lvl", RichText = true, Size = UDim2.new(0.5, 0, 0, 18),
-        FontFace = UITheme.F.display, TextSize = 16, Text = "" })
+    local lvl = UITheme.label({ Name = "Lvl", RichText = true, Size = UDim2.new(0.5, 0, 0, 20),
+        FontFace = UITheme.F.display, TextSize = 18, Text = "" })
     lvl.Parent = levelRow
     local lvlScale = Instance.new("UIScale")
     lvlScale.Parent = lvl
     local xp = UITheme.label({ Name = "XP", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-        Size = UDim2.new(0.6, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Right,
-        FontFace = UITheme.F.medium, TextSize = 12, TextColor3 = T.muted, Text = "" })
+        Size = UDim2.new(0.6, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Right,
+        FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.muted, Text = "" })
     xp.Parent = levelRow
     local flash = UITheme.label({ Name = "LevelUp", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
-        Size = UDim2.new(0.6, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Right,
-        FontFace = UITheme.F.display, TextSize = 14, TextColor3 = T.gold, Text = "LEVEL UP", TextTransparency = 1 })
+        Size = UDim2.new(0.6, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Right,
+        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.gold, Text = "LEVEL UP!", TextTransparency = 1 })
     flash.Parent = levelRow
-    local track = frame({ Name = "Track", Position = UDim2.fromOffset(0, 23), Size = UDim2.new(1, 0, 0, 4),
-        BackgroundColor3 = T.line, BackgroundTransparency = 0.88 })
-    UITheme.corner(track, 2)
+    local track = frame({ Name = "Track", Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 6),
+        BackgroundColor3 = T.line, BackgroundTransparency = 0.86 })
+    UITheme.corner(track, 3)
     track.Parent = levelRow
     local fill = frame({ Name = "Fill", Size = UDim2.fromScale(0, 1), BackgroundColor3 = T.info, BackgroundTransparency = 0 })
-    UITheme.corner(fill, 2)
+    UITheme.corner(fill, 3)
     fill.Parent = track
     local fg = Instance.new("UIGradient")
     fg.Color = ColorSequence.new(T.info, T.info:Lerp(T.text, 0.35))
     fg.Parent = fill
 
-    self._screen, self._card, self._cardScale = screen, card, cardScale
-    self._cardStroke = card:FindFirstChildOfClass("UIStroke")
-    self._stage, self._name, self._steps = stage, name, steps
+    self._card, self._cardScale = card, cardScale
+    self._cardStroke = card:FindFirstChild("Stroke")
+    self._badge, self._cap, self._chevron = badge, cap, chevron
+    self._stage, self._name, self._steps, self._more = stage, name, steps, more
     self._takeDivider, self._takeRow, self._take, self._bags = takeDivider, takeRow, take, bags
+    self._levelDivider, self._levelRow = levelDivider, levelRow
     self._chips = chips
     self._alarmChip, self._alarmDot, self._alarmTimer = alarmChip, alarmDot, alarmTimer
     self._silentChip, self._silentDot = silentChip, silentDot
@@ -386,28 +406,35 @@ function JobHud:_buildUi()
     end)
 end
 
+-- ── collapse ───────────────────────────────────────────────────────────
+function JobHud:_toggle()
+    self._collapsed = not self._collapsed
+    self._cardScale.Scale = 0.97
+    tween(self._cardScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+    self:_render(self._info)
+end
+
 -- ── steps ──────────────────────────────────────────────────────────────
 function JobHud:_buildRows(steps)
     for _, r in pairs(self._rows) do r.row:Destroy() end
     self._rows, self._rowOrder = {}, {}
+    self._flashUntil = {}
     for i, step in ipairs(steps) do
         local key = tostring(step.id or i)
-        local row = frame({ Name = "Step_" .. key, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 20),
-            AutomaticSize = Enum.AutomaticSize.Y })
+        local row = frame({ Name = "Step_" .. key, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 22),
+            AutomaticSize = Enum.AutomaticSize.Y, Visible = false })
         row.Parent = self._steps
         local c = makeCircle(row)
-        local label = UITheme.label({ RichText = true, Position = UDim2.fromOffset(CIRCLE + 9, 0),
-            Size = UDim2.new(1, -(CIRCLE + 9), 0, 20), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true,
-            FontFace = UITheme.F.medium, TextSize = 14 })
+        local label = UITheme.label({ RichText = true, Position = UDim2.fromOffset(CIRCLE + 10, 0),
+            Size = UDim2.new(1, -(CIRCLE + 10), 0, 22), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true,
+            FontFace = UITheme.F.medium, TextSize = UITheme.T.body })
         label.Parent = row
-        paintCircle(c, step.done, step.optional)
-        label.Text = stepText(step)
-        label.TextColor3 = stepColor(step)
         self._rows[key] = { row = row, circle = c, label = label, done = step.done and true or false }
         table.insert(self._rowOrder, key)
     end
 end
 
+-- show only: the next SHOW_STEPS unfinished steps (+ any step that JUST finished, briefly)
 function JobHud:_renderSteps(steps)
     steps = type(steps) == "table" and steps or {}
     local same = #steps == #self._rowOrder
@@ -419,28 +446,68 @@ function JobHud:_renderSteps(steps)
             end
         end
     end
-    if not same then
-        self:_buildRows(steps)
-        return
-    end
+    local fresh = not same
+    if fresh then self:_buildRows(steps) end
+
+    local now = os.clock()
+    local shown, remaining, firstOpen = 0, 0, nil
     for i, step in ipairs(steps) do
-        local r = self._rows[tostring(step.id or i)]
+        local key = tostring(step.id or i)
+        local r = self._rows[key]
         local done = step.done and true or false
-        r.label.Text = stepText(step)
-        paintCircle(r.circle, done, step.optional)
-        if done and not r.done then
-            -- quick pop: the disc springs in, the label flashes green then settles to muted
+        if done and not r.done and not fresh then
+            -- just finished: pop the disc, flash the label green, then drop out of the list
+            self._flashUntil[key] = now + DONE_FLASH
             r.circle.scale.Scale = 0.35
             tween(r.circle.scale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
-            r.label.TextColor3 = T.money
-            task.delay(0.35, function()
-                if r.label.Parent then tween(r.label, 0.6, { TextColor3 = stepColor(step) }) end
+            task.delay(DONE_FLASH + 0.05, function()
+                if self._rows[key] == r then self:_renderSteps(self._info and self._info.steps) end
             end)
-        else
-            r.label.TextColor3 = stepColor(step)
         end
         r.done = done
+        local flashing = done and (self._flashUntil[key] or 0) > now
+        local visible = false
+        if flashing then
+            visible = true
+        elseif not done then
+            remaining = remaining + 1
+            if shown < SHOW_STEPS then
+                shown = shown + 1
+                visible = true
+            end
+        end
+        local current = false
+        if visible and not done and not step.optional and not firstOpen then
+            firstOpen = key
+            current = true
+        end
+        r.row.Visible = visible
+        r.label.Text = stepText(step)
+        paintCircle(r.circle, done, step.optional, current)
+        if flashing then
+            r.label.TextColor3 = T.money
+            r.label.FontFace = UITheme.F.bold
+        elseif current then
+            r.label.TextColor3 = T.text
+            r.label.FontFace = UITheme.F.bold
+        else
+            r.label.TextColor3 = T.muted
+            r.label.FontFace = UITheme.F.medium
+        end
     end
+    local extra = remaining - shown
+    self._more.Visible = extra > 0
+    self._more.Text = string.format("+%d more", extra)
+
+    -- header caption: progress
+    local total, doneN = 0, 0
+    for _, step in ipairs(steps) do
+        if not step.optional then
+            total = total + 1
+            if step.done then doneN = doneN + 1 end
+        end
+    end
+    self._cap.Text = total > 0 and string.format("THE JOB  ·  %d OF %d DONE", doneN, total) or "THE JOB"
 end
 
 -- ── alarm chips ────────────────────────────────────────────────────────
@@ -482,10 +549,10 @@ function JobHud:_setSilent(on)
     self._silentChip.Visible = on
     if not on then return end
     -- a slow amber "breathe" — no countdown, the crew doesn't know when police roll
-    self._silentChip.BackgroundTransparency = 0.88
+    self._silentChip.BackgroundTransparency = 0.85
     self._silentDot.BackgroundTransparency = 0
     local info = TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
-    local a = TweenService:Create(self._silentChip, info, { BackgroundTransparency = 0.62 })
+    local a = TweenService:Create(self._silentChip, info, { BackgroundTransparency = 0.6 })
     local b = TweenService:Create(self._silentDot, info, { BackgroundTransparency = 0.75 })
     a:Play()
     b:Play()
@@ -505,32 +572,35 @@ function JobHud:_render(info)
     local active = info.stage == "ACTIVE"
     local wasActive = self._active
     self._active = active
+    local collapsed = self._collapsed == true
 
     local jobName = self:_jobName(info)
     if active then
-        self._name.TextSize = 20
-        self._name.FontFace = UITheme.F.display
         self._name.Text = esc(jobName or "THE JOB")
+        self._name.TextColor3 = T.text
         self._stage.Text = "LIVE"
         self._stage.TextColor3 = T.gold
         self._stage.BackgroundColor3 = T.gold
+        UITheme.setBadge(self._badge, I.target, T.gold)
     else
-        self._name.TextSize = 16
-        self._name.FontFace = UITheme.F.bold
+        self._cap.Text = "NEXT HEIST"
         if jobName then
-            self._name.Text = string.format('<font color="%s">Next heist:</font> %s',
-                hex(T.muted), esc(jobName))
+            self._name.Text = esc(jobName)
         else
             self._name.Text = string.format('<font color="%s">Pick a heist</font>', hex(T.muted))
         end
         self._stage.Text = "READY"
         self._stage.TextColor3 = T.muted
         self._stage.BackgroundColor3 = T.muted
+        UITheme.setBadge(self._badge, I.door, T.muted)
     end
+    self._chevron.Text = collapsed and "◂" or "▾"
 
-    self._steps.Visible = active
-    self._takeDivider.Visible = active
+    self._steps.Visible = active and not collapsed
+    self._takeDivider.Visible = active and not collapsed
     self._takeRow.Visible = active
+    self._levelDivider.Visible = not collapsed or not active
+    self._levelRow.Visible = not collapsed or not active
 
     if active then
         self:_renderSteps(info.steps)
@@ -564,10 +634,10 @@ function JobHud:_render(info)
     self._chips.Visible = active and (self._alarmOn or self._silentOn) or false
     self:_renderNotes(info, active)
 
-    -- stroke goes red while the alarm is live
+    -- outline goes red while the alarm is live
     if self._cardStroke and not self._levelFlashing then
-        self._cardStroke.Color = self._alarmOn and T.danger or T.line
-        self._cardStroke.Transparency = self._alarmOn and 0.45 or 0.88
+        self._cardStroke.Color = self._alarmOn and T.danger or T.edge
+        self._cardStroke.Transparency = self._alarmOn and 0.1 or 0.2
     end
 
     if wasActive ~= nil and wasActive ~= active then
@@ -601,9 +671,9 @@ function JobHud:_renderNotes(info, active)
     else
         self._crewJail.Visible = false
     end
-    -- bot crewmates
+    -- bot crewmates (hidden when folded)
     local bots = nameList(info.bots)
-    if active and #bots > 0 then
+    if active and #bots > 0 and not self._collapsed then
         self._botLine.Text = string.format('<font color="%s">Bot crew:</font> %s  <font color="%s">(E = give bag)</font>',
             hex(T.muted), table.concat(bots, ", "), hex(T.faint))
         self._botLine.Visible = true
@@ -686,7 +756,7 @@ function JobHud:_levelUp(ratio)
     tween(self._lvlScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
     if self._cardStroke then
         self._cardStroke.Color = T.gold
-        self._cardStroke.Transparency = 0.2
+        self._cardStroke.Transparency = 0.1
     end
     self._cardScale.Scale = 1.04
     tween(self._cardScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
@@ -698,8 +768,8 @@ function JobHud:_levelUp(ratio)
         self._levelFlashing = false
         if self._cardStroke then
             tween(self._cardStroke, 0.8, {
-                Color = self._alarmOn and T.danger or T.line,
-                Transparency = self._alarmOn and 0.45 or 0.88,
+                Color = self._alarmOn and T.danger or T.edge,
+                Transparency = self._alarmOn and 0.1 or 0.2,
             })
         end
     end)
@@ -717,9 +787,16 @@ end
 
 -- ── start ──────────────────────────────────────────────────────────────
 function JobHud:start()
+    self._collapsed = UITheme.isTouch()     -- phones: the objective bar already says the next step
     self:_buildUi()
     self:_render(nil)
     self:_renderLevel(false)
+
+    ContextActionService:BindAction(TOGGLE_ACTION, function(_, state)
+        if state ~= Enum.UserInputState.Begin then return Enum.ContextActionResult.Pass end
+        self:_toggle()
+        return Enum.ContextActionResult.Sink
+    end, false, Enum.KeyCode.J)
 
     for _, attr in ipairs({ "Level", "XP", "XPNext" }) do
         localPlayer:GetAttributeChangedSignal(attr):Connect(function() self:_queueLevel() end)

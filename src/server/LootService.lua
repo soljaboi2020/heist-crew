@@ -69,6 +69,20 @@ local currentTrunk = nil
 
 local function track(c) table.insert(conns, c) return c end
 
+-- v2.0 mask powers (masks agent): optional MaskService lookup, never a hard require
+local maskSvc = nil
+local function maskHas(player, abilityId)
+    if maskSvc == nil then
+        local mod = script.Parent:FindFirstChild("MaskService")
+        local ok, r = false, nil
+        if mod then ok, r = pcall(require, mod) end
+        maskSvc = (ok and type(r) == "table" and type(r.has) == "function") and r or false
+    end
+    if not maskSvc then return false end
+    local ok, yes = pcall(maskSvc.has, maskSvc, player, abilityId)
+    return ok and yes == true
+end
+
 -- v2.0: any loot kind a builder names pays something (LOOT_DEFAULT), never nil
 local function info(kind)
     return Constants.LOOT[kind] or Constants.LOOT_DEFAULT or { value = 500, speed = 13, color = { 255, 255, 255 } }
@@ -123,13 +137,20 @@ local function hideVisual(pile, hide)
 end
 
 -- ── carrying ─────────────────────────────────────────────────────────
+-- v2.0 masks: Kitsune "FOX SPEED" — MaskService sets the SpeedMult attribute
+-- (1.2) while the power is on; every speed this file writes is scaled by it.
+local function speedMult(player)
+    local m = tonumber(player:GetAttribute("SpeedMult"))
+    return (m and m > 0) and m or 1
+end
+
 local function carrySpeed(player, kind)
     local base = DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0)
-    if player:GetAttribute("Role") == "Muscle" then return base end
+    if player:GetAttribute("Role") == "Muscle" then return base * speedMult(player) end
     local target = info(kind).speed or 13
     local slow = base - target
     if Shop and Shop:hasGear(player, "Duffel") then slow = slow / 2 end
-    return base - slow
+    return (base - slow) * speedMult(player)
 end
 
 local function makeBag(kind, cframe)
@@ -169,7 +190,7 @@ local function setCarrying(player, kind)
     player:SetAttribute("CarryingLoot", kind)
     if hum then
         hum.WalkSpeed = kind and carrySpeed(player, kind)
-            or (DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0))
+            or (DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0)) * speedMult(player)
         hum.UseJumpPower = false
         hum.JumpHeight = kind and 4 or 7.2
     end
@@ -185,8 +206,10 @@ local function setCarrying(player, kind)
     styleBag(player, bag)
 end
 
-local function spawnLoose(kind, cframe, velocity)
+-- owner (v2.1): the player whose bag skin it keeps (throw / drop / death) — optional
+local function spawnLoose(kind, cframe, velocity, owner)
     local bag = makeBag(kind, cframe)
+    if owner then styleBag(owner, bag) end
     bag.Massless = false
     bag.CanCollide = true
     bag.Parent = refs and refs.root or workspace
@@ -231,7 +254,7 @@ function LootService:drop(player)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     setCarrying(player, nil)
     if root and refs then
-        spawnLoose(kind, root.CFrame * CFrame.new(0, -1, 1.5))
+        spawnLoose(kind, root.CFrame * CFrame.new(0, -1, 1.5), nil, player)
     end
 end
 
@@ -373,7 +396,7 @@ function LootService:dropBot(botModel)
     local b = clearBotBag(botModel)
     if not b or not refs then return end
     local root = botModel and botModel:FindFirstChild("HumanoidRootPart")
-    if root then spawnLoose(b.kind, root.CFrame * CFrame.new(0, -1, 1.5)) end
+    if root then spawnLoose(b.kind, root.CFrame * CFrame.new(0, -1, 1.5), nil, (b.owner and b.owner.Parent) and b.owner or nil) end
 end
 
 function LootService:counts()
@@ -475,7 +498,7 @@ function LootService:arm(jobRefs)
             -- leave the bag where they stood so the crew can grab it
             local c = carriers[p]
             local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-            if root then spawnLoose(c.kind, root.CFrame) end
+            if root then spawnLoose(c.kind, root.CFrame, nil, p) end
             carriers[p] = nil
         end
     end))
@@ -520,7 +543,9 @@ function LootService:init(callbacks, shopService)
         setCarrying(player, nil)
         local muscle = player:GetAttribute("Role") == "Muscle"
         local speed = Constants.BAG_THROW_SPEED * (muscle and 1.3 or 1)
-        local bag = spawnLoose(kind, root.CFrame * CFrame.new(0, 1.5, -2.5), flat * speed + Vector3.new(0, 22, 0))
+        -- v2.0 masks: 8-Bit Skull "POWER THROW" → twice as far (same arc height, 2x sideways speed)
+        if maskHas(player, "powerthrow") then speed = speed * ((Constants.MASK_POWERS or {}).THROW_MULT or 2) end
+        local bag = spawnLoose(kind, root.CFrame * CFrame.new(0, 1.5, -2.5), flat * speed + Vector3.new(0, 22, 0), player)
         cb.onEvent("throw", player, { kind = kind })
     end)
 
@@ -541,7 +566,7 @@ function LootService:init(callbacks, shopService)
                     if c.bag then c.bag:Destroy() end
                     carriers[player] = nil
                     player:SetAttribute("CarryingLoot", nil)
-                    if root and refs then spawnLoose(c.kind, root.CFrame) end
+                    if root and refs then spawnLoose(c.kind, root.CFrame, nil, player) end
                 end)
             end
         end

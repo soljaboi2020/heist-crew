@@ -15,6 +15,10 @@
     v2.0: bags a bot carried say so ("Gold · Rex carried it"), and every bot
     crewmate gets a thank-you line. Words are kid-simple (Malachi's bar: a
     7-year-old gets it).
+
+    v2.1 UI overhaul: chunky card with a colour wash in the result colour,
+    the grade stamped in a ringed disc, every row gets an icon badge, big
+    PLAY AGAIN button, and the whole card follows the HUD scale (UITheme).
 --]]
 
 local Players = game:GetService("Players")
@@ -79,12 +83,15 @@ function PayoutScreen:_build()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(520, 520)
+    card.Size = UDim2.fromOffset(540, 560)
     card.BackgroundColor3 = T.bg
-    card.BackgroundTransparency = 0.04
+    card.BackgroundTransparency = 0.02
     card.Parent = screen
-    UITheme.corner(card, 22)
-    UITheme.stroke(card)
+    UITheme.corner(card, 24)
+    local cg = Instance.new("UIGradient")
+    cg.Rotation = 90
+    cg.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 155, 170))
+    cg.Parent = card
     local scale = Instance.new("UIScale")
     scale.Parent = card
     -- (fix v1.1) scale the whole card down on small screens (phones): the card's
@@ -92,85 +99,108 @@ function PayoutScreen:_build()
     self._fit = 1
     local function refit()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-        self._fit = math.clamp(math.min((vp.Y - 40) / 540, (vp.X - 40) / 540), 0.4, 1)
+        -- v2.1: follows the HUD scale (big on 1440p), never bigger than the screen
+        self._fit = math.clamp(math.min(UITheme.scale(), (vp.Y - 40) / 580, (vp.X - 40) / 560), 0.4, 1.6)
         if screen.Enabled then scale.Scale = self._fit end
     end
     refit()
     if workspace.CurrentCamera then workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(refit) end
     local accent = Instance.new("Frame")
-    accent.Size = UDim2.new(1, 0, 0, 5)
+    accent.Size = UDim2.new(1, 0, 0, 8)
     accent.BorderSizePixel = 0
     accent.Parent = card
+    -- colour wash behind the title, in the result colour
+    local wash = Instance.new("Frame")
+    wash.Name = "Wash"
+    wash.Size = UDim2.new(1, 0, 0, 170)
+    wash.BorderSizePixel = 0
+    wash.BackgroundTransparency = 0
+    wash.Parent = card
+    local wg = Instance.new("UIGradient")
+    wg.Rotation = 90
+    wg.Transparency = NumberSequence.new(0.72, 1)
+    wg.Parent = wash
 
-    local grade = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -28, 0, 20), Size = UDim2.fromOffset(110, 110),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 104, Rotation = 8 })
+    local gradeDisc = Instance.new("Frame")
+    gradeDisc.AnchorPoint = Vector2.new(1, 0)
+    gradeDisc.Position = UDim2.new(1, -30, 0, 24)
+    gradeDisc.Size = UDim2.fromOffset(112, 112)
+    gradeDisc.BackgroundColor3 = T.bgDeep
+    gradeDisc.BackgroundTransparency = 0.25
+    gradeDisc.Parent = card
+    UITheme.corner(gradeDisc, 56)
+    local gradeRing = UITheme.stroke(gradeDisc, T.gold, 0.05, 4)
+    local grade = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -31, 0, 24), Size = UDim2.fromOffset(110, 110),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 96, Rotation = 8 })
     grade.Parent = card
-    local gradeWord = UITheme.caption("", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -28, 0, 128),
-        Size = UDim2.fromOffset(110, 14), TextXAlignment = Enum.TextXAlignment.Center })
+    local gradeWord = UITheme.caption("", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -30, 0, 142),
+        Size = UDim2.fromOffset(112, 16), TextSize = 14, TextXAlignment = Enum.TextXAlignment.Center })
     gradeWord.Parent = card
-    local jobCap = UITheme.caption("", { Position = UDim2.fromOffset(30, 30), Size = UDim2.fromOffset(300, 14) })
+    local jobCap = UITheme.caption("", { Position = UDim2.fromOffset(30, 32), Size = UDim2.fromOffset(300, 16), TextSize = 14 })
     jobCap.Parent = card
-    local title = UITheme.label({ Position = UDim2.fromOffset(28, 48), Size = UDim2.fromOffset(340, 50),
-        FontFace = UITheme.F.display, TextSize = 44 })
+    local title = UITheme.label({ Position = UDim2.fromOffset(28, 50), Size = UDim2.fromOffset(360, 54),
+        FontFace = UITheme.F.display, TextSize = 48 })
     title.Parent = card
-    local subtitle = UITheme.label({ Position = UDim2.fromOffset(30, 100), Size = UDim2.fromOffset(330, 40),
-        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium, TextSize = 16, TextColor3 = T.muted })
+    local subtitle = UITheme.label({ Position = UDim2.fromOffset(30, 106), Size = UDim2.fromOffset(350, 44),
+        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium, TextSize = 17, TextColor3 = T.text })
     subtitle.Parent = card
 
     local list = Instance.new("Frame")
-    list.Position = UDim2.fromOffset(30, 156)
-    list.Size = UDim2.new(1, -60, 0, 210)
+    list.Position = UDim2.fromOffset(30, 170)
+    list.Size = UDim2.new(1, -60, 0, 200)
     list.BackgroundTransparency = 1
     list.ClipsDescendants = true
     list.Parent = card
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 4)
+    layout.Padding = UDim.new(0, 5)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = list
 
     local line = Instance.new("Frame")
-    line.Position = UDim2.new(0, 30, 0, 374)
+    line.Position = UDim2.new(0, 30, 0, 380)
     line.Size = UDim2.new(1, -60, 0, 1)
     line.BackgroundColor3 = T.line
     line.BackgroundTransparency = 0.85
     line.BorderSizePixel = 0
     line.Parent = card
-    local cutCap = UITheme.caption("Your money", { Position = UDim2.fromOffset(30, 388), Size = UDim2.fromOffset(200, 14) })
+    local cutCap = UITheme.caption("Your money", { Position = UDim2.fromOffset(30, 392), Size = UDim2.fromOffset(200, 16),
+        TextSize = 14 })
     cutCap.Parent = card
-    local cut = UITheme.label({ Position = UDim2.fromOffset(28, 404), Size = UDim2.fromOffset(300, 46),
-        FontFace = UITheme.F.display, TextSize = 42, TextColor3 = T.money })
+    local cut = UITheme.label({ Position = UDim2.fromOffset(28, 408), Size = UDim2.fromOffset(300, 52),
+        FontFace = UITheme.F.display, TextSize = 48, TextColor3 = T.money })
     cut.Parent = card
-    local meta = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -30, 0, 392),
-        Size = UDim2.fromOffset(200, 40), TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top,
-        FontFace = UITheme.F.bold, TextSize = 15, TextColor3 = T.muted, TextWrapped = true })
+    local meta = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -30, 0, 396),
+        Size = UDim2.fromOffset(210, 50), TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top,
+        FontFace = UITheme.F.display, TextSize = 18, TextColor3 = T.gold, TextWrapped = true })
     meta.Parent = card
 
-    local again = Instance.new("TextButton")
-    again.AnchorPoint = Vector2.new(0.5, 1)
-    again.Position = UDim2.new(0.5, 0, 1, -18)
-    again.Size = UDim2.fromOffset(240, 46)
-    again.BackgroundColor3 = T.gold
-    again.Text = "PLAY AGAIN"
-    again.TextColor3 = T.bg
-    again.FontFace = UITheme.F.display
-    again.TextSize = 20
+    local again = UITheme.button("PLAY AGAIN", T.gold, { AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, -20), Size = UDim2.fromOffset(280, 54), TextSize = 24 })
     again.Parent = card
-    UITheme.corner(again, 23)
 
-    self._u = { screen = screen, card = card, scale = scale, accent = accent, grade = grade, gradeWord = gradeWord,
+    self._u = { screen = screen, card = card, scale = scale, accent = accent, wash = wash, gradeRing = gradeRing,
+        grade = grade, gradeWord = gradeWord,
         jobCap = jobCap, title = title, subtitle = subtitle, list = list, cut = cut, meta = meta, again = again }
     again.Activated:Connect(function() self:close() end)
 end
 
-local function row(parent, order, left, right, color)
+local function row(parent, order, left, right, color, icon)
     local r = Instance.new("Frame")
     r.LayoutOrder = order
-    r.Size = UDim2.new(1, 0, 0, 24)
-    r.BackgroundTransparency = 1
+    r.Size = UDim2.new(1, 0, 0, 32)
+    r.BackgroundColor3 = T.bgRaised
+    r.BackgroundTransparency = 0.45
+    r.BorderSizePixel = 0
     r.Parent = parent
-    UITheme.label({ Text = left, Size = UDim2.fromScale(0.65, 1), FontFace = UITheme.F.bold, TextSize = 16 }).Parent = r
-    UITheme.label({ Text = right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.fromScale(0.35, 1),
-        TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display, TextSize = 17, TextColor3 = color or T.text }).Parent = r
+    UITheme.corner(r, 10)
+    local b = UITheme.badge(icon or UITheme.ICON.bag, color or T.gold, 24)
+    b.AnchorPoint = Vector2.new(0, 0.5)
+    b.Position = UDim2.new(0, 6, 0.5, 0)
+    b.Parent = r
+    UITheme.label({ Text = left, Position = UDim2.fromOffset(38, 0), Size = UDim2.new(0.68, -38, 1, 0), FontFace = UITheme.F.bold,
+        TextSize = 17, TextTruncate = Enum.TextTruncate.AtEnd }).Parent = r
+    UITheme.label({ Text = right, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 0), Size = UDim2.fromScale(0.32, 1),
+        TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display, TextSize = 19, TextColor3 = color or T.text }).Parent = r
     r.Visible = false
     return r
 end
@@ -193,8 +223,10 @@ function PayoutScreen:show(win, p)
     local mine = false
     for _, id in ipairs(p.escapees or {}) do if id == localPlayer.UserId then mine = true end end
     u.accent.BackgroundColor3 = win and T.money or T.danger
+    u.wash.BackgroundColor3 = win and T.money or T.danger
     u.grade.Text = g
     u.grade.TextColor3 = GRADE_COLOR[g] or T.text
+    u.gradeRing.Color = GRADE_COLOR[g] or T.gold
     u.gradeWord.Text = GRADE_WORD[g] or ""
     u.jobCap.Text = p.jobName or ""
     if win then
@@ -215,26 +247,26 @@ function PayoutScreen:show(win, p)
         local col = info and info.color and UITheme.rgb(info.color) or T.text
         local left = tostring(b.kind or "Loot")
         if b.bot then left = left .. "  ·  " .. tostring(b.bot) .. " carried it" end
-        table.insert(rows, row(u.list, order, left, UITheme.money(b.value or 0), col))
+        table.insert(rows, row(u.list, order, left, UITheme.money(b.value or 0), col, b.bot and "🤖" or UITheme.ICON.bag))
     end
     if win and (p.stealthBonus or 0) > 0 then
         order = order + 1
-        table.insert(rows, row(u.list, order, "Sneaky bonus (no alarm!)", "+" .. UITheme.money(p.stealthBonus), T.gold))
+        table.insert(rows, row(u.list, order, "Sneaky bonus (no alarm!)", "+" .. UITheme.money(p.stealthBonus), T.gold, UITheme.ICON.star))
     end
     if win and #(p.bags or {}) == 0 then
         order = order + 1
-        table.insert(rows, row(u.list, order, "The car was empty", "$0", T.muted))
+        table.insert(rows, row(u.list, order, "The car was empty", "$0", T.muted, UITheme.ICON.car))
     end
     -- v2.0 bot crew lines
     for _, bot in ipairs(p.botCrew or {}) do
         order = order + 1
         local n = tonumber(bot.bags) or 0
         local right = n > 0 and string.format("%d bag%s", n, n == 1 and "" or "s") or "helped"
-        table.insert(rows, row(u.list, order, "Bot crew: " .. tostring(bot.name or "Bot"), right, T.info))
+        table.insert(rows, row(u.list, order, "Bot crew: " .. tostring(bot.name or "Bot"), right, T.info, "🤖"))
     end
     if (p.jailed or 0) > 0 then
         order = order + 1
-        table.insert(rows, row(u.list, order, "Still in jail at the end", tostring(p.jailed), T.danger))
+        table.insert(rows, row(u.list, order, "Still in jail at the end", tostring(p.jailed), T.danger, UITheme.ICON.jail))
     end
 
     u.cut.Text = "$0"
@@ -268,9 +300,9 @@ function PayoutScreen:show(win, p)
         u.grade.TextTransparency = 1
         task.wait(1.1)
         if self._token ~= token then return end
-        u.grade.TextSize = 160
+        u.grade.TextSize = 150
         u.grade.TextTransparency = 0
-        TweenService:Create(u.grade, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 104 }):Play()
+        TweenService:Create(u.grade, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 96 }):Play()
     end)
 end
 

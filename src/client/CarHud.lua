@@ -81,48 +81,42 @@ function CarHud:_buildUi()
     local existing = playerGui:FindFirstChild("CarHud")
     if existing then existing:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "CarHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.DisplayOrder = 4
-    screen.Enabled = false
-    screen.Parent = playerGui
-
-    local panel = UITheme.panel({
-        Name = "CarPanel", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -22),
-        Size = UDim2.fromOffset(320, 116), radius = 16,
+    -- (v2.1) the dashboard is a card in the UITheme bottomCenter slot (hidden until you sit in the car)
+    local panel = UITheme.card({
+        Name = "CarPanel", LayoutOrder = 50, Size = UDim2.fromOffset(340, 122), radius = 18, Visible = false,
     })
-    panel.Parent = screen
+    panel.Parent = UITheme.slot("bottomCenter")
 
     -- ── drop-off navigation row ──
+    local boat = UITheme.badge(UITheme.ICON.marina, T.info, 30)
+    boat.Position = UDim2.fromOffset(12, 8)
+    boat.Parent = panel
     local arrow = UITheme.label({
-        Name = "Arrow", Text = "▲", Position = UDim2.fromOffset(14, 9), Size = UDim2.fromOffset(22, 22),
-        TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = T.info, TextSize = 17,
+        Name = "Arrow", Text = "▲", Position = UDim2.fromOffset(48, 10), Size = UDim2.fromOffset(26, 26),
+        TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = T.info, TextSize = 20,
     })
     arrow.Parent = panel
-    UITheme.caption("Marina", { Position = UDim2.fromOffset(42, 8), Size = UDim2.fromOffset(120, 12) }).Parent = panel
+    UITheme.caption("Marina", { Position = UDim2.fromOffset(80, 8), Size = UDim2.fromOffset(120, 14) }).Parent = panel
     local distLabel = UITheme.label({
-        Name = "Distance", Text = "--", Position = UDim2.fromOffset(42, 19), Size = UDim2.fromOffset(140, 14),
-        FontFace = UITheme.F.medium, TextSize = 13, TextColor3 = T.text,
+        Name = "Distance", Text = "--", Position = UDim2.fromOffset(80, 21), Size = UDim2.fromOffset(140, 18),
+        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.text,
     })
     distLabel.Parent = panel
 
     -- ── speed ──
     local speed = UITheme.label({
-        Name = "Speed", Text = "0", Position = UDim2.fromOffset(10, 34), Size = UDim2.fromOffset(112, 50),
-        FontFace = UITheme.F.display, TextSize = 50, TextXAlignment = Enum.TextXAlignment.Right,
+        Name = "Speed", Text = "0", Position = UDim2.fromOffset(10, 40), Size = UDim2.fromOffset(112, 52),
+        FontFace = UITheme.F.display, TextSize = 52, TextXAlignment = Enum.TextXAlignment.Right,
     })
     speed.Parent = panel
-    UITheme.caption("mph", { Position = UDim2.fromOffset(128, 64), Size = UDim2.fromOffset(40, 12) }).Parent = panel
+    UITheme.caption("mph", { Position = UDim2.fromOffset(128, 72), Size = UDim2.fromOffset(40, 14) }).Parent = panel
 
     -- ── nitro chip (Driver only) ──
     local chip = Instance.new("Frame")
     chip.Name = "NitroChip"
     chip.AnchorPoint = Vector2.new(1, 0)
-    chip.Position = UDim2.new(1, -14, 0, 46)
-    chip.Size = UDim2.fromOffset(118, 30)
+    chip.Position = UDim2.new(1, -14, 0, 52)
+    chip.Size = UDim2.fromOffset(130, 34)
     chip.BackgroundColor3 = T.bgRaised
     chip.BackgroundTransparency = 0.1
     chip.BorderSizePixel = 0
@@ -141,7 +135,7 @@ function CarHud:_buildUi()
     UITheme.corner(chipFill, 8)
     local chipLabel = UITheme.label({
         Name = "Label", Text = "SHIFT  NITRO", Size = UDim2.fromScale(1, 1),
-        TextXAlignment = Enum.TextXAlignment.Center, TextSize = 13, TextColor3 = T.gold, ZIndex = 2,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 15, TextColor3 = T.gold, ZIndex = 2,
     })
     chipLabel.Parent = chip
 
@@ -149,8 +143,8 @@ function CarHud:_buildUi()
     local bustRow = Instance.new("Frame")
     bustRow.Name = "Bust"
     bustRow.BackgroundTransparency = 1
-    bustRow.Position = UDim2.fromOffset(14, 90)
-    bustRow.Size = UDim2.new(1, -28, 0, 14)
+    bustRow.Position = UDim2.fromOffset(14, 98)
+    bustRow.Size = UDim2.new(1, -28, 0, 16)
     bustRow.Visible = false
     bustRow.Parent = panel
     UITheme.caption("Bust", {
@@ -174,7 +168,7 @@ function CarHud:_buildUi()
     UITheme.corner(bustFill, 3)
 
     self.ui = {
-        screen = screen, panel = panel, arrow = arrow, dist = distLabel, speed = speed,
+        panel = panel, arrow = arrow, dist = distLabel, speed = speed,
         chip = chip, chipStroke = chipStroke, chipFill = chipFill, chipLabel = chipLabel,
         bustRow = bustRow, bustFill = bustFill,
     }
@@ -219,12 +213,12 @@ function CarHud:_onSeat(seat)
         self.seat = seat
         self.car = car
         self.isDriverSeat = seat:IsA("VehicleSeat") and seat.Name == "GetawayDriverSeat"
-        if self.ui then self.ui.screen.Enabled = true end
+        if self.ui then self.ui.panel.Visible = true end
     else
         self.seat = nil
         self.car = nil
         self.isDriverSeat = false
-        if self.ui then self.ui.screen.Enabled = false end
+        if self.ui then self.ui.panel.Visible = false end
         self:_sendInput(0, 0, true)
     end
     self:_refreshNitroBinding()
@@ -294,9 +288,9 @@ function CarHud:_update()
     if not ui then return end
     local car = self.car
     if not car or not car.Parent then
-        if ui.screen.Enabled then
+        if ui.panel.Visible then
             self.car = nil
-            ui.screen.Enabled = false
+            ui.panel.Visible = false
         end
         return
     end

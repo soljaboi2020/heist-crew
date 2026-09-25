@@ -65,6 +65,44 @@ local CYAN = Color3.fromRGB(40, 230, 255)
 
 local function track(c) table.insert(conns, c) return c end
 
+-- v2.0 mask powers (masks agent): optional MaskService lookup, never a hard require
+local maskSvc = nil
+local function maskHas(player, abilityId)
+    if maskSvc == nil then
+        local mod = script.Parent:FindFirstChild("MaskService")
+        local ok, r = false, nil
+        if mod then ok, r = pcall(require, mod) end
+        maskSvc = (ok and type(r) == "table" and type(r.has) == "function") and r or false
+    end
+    if not maskSvc then return false end
+    local ok, yes = pcall(maskSvc.has, maskSvc, player, abilityId)
+    return ok and yes == true
+end
+
+-- v2.0 masks: Cyber "HACK CHIP" finishes a hold prompt in 1/HACK_SPEED of the
+-- time, server-side (the client's hold ring keeps going, but the action has
+-- already happened). Every action wired through here must be idempotent.
+local hackHolds = {}   -- [prompt] = { [player] = token }
+local function hackChipFast(p, fn)
+    local speed = (Constants.MASK_POWERS or {}).HACK_SPEED or 2
+    hackHolds[p] = {}
+    track(p.PromptButtonHoldBegan:Connect(function(player)
+        if not maskHas(player, "hackchip") then return end
+        local token = {}
+        hackHolds[p][player] = token
+        task.delay(p.HoldDuration / speed, function()
+            local holds = hackHolds[p]
+            if holds and holds[player] == token and p.Parent then
+                holds[player] = nil
+                fn(player)
+            end
+        end)
+    end))
+    track(p.PromptButtonHoldEnded:Connect(function(player)
+        if hackHolds[p] then hackHolds[p][player] = nil end
+    end))
+end
+
 local function prompt(parent, name, action, object, hold, extra)
     local p = Instance.new("ProximityPrompt")
     p.Name = name
@@ -172,6 +210,8 @@ local function tickCameras(dt)
                 end
                 if inView then
                     local rate = (Shop and Shop:hasGear(player, "Jammer")) and 0.5 or 1
+                    -- v2.0 masks: Catrina "GHOST" → cameras take 2x longer (stacks with the Jammer)
+                    if maskHas(player, "ghost") then rate = rate * ((Constants.MASK_POWERS or {}).GHOST_CAMERA or 0.5) end
                     seen[i] = (seen[i] or 0) + dt * rate
                     if cam.led then cam.led.Color = (math.floor(t * 8) % 2 == 0) and RED or Color3.fromRGB(255, 200, 60) end
                     if seen[i] >= S.CAMERA_DETECT_TIME then
@@ -319,6 +359,7 @@ function SecurityService:disarm()
     conns = {}
     for _, p in ipairs(prompts) do if p.Parent then p:Destroy() end end
     prompts = {}
+    hackHolds = {}   -- v2.0 masks: pending HACK CHIP holds die with their prompts
     if refs then
         closeDoors()
         for i, cam in ipairs(refs.cameras or {}) do
@@ -355,6 +396,11 @@ function SecurityService:arm(jobRefs)
         track(fast.Triggered:Connect(function(player)
             if roleOf(player) == "Hacker" then cutCameras(player) end
         end))
+        -- v2.0 masks: HACK CHIP halves both breaker holds
+        hackChipFast(slow, function(player) cutCameras(player) end)
+        hackChipFast(fast, function(player)
+            if roleOf(player) == "Hacker" then cutCameras(player) end
+        end)
     end
 
     for i, door in ipairs(refs.keycardDoors or {}) do
@@ -378,6 +424,10 @@ function SecurityService:arm(jobRefs)
         track(hack.Triggered:Connect(function(player)
             if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
         end))
+        -- v2.0 masks: HACK CHIP halves the keypad hack too
+        hackChipFast(hack, function(player)
+            if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
+        end)
     end
 
     track(RunService.Heartbeat:Connect(function(dt)

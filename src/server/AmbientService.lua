@@ -58,8 +58,9 @@ local CONFIG = {
     X_END = 150,             -- street runs x -150..150
     ROAD_Y = 0.2,            -- asphalt top
     LANES = {
-        { z = -10, dir = 1,  spots = { -40, 44, 80 } },   -- eastbound (south lane)
-        { z = -18, dir = -1, spots = { -40 } },           -- westbound (north lane)
+        -- (v2.0.2) getaway gates: DD -42.4 · mart 78.25 · bank 135.9 (south side); villa 45.6 (north side)
+        { z = -10, dir = 1,  spots = { -42.4, 78.25, 135.9, 45.6 } },   -- eastbound (south lane)
+        { z = -18, dir = -1, spots = { 45.6, -42.4 } },                  -- westbound (north lane)
     },
     CRUISE_MIN = 13, CRUISE_MAX = 19,   -- studs/s
     ACCEL = 9, BRAKE = 30,

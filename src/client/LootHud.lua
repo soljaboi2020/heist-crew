@@ -3,15 +3,17 @@
     ────────────────────────────────────────────────
     v1.0 (2026-09-25). Two small pieces:
 
-      • CARRYING PILL (bottom-centre, above the vault-crack card) while the
-        "CarryingLoot" attribute is set:
+      (v2.1) both live in ONE row in the UITheme bottomCenter slot, so they
+      can't overlap the drill card / heist-door panel / car dashboard.
+
+      • CARRYING PILL while the "CarryingLoot" attribute is set:
             [bag] CARRYING  GOLD · $1,500    [ G  THROW ]
         The throw action is bound only while you carry something:
         G / gamepad Y / an on-screen THROW button on touch. It fires
         ThrowBag(camera look direction); the server does the rest.
 
-      • KEYCARD CHIP (bottom-left, just above the role card) while the
-        "HasKeycard" attribute is true.
+      • KEYCARD CHIP (left of the carrying pill) while the "HasKeycard"
+        attribute is true.
 
     PUBLIC API:
         LootHud:start()
@@ -32,7 +34,6 @@ local LootHud = {}
 local localPlayer = Players.LocalPlayer
 
 local ACTION = "HC_ThrowBag"
-local PILL_Y = -170             -- vault card occupies y -160..-96 above the bottom edge
 local THROW_COOLDOWN = 0.35
 -- Touch button spot inside Roblox's context-button frame (bottom-right third of the
 -- screen, around the jump button). Scale values; tweak here if it crowds the jump button.
@@ -107,26 +108,24 @@ function LootHud:_buildUi()
     local existing = playerGui:FindFirstChild("LootHud")
     if existing then existing:Destroy() end
 
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "LootHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screen.Parent = playerGui
+    -- one centred row in the bottomCenter slot:  [KEYCARD]  [(bag) CARRYING GOLD · $1,500  (G) THROW]
+    local rowFrame = frame({ Name = "LootRow", LayoutOrder = 20, Size = UDim2.fromOffset(0, 0),
+        AutomaticSize = Enum.AutomaticSize.XY, Visible = false })
+    rowFrame.Parent = UITheme.slot("bottomCenter")
+    hrow(rowFrame, 10)
 
     -- ── carrying pill ──
-    -- A transparent CanvasGroup wraps the glass pill (2px inset) so the whole thing
-    -- fades as one piece without clipping the pill's hairline stroke.
+    -- A transparent CanvasGroup wraps the pill (3px inset) so the whole thing
+    -- fades as one piece without clipping the pill's outline.
     local group = Instance.new("CanvasGroup")
     group.Name = "Carrying"
-    group.AnchorPoint = Vector2.new(0.5, 1)
-    group.Position = UDim2.new(0.5, 0, 1, PILL_Y)
-    group.Size = UDim2.fromOffset(0, 50)
+    group.LayoutOrder = 2
+    group.Size = UDim2.fromOffset(0, 58)
     group.AutomaticSize = Enum.AutomaticSize.X
     group.BackgroundTransparency = 1
     group.GroupTransparency = 1
     group.Visible = false
-    group.Parent = screen
+    group.Parent = rowFrame
     local gp = Instance.new("UIPadding")
     gp.PaddingLeft, gp.PaddingRight = UDim.new(0, 3), UDim.new(0, 3)
     gp.PaddingTop, gp.PaddingBottom = UDim.new(0, 3), UDim.new(0, 3)
@@ -134,78 +133,63 @@ function LootHud:_buildUi()
     local scale = Instance.new("UIScale")
     scale.Parent = group
 
-    local pill = UITheme.panel({ Name = "Pill", Size = UDim2.fromOffset(0, 44), AutomaticSize = Enum.AutomaticSize.X,
-        radius = 22 })
+    local pill = UITheme.card({ Name = "Pill", Size = UDim2.fromOffset(0, 52), AutomaticSize = Enum.AutomaticSize.X,
+        radius = 26, noHighlight = true })
     pill.Parent = group
-    hpad(pill, 16, 7)
+    hpad(pill, 7, 8)
     hrow(pill, 10)
 
-    -- bag glyph: rounded body + hollow handle, tinted with the loot colour
-    local bag = frame({ Name = "Bag", LayoutOrder = 1, Size = UDim2.fromOffset(18, 18) })
-    bag.Parent = pill
-    local body = frame({ Position = UDim2.fromOffset(1, 6), Size = UDim2.fromOffset(16, 12), BackgroundTransparency = 0,
-        BackgroundColor3 = T.gold })
-    UITheme.corner(body, 4)
-    body.Parent = bag
-    local handle = frame({ Position = UDim2.fromOffset(5, 1), Size = UDim2.fromOffset(8, 8) })
-    UITheme.corner(handle, 4)
-    local handleStroke = UITheme.stroke(handle, T.gold, 0, 2)
-    handle.Parent = bag
+    local bagBadge = UITheme.badge(UITheme.ICON.bag, T.gold, 40, { LayoutOrder = 1 })
+    bagBadge.Parent = pill
 
     UITheme.caption("Carrying", { LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 44), TextSize = 12 }).Parent = pill
+        Size = UDim2.fromOffset(0, 52), TextSize = 13 }).Parent = pill
     local kind = UITheme.label({ Name = "Kind", LayoutOrder = 3, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 44), FontFace = UITheme.F.display, TextSize = 17, Text = "" })
+        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, Text = "" })
     kind.Parent = pill
-    UITheme.label({ LayoutOrder = 4, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 44),
-        Text = "·", TextColor3 = T.faint, TextSize = 17 }).Parent = pill
+    UITheme.label({ LayoutOrder = 4, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 52),
+        Text = "·", TextColor3 = T.faint, TextSize = 21 }).Parent = pill
     local value = UITheme.label({ Name = "Value", LayoutOrder = 5, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 44), FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.money, Text = "" })
+        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, TextColor3 = T.money, Text = "" })
     value.Parent = pill
 
     -- key hint chip:  [G] THROW
-    local hint = frame({ Name = "Hint", LayoutOrder = 6, Size = UDim2.fromOffset(0, 30),
-        AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = T.line, BackgroundTransparency = 0.93 })
-    UITheme.corner(hint, 15)
-    UITheme.stroke(hint, T.line, 0.9)
+    local hint = frame({ Name = "Hint", LayoutOrder = 6, Size = UDim2.fromOffset(0, 36),
+        AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = T.line, BackgroundTransparency = 0.9 })
+    UITheme.corner(hint, 18)
+    UITheme.stroke(hint, T.line, 0.85)
     hint.Parent = pill
-    hpad(hint, 4, 12)
+    hpad(hint, 5, 13)
     hrow(hint, 8)
-    local keycap = UITheme.label({ Name = "Key", LayoutOrder = 1, Size = UDim2.fromOffset(22, 22), Text = "G",
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.mono, TextSize = 13, TextColor3 = T.bg,
+    local keycap = UITheme.label({ Name = "Key", LayoutOrder = 1, Size = UDim2.fromOffset(26, 26), Text = "G",
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.mono, TextSize = 15, TextColor3 = T.bgDeep,
         BackgroundColor3 = T.text, BackgroundTransparency = 0 })
-    UITheme.corner(keycap, 11)
+    UITheme.corner(keycap, 13)
     keycap.Parent = hint
-    UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 30),
-        Text = "THROW", FontFace = UITheme.F.bold, TextSize = 12 }).Parent = hint
+    UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 36),
+        Text = "THROW", FontFace = UITheme.F.display, TextSize = 14 }).Parent = hint
 
-    -- ── keycard chip (just above the 62px role card: 16 margin + 62 + 8 gap) ──
-    local key = UITheme.panel({ Name = "Keycard", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -86),
-        Size = UDim2.fromOffset(0, 32), AutomaticSize = Enum.AutomaticSize.X, radius = 16, Visible = false })
-    key.Parent = screen
-    local keyStroke = key:FindFirstChildOfClass("UIStroke")
-    if keyStroke then
-        keyStroke.Color = T.info
-        keyStroke.Transparency = 0.45
-    end
-    hpad(key, 10, 13)
+    -- ── keycard chip (left of the carrying pill) ──
+    local key = UITheme.card({ Name = "Keycard", LayoutOrder = 1, Size = UDim2.fromOffset(0, 46),
+        AutomaticSize = Enum.AutomaticSize.X, radius = 23, accent = T.info, noHighlight = true, Visible = false })
+    key.Parent = rowFrame
+    hpad(key, 6, 16)
     hrow(key, 8)
     local keyScale = Instance.new("UIScale")
     keyScale.Parent = key
-    local card = frame({ LayoutOrder = 1, Size = UDim2.fromOffset(18, 13), BackgroundColor3 = T.info, BackgroundTransparency = 0 })
-    UITheme.corner(card, 3)
-    card.Parent = key
-    frame({ Position = UDim2.fromOffset(0, 3), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = T.bg,
-        BackgroundTransparency = 0.35 }).Parent = card
-    frame({ Position = UDim2.fromOffset(3, 8), Size = UDim2.fromOffset(6, 2), BackgroundColor3 = T.bg,
-        BackgroundTransparency = 0.5 }).Parent = card
-    UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 32),
-        Text = "KEYCARD", FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.info }).Parent = key
+    UITheme.badge(UITheme.ICON.key, T.info, 34, { LayoutOrder = 1 }).Parent = key
+    UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 46),
+        Text = "KEYCARD", FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.info }).Parent = key
 
+    self._row = rowFrame
     self._group, self._scale = group, scale
-    self._body, self._handleStroke, self._kind, self._value = body, handleStroke, kind, value
+    self._bagBadge, self._kind, self._value = bagBadge, kind, value
     self._hint, self._keycap = hint, keycap
     self._key, self._keyScale = key, keyScale
+end
+
+function LootHud:_syncRow()
+    self._row.Visible = self._group.Visible or self._key.Visible
 end
 
 -- ── input hint (G / Y / hidden on touch) ──
@@ -263,22 +247,24 @@ function LootHud:_renderCarry()
         local color = def and UITheme.rgb(def.color) or T.text
         self._kind.Text = string.upper(kindId)
         self._kind.TextColor3 = color
-        self._body.BackgroundColor3 = color
-        self._handleStroke.Color = color
+        UITheme.setBadge(self._bagBadge, UITheme.ICON.bag, color)
         self._value.Text = def and UITheme.money(def.value) or ""
         if not g.Visible or g.GroupTransparency > 0.5 then
             g.Visible = true
             g.GroupTransparency = 1
-            g.Position = UDim2.new(0.5, 0, 1, PILL_Y + 12)
-            self._scale.Scale = 0.9
+            self._scale.Scale = 0.85
         end
-        tween(g, 0.25, { GroupTransparency = 0, Position = UDim2.new(0.5, 0, 1, PILL_Y) })
+        self:_syncRow()
+        tween(g, 0.25, { GroupTransparency = 0 })
         tween(self._scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
     elseif g.Visible then
-        local out = tween(g, 0.25, { GroupTransparency = 1, Position = UDim2.new(0.5, 0, 1, PILL_Y + 10) },
-            Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        tween(self._scale, 0.25, { Scale = 0.9 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        local out = tween(g, 0.25, { GroupTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         out.Completed:Connect(function()
-            if self._carryToken == token then g.Visible = false end
+            if self._carryToken == token then
+                g.Visible = false
+                self:_syncRow()
+            end
         end)
     end
 end
@@ -289,12 +275,16 @@ function LootHud:_renderKeycard()
     self._hasKey = has
     if has then
         self._key.Visible = true
+        self:_syncRow()
         self._keyScale.Scale = 0.6
         tween(self._keyScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
     else
         local out = tween(self._keyScale, 0.18, { Scale = 0.6 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         out.Completed:Connect(function()
-            if not self._hasKey then self._key.Visible = false end
+            if not self._hasKey then
+                self._key.Visible = false
+                self:_syncRow()
+            end
         end)
     end
 end

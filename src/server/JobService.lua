@@ -656,6 +656,19 @@ local function kickBack(player, guard)
     addToCrew(player)
     local e = run.crew[player]
     if e and (e.out or e.escaped or e.jailed) then return end
+    -- v2.0 masks: Goalie "TOUGH GUY" — the first guard catch each run, you break
+    -- free: keep your bag + keycard, stay where you are, the guard gets stunned.
+    local MS = optionalService("MaskService")
+    if MS and type(MS.useToughGuy) == "function" then
+        local okT, saved = pcall(MS.useToughGuy, MS, player)
+        if okT and saved then
+            if guard then S.guards:stun(guard, 3) end
+            player:SetAttribute("GuardSuspicion", 0)
+            notifyAll(player.DisplayName .. " broke free from a guard!", "gold", 2)
+            pushInfo()
+            return
+        end
+    end
     S.loot:drop(player)
     S.security:dropKeycard(player)
     if guard then S.guards:stun(guard, 3) end   -- he doesn't grab you again on the way out
@@ -814,6 +827,19 @@ finish = function(result)
         S.progress:addXP(p, xpEach, "heist")
         if each > 0 then
             notify(p, string.format("You got %s%s", UITheme.money(each), stealth and "  (+sneaky bonus)" or ""), "green", 6)
+            -- v2.0 masks: Bandit "LUCKY" → +10% of the bags' cash, on top, for you
+            local MS = optionalService("MaskService")
+            if MS and type(MS.has) == "function" and take > 0 then
+                local okL, lucky = pcall(MS.has, MS, p, "lucky")
+                if okL and lucky then
+                    local extra = math.floor(take * ((Constants.MASK_POWERS or {}).LUCKY_BONUS or 0.1) + 0.5)
+                    if extra > 0 then
+                        S.economy:addCash(p, extra, "LUCKY mask", { payout = true })
+                        lifetimeEarned(p, extra)
+                        notify(p, string.format("LUCKY mask: +%s extra!", UITheme.money(extra)), "gold", 5)
+                    end
+                end
+            end
         else
             notify(p, "You got away — but the car was empty", "gold", 5)
         end
@@ -1229,7 +1255,9 @@ function JobService:selectJob(id)
         -- drill model goes — the door's LookVector).
         local att = refs.vault.door:FindFirstChild("DrillPoint") or Instance.new("Attachment")
         att.Name = "DrillPoint"
-        att.Position = Vector3.new(0, 0, -1.5)
+        -- (v2.1) a builder can move it (vault.drillOffset, door space): the mart safe
+        -- sits in a tight office behind a desk, so its prompt hangs at head height
+        att.Position = typeof(refs.vault.drillOffset) == "Vector3" and refs.vault.drillOffset or Vector3.new(0, 0, -1.5)
         att.Parent = refs.vault.door
         p.Parent = att
         p.Triggered:Connect(function(player) startDrill(player) end)

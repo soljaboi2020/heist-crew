@@ -28,11 +28,27 @@
         z -38 └──────────────┴────── FRONT DOOR x -5..5 ┴───────────────────┘ (street)
         front garden z -38..-26.6 · back terrace + pool z -102..-96
 
+    v2.1 ART PASS (2026-09-25, from Malachi's Future-lighting playtest video):
+      • THE GROUNDS: the villa sits inside an 11-tall garden wall + iron
+        railings (x -50.9..54, z -103..-26.8, inside MiamiBuilder.KEEP_CLEAR),
+        a closed front gate, and invisible ClimbGuards on every wall top. The
+        only way out is the SERVICE YARD (east, outside the staff door) and its
+        open VEHICLE GATE x 42.6..50.2 at z -27.2 onto Ocean Drive.
+      • getawayCFrame = (45.6, 0, -72) facing +Z (south): parked in the yard,
+        nose at the gate, a straight clear run down the driveway lane.
+      • every room has its own wallpaper / dado / skirting (_paintWalls:
+        SurfaceGui colour on each wall face + thin relief parts), patterned
+        floors, clean painted door trim (no more stripy wood grain),
+        per-room lighting (warm vs cool, shadowed key lamps, moonlight in the
+        bedroom), and Kenney props recoloured on arrival (tintProp).
+
     THE THREE WAYS IN (refs.entrances)
         front  — the obvious one. Camera_Hall watches it, Guard A walks the hall.
-        side   — STAFF ONLY door on the east wall → staff room (= sneakIn). No
-                 guard route and no camera covers the staff room or the door.
-        roof   — steel ladder (a climbable TrussPart) on the WEST wall at z -84 →
+        side   — STAFF ONLY door on the east wall (opens onto the service yard)
+                 → staff room (= sneakIn). No guard route and no camera covers
+                 the staff room or the door.
+        roof   — steel ladder (a climbable TrussPart) on the WEST wall at z -84
+                 (in the walled west garden strip) →
                  roof hatch. The hatch is a Vent pair: roof lid `Vent_RoofHatch` ↔
                  `Vent_ClosetLadder` in the bedroom's walk-in closet.
 
@@ -97,6 +113,14 @@ local SIGN_RED   = Color3.fromRGB(255, 60, 70)
 local LEAF       = Color3.fromRGB(56, 118, 66)
 local HATCH      = Color3.fromRGB(232, 170, 40)     -- "you can use this" amber (FE2 colour rule)
 local NIGHT_GLASS = Color3.fromRGB(70, 96, 130)
+-- v2.1 art pass
+local WALNUT     = Color3.fromRGB(88, 56, 38)
+local WALNUT_DK  = Color3.fromRGB(52, 34, 24)
+local IRON       = Color3.fromRGB(28, 30, 34)
+local WALL_PINK  = Color3.fromRGB(226, 170, 176)     -- garden wall stucco (a shade deeper than the villa)
+local MOON       = Color3.fromRGB(130, 160, 230)
+local LAMP_WARM  = Color3.fromRGB(255, 190, 120)     -- table / floor lamps: warmer + more orange than WARM
+local YARD_LIGHT = Color3.fromRGB(255, 214, 160)
 
 -- ──────────────────────────────────────────────
 -- helpers
@@ -266,6 +290,11 @@ local function abox(name, axis, c, a0, y0, a1, y1, thick, color, mat, parent, ex
     return box(name, c - h, y0, a0, c + h, y1, a1, color, mat, parent, extra)
 end
 
+-- Every wall segment wallRun makes is recorded here (v2.1) so _paintWalls can
+-- give each room its own wallpaper / dado / skirting on its side of the wall.
+-- Reset at the start of every build.
+local SEGMENTS = {}
+
 -- A 1-thick wall from `from` to `to` with openings cut in it.
 -- ops = { {a0, a1, y0, y1, kind} } kind = "door" (casing) | "arch" | "window" | "open" (bare hole)
 local function wallRun(parent, name, axis, c, from, to, ops, color, mat, opts)
@@ -276,7 +305,10 @@ local function wallRun(parent, name, axis, c, from, to, ops, color, mat, opts)
     table.sort(list, function(p, q) return p[1] < q[1] end)
     local function seg(a0, a1, y0, y1, nm)
         if a1 - a0 > 0.01 and y1 - y0 > 0.01 then
-            abox(nm or name, axis, c, a0, y0, a1, y1, 1, color, mat, parent)
+            local p = abox(nm or name, axis, c, a0, y0, a1, y1, 1, color, mat, parent)
+            if not opts.noPaint then
+                table.insert(SEGMENTS, { part = p, axis = axis, c = c, a0 = a0, a1 = a1, y0 = y0, y1 = y1 })
+            end
         end
     end
     local cur = from
@@ -296,10 +328,13 @@ local function wallRun(parent, name, axis, c, from, to, ops, color, mat, opts)
             abox("WindowTransom", axis, c, a0, ty - 0.1, a1, ty + 0.1, 1.15, fr, M.Metal, parent)
             abox("WindowSill", axis, c, a0 - 0.3, y0 - 0.25, a1 + 0.3, y0, 1.6, opts.sill or PLINTH, M.Plaster, parent)
         elseif kind == "door" or kind == "arch" then
+            -- v2.1: clean painted trim. (Wood grain on a 0.35-wide strip rendered as
+            -- glitchy stripes in Malachi's video.) 1.7 thick so it caps the skirting.
             local trim = opts.trim or TRIM
-            abox("Casing", axis, c, a0 - 0.35, FLOOR, a0, y1 + 0.35, 1.2, trim, M.Wood, parent)
-            abox("Casing", axis, c, a1, FLOOR, a1 + 0.35, y1 + 0.35, 1.2, trim, M.Wood, parent)
-            abox("Casing", axis, c, a0 - 0.35, y1, a1 + 0.35, y1 + 0.35, 1.2, trim, M.Wood, parent)
+            local ct = 0.45
+            abox("Casing", axis, c, a0 - ct, FLOOR, a0, y1 + ct, 1.7, trim, M.Plaster, parent)
+            abox("Casing", axis, c, a1, FLOOR, a1 + ct, y1 + ct, 1.7, trim, M.Plaster, parent)
+            abox("Casing", axis, c, a0 - ct, y1, a1 + ct, y1 + ct, 1.7, trim, M.Plaster, parent)
         end
         cur = a1
     end
@@ -413,13 +448,13 @@ local ROOMS = {   -- wall-centre rectangles: x0, z0, x1, z1, floor colour, floor
     { -42, -58, -14, -38, Color3.fromRGB(92, 62, 44), M.WoodPlanks, "Office" },
     { 14, -58, 42, -38, Color3.fromRGB(214, 212, 204), M.CeramicTiles, "Kitchen" },
     { -42, -70, 42, -58, MARBLE_DK, M.Marble, "Corridor" },
-    { -42, -96, -18, -70, Color3.fromRGB(104, 66, 80), M.Fabric, "Bedroom" },
+    { -42, -96, -18, -70, Color3.fromRGB(118, 96, 104), M.Carpet, "Bedroom" },
     { -18, -82, -6, -70, Color3.fromRGB(150, 112, 80), M.WoodPlanks, "Closet" },
     { -6, -82, 6, -70, Color3.fromRGB(80, 84, 92), M.DiamondPlate, "Lasers" },
     { 6, -82, 18, -70, Color3.fromRGB(48, 50, 56), M.Slate, "Security" },
     { 18, -80, 42, -70, Color3.fromRGB(128, 126, 120), M.Concrete, "Service" },
     { 18, -96, 28, -80, Color3.fromRGB(200, 214, 220), M.CeramicTiles, "Laundry" },
-    { 28, -96, 42, -80, Color3.fromRGB(96, 104, 100), M.Slate, "Staff" },
+    { 28, -96, 42, -80, Color3.fromRGB(150, 158, 140), M.CeramicTiles, "Staff" },
     { -18, -96, 18, -82, Color3.fromRGB(80, 84, 92), M.DiamondPlate, "Vault" },
 }
 
@@ -436,9 +471,9 @@ function VillaBuilder:_shell(f)
     local win = function(a0, a1, y0, y1) return { a0, a1, y0 or 3.5, y1 or 11, "window" } end
     wallRun(f, "WallSouth", "x", -38, -42.5, 42.5, {
         { -5, 5, FLOOR, DOOR_TOP, "open" },                          -- front door
-        win(-38, -34), win(-24, -20),                                -- office
+        win(-36, -32), win(-24, -20),                                -- office
         win(-12.8, -9.4), win(9.4, 12.8),                            -- hall
-        win(20, 24), win(34, 38),                                    -- kitchen
+        win(20, 24), win(32, 36),                                    -- kitchen
     }, STUCCO, M.Plaster)
     wallRun(f, "WallNorth", "x", -96, -42.5, 42.5, {
         win(-38.5, -33.5, 3.5, 12), win(-26.5, -21.5, 3.5, 12),      -- bedroom (sea view)
@@ -494,6 +529,193 @@ function VillaBuilder:_shell(f)
 end
 
 -- ──────────────────────────────────────────────
+-- 🎨 v2.1 ROOM FINISHES — Malachi: "the graphics are very simple". Every room
+-- used to be the same peach plaster (and the outer rooms the pink stucco of
+-- the outside). Now each room gets its own wallpaper (+ stripes), a dado
+-- (panelled / tiled / painted lower wall) and real skirting + chair rail.
+--
+-- The colour is a SurfaceGui on the wall part's face (zero extra parts); the
+-- skirting and rail are thin non-collide parts so the wall has relief.
+-- GUI X runs toward the viewer's right: Back(+Z)→+X, Front(-Z)→-X,
+-- Right(+X)→-Z, Left(-X)→+Z. That's what `flip` below encodes.
+-- ──────────────────────────────────────────────
+local DADO_TOP = FLOOR + 3.1      -- y 3.6: below every window sill, so windows never cut the dado
+
+local STYLES = {
+    Hall = { paper = Color3.fromRGB(232, 222, 200), stripe = Color3.fromRGB(214, 194, 150), every = 1.8, sw = 0.22,
+        dado = Color3.fromRGB(206, 198, 186), kind = "panel", rail = GOLD, railMat = M.Metal, base = MARBLE_DK, baseMat = M.Marble },
+    Office = { paper = Color3.fromRGB(44, 70, 56), stripe = Color3.fromRGB(52, 80, 64), every = 1.2, sw = 0.5,
+        dado = WALNUT, kind = "panel", rail = WALNUT_DK, railMat = M.WoodPlanks, base = WALNUT_DK, baseMat = M.WoodPlanks },
+    Kitchen = { paper = Color3.fromRGB(214, 230, 222),
+        dado = Color3.fromRGB(242, 242, 236), kind = "tile", grout = Color3.fromRGB(190, 196, 196),
+        base = Color3.fromRGB(40, 70, 72), baseMat = M.Plaster },
+    Corridor = { paper = Color3.fromRGB(30, 66, 72),
+        dado = Color3.fromRGB(40, 40, 46), kind = "panel", rail = BRASS, railMat = M.Metal, base = Color3.fromRGB(26, 26, 30), baseMat = M.Marble },
+    Bedroom = { paper = Color3.fromRGB(206, 160, 168), stripe = Color3.fromRGB(236, 214, 206), every = 1.5, sw = 0.16,
+        dado = Color3.fromRGB(236, 228, 218), kind = "panel", rail = TRIM, railMat = M.Plaster, base = TRIM, baseMat = M.Plaster },
+    Closet = { paper = Color3.fromRGB(228, 214, 190), base = WOOD_MID, baseMat = M.WoodPlanks },
+    Security = { paper = Color3.fromRGB(58, 62, 72), dado = Color3.fromRGB(40, 43, 50), kind = "paint",
+        base = Color3.fromRGB(26, 28, 32), baseMat = M.Rubber },
+    Service = { paper = Color3.fromRGB(176, 176, 166), dado = Color3.fromRGB(104, 110, 104), kind = "paint",
+        base = Color3.fromRGB(52, 54, 56), baseMat = M.Rubber },
+    Laundry = { paper = Color3.fromRGB(196, 216, 224), dado = Color3.fromRGB(240, 244, 244), kind = "tile",
+        grout = Color3.fromRGB(170, 190, 198), base = Color3.fromRGB(90, 110, 120), baseMat = M.Rubber },
+    Staff = { paper = Color3.fromRGB(222, 212, 184), dado = Color3.fromRGB(96, 128, 112), kind = "paint",
+        base = Color3.fromRGB(50, 56, 52), baseMat = M.Rubber },
+    -- Lasers + Vault keep their bare steel (no entry = untouched)
+}
+
+local function roomAt(x, z)
+    for _, r in ipairs(ROOMS) do
+        if x > r[1] and x < r[3] and z > r[2] and z < r[4] then return r end
+    end
+    return nil
+end
+
+function VillaBuilder:_paintWalls(f)
+    local E = 0.01
+    for _, seg in ipairs(SEGMENTS) do
+        local L, H = seg.a1 - seg.a0, seg.y1 - seg.y0
+        for _, side in ipairs({ -1, 1 }) do
+            -- split the segment's span at room edges and find the room on this side
+            local cuts = { seg.a0, seg.a1 }
+            for _, r in ipairs(ROOMS) do
+                local e0, e1 = (seg.axis == "x") and r[1] or r[2], (seg.axis == "x") and r[3] or r[4]
+                for _, e in ipairs({ e0, e1 }) do
+                    if e > seg.a0 + E and e < seg.a1 - E then table.insert(cuts, e) end
+                end
+            end
+            table.sort(cuts)
+            local pieces = {}
+            for i = 1, #cuts - 1 do
+                local a0, a1 = cuts[i], cuts[i + 1]
+                if a1 - a0 > E then
+                    local m = (a0 + a1) / 2
+                    local off = seg.c + side * 0.75
+                    local r = (seg.axis == "x") and roomAt(m, off) or roomAt(off, m)
+                    local st = r and STYLES[r[7]]
+                    if st then
+                        local last = pieces[#pieces]
+                        if last and last.room == r and math.abs(last.a1 - a0) < E then
+                            last.a1 = a1
+                        else
+                            table.insert(pieces, { a0 = a0, a1 = a1, room = r, style = st })
+                        end
+                    end
+                end
+            end
+
+            if #pieces > 0 then
+                local face, flip
+                if seg.axis == "x" then
+                    face, flip = (side > 0) and Enum.NormalId.Back or Enum.NormalId.Front, side < 0
+                else
+                    face, flip = (side > 0) and Enum.NormalId.Right or Enum.NormalId.Left, side > 0
+                end
+                local g = surface(seg.part, face, 8, 1, 1)
+                g.Name = "RoomFinish"
+                for _, pc in ipairs(pieces) do
+                    local st = pc.style
+                    local u0, u1 = (pc.a0 - seg.a0) / L, (pc.a1 - seg.a0) / L
+                    if flip then u0, u1 = 1 - u1, 1 - u0 end
+                    local plen = pc.a1 - pc.a0
+                    local holder = frame({ Position = UDim2.fromScale(u0, 0), Size = UDim2.fromScale(u1 - u0, 1),
+                        BackgroundColor3 = st.paper, BackgroundTransparency = 0.04, ClipsDescendants = true, ZIndex = 1 }, g)
+                    -- wallpaper stripes (only where there's paper above the dado)
+                    if st.stripe and seg.y1 > DADO_TOP then
+                        local n = math.floor(plen / st.every)
+                        for i = 0, n do
+                            local a = i * st.every + (st.every - st.sw) / 2
+                            frame({ Position = UDim2.fromScale(a / plen, 0), Size = UDim2.fromScale(st.sw / plen, 1),
+                                BackgroundColor3 = st.stripe, ZIndex = 2 }, holder)
+                        end
+                    end
+                    -- the dado: panelled / tiled / painted lower wall
+                    if st.dado and seg.y0 < DADO_TOP - E then
+                        local top = math.min(seg.y1, DADO_TOP)
+                        local vTop = (seg.y1 - top) / H
+                        local dh = top - seg.y0
+                        local d = frame({ Position = UDim2.fromScale(0, vTop), Size = UDim2.fromScale(1, 1 - vTop),
+                            BackgroundColor3 = st.dado, ZIndex = 3, ClipsDescendants = true }, holder)
+                        if st.kind == "panel" and dh > 1.4 then
+                            local n = math.max(1, math.floor(plen / 2.6))
+                            local w = plen / n
+                            local inset = st.dado:Lerp(Color3.new(0, 0, 0), 0.14)
+                            for i = 0, n - 1 do
+                                frame({ Position = UDim2.fromScale((i * w + 0.35) / plen, 0.22), Size = UDim2.fromScale((w - 0.7) / plen, 0.56),
+                                    BackgroundColor3 = inset, ZIndex = 4 }, d)
+                            end
+                        elseif st.kind == "tile" then
+                            local rows = math.floor(dh / 0.55)
+                            for i = 1, rows do
+                                frame({ Position = UDim2.fromScale(0, 1 - (i * 0.55) / dh), Size = UDim2.new(1, 0, 0, 1),
+                                    BackgroundColor3 = st.grout, ZIndex = 4 }, d)
+                            end
+                            local cols = math.floor(plen / 1.1)
+                            for i = 1, cols do
+                                frame({ Position = UDim2.fromScale((i * 1.1) / plen, 0), Size = UDim2.new(0, 1, 1, 0),
+                                    BackgroundColor3 = st.grout, ZIndex = 4 }, d)
+                            end
+                        end
+                    end
+
+                    -- relief: skirting + chair rail, clipped to the room's interior
+                    local r = pc.room
+                    local i0 = ((seg.axis == "x") and r[1] or r[2]) + 0.5
+                    local i1 = ((seg.axis == "x") and r[3] or r[4]) - 0.5
+                    local b0, b1 = math.max(pc.a0, i0), math.min(pc.a1, i1)
+                    if b1 - b0 > 0.3 and seg.y0 <= FLOOR + E then
+                        local rel = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+                        abox("Skirting", seg.axis, seg.c + side * 0.6, b0, FLOOR, b1, FLOOR + 0.55, 0.2,
+                            st.base, st.baseMat or M.Plaster, f, rel)
+                        if st.rail and seg.y1 >= DADO_TOP + 0.2 then
+                            abox("ChairRail", seg.axis, seg.c + side * 0.58, b0, DADO_TOP - 0.12, b1, DADO_TOP + 0.12, 0.16,
+                                st.rail, st.railMat or M.Plaster, f, rel)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ── floors with pattern (v2.1): kitchen checkerboard, hall inlay border ──
+function VillaBuilder:_floorDetail(f)
+    -- kitchen: black + white checkerboard (drawn on a thin top sheet, 2-stud tiles)
+    local kx0, kz0, kx1, kz1 = 14.5, -57.5, 41.5, -38.5
+    local sheet = box("KitchenChecker", kx0, FLOOR, kz0, kx1, FLOOR + 0.02, kz1, Color3.fromRGB(236, 234, 228), M.CeramicTiles, f, NOSHADOW)
+    sheet.CanQuery = false
+    local g = surface(sheet, Enum.NormalId.Top, 6, 1, 1)
+    local nx, nz = math.floor((kx1 - kx0) / 2.25), math.floor((kz1 - kz0) / 2.25)
+    for i = 0, nx - 1 do
+        for j = 0, nz - 1 do
+            if (i + j) % 2 == 0 then
+                frame({ Position = UDim2.fromScale(i / nx, j / nz), Size = UDim2.fromScale(1 / nx, 1 / nz),
+                    BackgroundColor3 = Color3.fromRGB(34, 34, 38), BackgroundTransparency = 0.05 }, g)
+            end
+        end
+    end
+    -- hall: dark marble border band + a brass compass star under the chandelier
+    local hx0, hz0, hx1, hz1 = -13.5, -57.5, 13.5, -38.5
+    local bw = 1.2
+    local B = MARBLE_DK
+    box("HallBorder", hx0, FLOOR, hz0, hx1, FLOOR + 0.03, hz0 + bw, B, M.Marble, f, NOSHADOW)
+    box("HallBorder", hx0, FLOOR, hz1 - bw, hx1, FLOOR + 0.03, hz1, B, M.Marble, f, NOSHADOW)
+    box("HallBorder", hx0, FLOOR, hz0 + bw, hx0 + bw, FLOOR + 0.03, hz1 - bw, B, M.Marble, f, NOSHADOW)
+    box("HallBorder", hx1 - bw, FLOOR, hz0 + bw, hx1, FLOOR + 0.03, hz1 - bw, B, M.Marble, f, NOSHADOW)
+    local star = cpart("HallMedallion", Vector3.new(0.04, 7, 7), CFrame.new(0, FLOOR + 0.02, -47) * CFrame.Angles(0, 0, math.rad(90)),
+        B, M.Marble, f, merge(NOSHADOW, { Shape = Enum.PartType.Cylinder, CanQuery = false }))
+    star.Name = "HallMedallion"
+    for k = 0, 3 do
+        cpart("MedallionRay", Vector3.new(0.5, 0.04, 6.2), CFrame.new(0, FLOOR + 0.045, -47) * CFrame.Angles(0, math.rad(k * 45), 0),
+            BRASS, M.Metal, f, merge(NOSHADOW, { CanQuery = false }))
+    end
+    -- office: dark border around the planks
+    box("OfficeBorder", -41.5, FLOOR, -57.5, -14.5, FLOOR + 0.03, -56.7, WALNUT_DK, M.WoodPlanks, f, NOSHADOW)
+    box("OfficeBorder", -41.5, FLOOR, -39.3, -14.5, FLOOR + 0.03, -38.5, WALNUT_DK, M.WoodPlanks, f, NOSHADOW)
+end
+
+-- ──────────────────────────────────────────────
 -- 🌴 FACADE: deco details, tower, sign, canopy, parapets
 -- ──────────────────────────────────────────────
 function VillaBuilder:_facade(f, refs)
@@ -515,19 +737,21 @@ function VillaBuilder:_facade(f, refs)
         box("SpeedLineE" .. i, XE, y, ZN, XE + 0.2, y1, ZS, TEAL, M.Plaster, f)
     end
 
-    -- rounded corner towers at the two front corners
+    -- rounded corner towers at the two front corners. v2.1: pulled in to x ±40
+    -- (Ø5.4 → outer edge x ±42.7, flush with the side wall) so the east one no
+    -- longer pokes into the service driveway the getaway car drives down.
     for _, sx in ipairs({ -1, 1 }) do
-        local cx, cz = sx * 42.5, -37.5
-        vcyl("CornerTower", cx, 0, 19.5, cz, 6, PINK, M.Plaster, f)
+        local cx, cz = sx * 40, -37.5
+        vcyl("CornerTower", cx, 0, 19.5, cz, 5.4, PINK, M.Plaster, f)
         for i, y in ipairs({ 14.0, 14.7, 15.4 }) do
-            vcyl("CornerBand" .. i, cx, y, y + 0.35, cz, 6.3, TEAL, M.Plaster, f)
+            vcyl("CornerBand" .. i, cx, y, y + 0.35, cz, 5.7, TEAL, M.Plaster, f)
         end
-        vcyl("CornerNeonRing", cx, 19.3, 19.42, cz, 6.25, HOT_PINK, M.Neon, f, NOSHADOW)
-        vcyl("CornerCap", cx, 19.5, 19.9, cz, 6.6, TEAL, M.Plaster, f)
+        vcyl("CornerNeonRing", cx, 19.3, 19.42, cz, 5.65, HOT_PINK, M.Neon, f, NOSHADOW)
+        vcyl("CornerCap", cx, 19.5, 19.9, cz, 6.0, TEAL, M.Plaster, f)
         vcyl("CornerFinial", cx, 19.9, 21.2, cz, 0.5, STEEL_LITE, M.Metal, f, DECOR)
         local d = Vector3.new(sx, 0, 1).Unit
         for k = 0, 5 do
-            local p = Vector3.new(cx, 3.2 + k * 1.5, cz) + d * 2.95
+            local p = Vector3.new(cx, 3.2 + k * 1.5, cz) + d * 2.65
             cpart("GlassBlock", Vector3.new(1.1, 1.1, 0.4), CFrame.lookAt(p, p + d),
                 Color3.fromRGB(190, 230, 235), M.Glass, f, { Transparency = 0.15, Reflectance = 0.1 })
         end
@@ -544,7 +768,7 @@ function VillaBuilder:_facade(f, refs)
         end
     end
     -- portholes above the front windows
-    for _, x in ipairs({ -36, -22, 22, 36 }) do
+    for _, x in ipairs({ -34, -22, 22, 34 }) do
         local p = Vector3.new(x, 13, ZS)
         disc("PortholeRim", p + Vector3.new(0, 0, 0.1), PZ, 0.2, 2, TEAL_DARK, M.Metal, f)
         disc("PortholeGlass", p + Vector3.new(0, 0, 0.22), PZ, 0.1, 1.6,
@@ -568,7 +792,9 @@ function VillaBuilder:_facade(f, refs)
     box("Canopy", -7, 10.6, ZS, 7, 11.3, -32.6, STUCCO, M.Plaster, f)
     box("CanopyFascia", -7.05, 10.55, -32.6, 7.05, 11.35, -32.4, TEAL, M.Plaster, f)
     local strip = box("CanopyNeon", -6.5, 10.48, -33.2, 6.5, 10.6, -32.95, HOT_PINK, M.Neon, f, NOSHADOW)
-    pointLight(strip, HOT_PINK, 0.9, 10, false)
+    -- v2.1: a downward spot, not a point light — the old one shone pink straight
+    -- through the front wall and tinted the whole grand hall
+    spotLight(strip, Enum.NormalId.Bottom, HOT_PINK, 1.1, 12, 110, false)
     for _, sx in ipairs({ -1, 1 }) do
         local fix = box("CanopyDownlight", sx * 3 - 0.35, 10.45, -35.85, sx * 3 + 0.35, 10.6, -35.15, STEEL, M.Metal, f, DECOR)
         spotLight(fix, Enum.NormalId.Bottom, WARM, 1.2, 14, 90, true)
@@ -617,7 +843,7 @@ function VillaBuilder:_facade(f, refs)
     box("SignTube", 1.7, 17.25, -36.45, 1.85, 30.75, -36.15, HOT_PINK, M.Neon, f, NOSHADOW)
     box("SignTube", -1.85, 30.6, -36.45, 1.85, 30.75, -36.15, HOT_PINK, M.Neon, f, NOSHADOW)
     box("SignTube", -1.85, 17.25, -36.45, 1.85, 17.4, -36.15, HOT_PINK, M.Neon, f, NOSHADOW)
-    pointLight(sign, HOT_PINK, 3, 16, false)
+    spotLight(sign, Enum.NormalId.Back, HOT_PINK, 2.5, 18, 120, false)   -- faces the garden only (was a point light leaking indoors)
 
     -- ── parapets + neon roofline (gap in the west parapet where the ladder arrives) ──
     box("ParapetS", XW, ROOF, -38.5, XE, 19, ZS, STUCCO, M.Plaster, f)
@@ -688,17 +914,18 @@ local function bollard(parent, x, z)
     vcyl("Bollard", x, 0, 2.4, z, 0.55, STEEL, M.Metal, parent)
     local lens = vcyl("BollardLens", x, 2.0, 2.3, z, 0.6, WARM, M.Neon, parent, NOSHADOW)
     vcyl("BollardCap", x, 2.4, 2.55, z, 0.7, STEEL, M.Metal, parent, DECOR)
-    pointLight(lens, WARM, 1, 10, false)
+    -- a downward pool (unrotated holder: a vcyl's local axes are turned 90°)
+    spotLight(lightHolder(parent, Vector3.new(x, 2.2, z)), Enum.NormalId.Bottom, WARM, 1.2, 9, 150, false)
 end
 
 function VillaBuilder:_garden(f)
     local rng = Random.new(1958)
     local flowerCols = { Color3.fromRGB(255, 120, 190), Color3.fromRGB(250, 240, 240), Color3.fromRGB(220, 60, 140) }
     for _, sx in ipairs({ -1, 1 }) do
-        box("Lawn", sx * 6.4, 0, -37.5, sx * 42.5, 0.12, -26.8, Color3.fromRGB(46, 102, 58), M.Grass, f)
-        box("SidewalkHedge", sx * 10, 0, -27.8, sx * 42.5, 1.8, -26.8, Color3.fromRGB(40, 86, 48), M.Grass, f)
-        box("Flowerbed", sx * 10.4, 0, -37.5, sx * 39, 0.6, -36, Color3.fromRGB(70, 48, 36), M.Ground, f)
-        for k = 0, 12 do
+        -- lawn up to the garden wall (z -27.6); the old sidewalk hedge is now the wall itself
+        box("Lawn", sx * 6.4, 0, -37.5, sx * 42.6, 0.12, -27.6, Color3.fromRGB(46, 102, 58), M.Grass, f)
+        box("Flowerbed", sx * 10.4, 0, -37.5, sx * 36.8, 0.6, -36, Color3.fromRGB(70, 48, 36), M.Ground, f)
+        for k = 0, 11 do
             local x = sx * (11.2 + k * 2.2)
             local z = -36.75 + rng:NextNumber(-0.3, 0.3)
             if k % 3 == 1 then
@@ -707,14 +934,15 @@ function VillaBuilder:_garden(f)
                 ball("Flowers", Vector3.new(x, 0.85, z), 0.8, flowerCols[(k % 3) + 1], M.Fabric, f, DECOR)
             end
         end
+        -- a clipped hedge bed along the inside of the garden wall
+        box("WallHedge", sx * 10, 0, -29.4, sx * 34, 2.6, -27.6, Color3.fromRGB(40, 86, 48), M.LeafyGrass, f)
         palm(f, sx * 27, -31, sx * 1.4)
         bollard(f, sx * 7.4, -34.5)
-        -- pink / cyan uplights washing the facade (tilted back toward the wall)
-        for i, x in ipairs({ 29, 39 }) do   -- kept away from the office/kitchen dark corners (unshadowed light leaks through walls)
-            local fixture = cpart("Uplight", Vector3.new(0.6, 0.3, 0.6),
-                CFrame.new(sx * x, 0.3, -35.6) * CFrame.Angles(math.rad(-12), 0, 0), STEEL, M.Metal, f, DECOR)
-            spotLight(fixture, Enum.NormalId.Top, i == 1 and HOT_PINK or CYAN, 3, 20, 50, false)
-        end
+        -- v2.1 facade uplights: tight pink / cyan washes up the stucco. SHADOWED —
+        -- the old unshadowed ones lit the office + kitchen from outside.
+        local fixture = cpart("Uplight", Vector3.new(0.6, 0.3, 0.6),
+            CFrame.new(sx * 28, 0.75, -36.2) * CFrame.Angles(math.rad(-8), 0, 0), STEEL, M.Metal, f, DECOR)
+        spotLight(fixture, Enum.NormalId.Top, sx < 0 and HOT_PINK or CYAN, 2.8, 18, 38, true)
     end
 end
 
@@ -723,7 +951,7 @@ end
 -- ──────────────────────────────────────────────
 function VillaBuilder:_terrace(f)
     local STONE = Color3.fromRGB(226, 214, 192)
-    box("TerraceDeck", -42.5, 0, -102, 42.5, FLOOR, -96.5, STONE, M.Limestone, f)
+    box("TerraceDeck", -42.5, 0, -102.4, 42.6, FLOOR, -96.5, STONE, M.Limestone, f)   -- v2.1: runs to the beach railing
 
     local poolFloor = box("PoolFloor", -12, FLOOR, -101.2, 12, FLOOR + 0.02, -97.6, Color3.fromRGB(120, 215, 225), M.CeramicTiles, f)
     local pg = surface(poolFloor, Enum.NormalId.Top, 4, 0, 1)
@@ -882,7 +1110,7 @@ function VillaBuilder:_hall(f, props, spots, hides)
     end
     local drop = ball("ChandelierDrop", Vector3.new(0, 10.9, cz), 0.9, Color3.fromRGB(255, 236, 214), M.Glass, f,
         merge(NOSHADOW, { Transparency = 0.1 }))
-    pointLight(drop, WARM, 1.2, 24, true)
+    pointLight(drop, Color3.fromRGB(255, 200, 140), 1.5, 24, true)   -- the one big warm pool; corners stay dim
 
     -- marble columns flanking the corridor arch
     for _, sx in ipairs({ -1, 1 }) do
@@ -894,7 +1122,7 @@ function VillaBuilder:_hall(f, props, spots, hides)
         local sx7 = sx * 7.1
         box("Sconce", sx7 - 0.3, 7.8, -57.5, sx7 + 0.3, 8.3, -57.15, BRASS, M.Metal, f, DECOR)
         local b = ball("SconceBulb", Vector3.new(sx7, 8.45, -57.3), 0.3, WARM, M.Neon, f, NOSHADOW)
-        pointLight(b, WARM, 0.7, 10, false)
+        pointLight(b, WARM, 0.9, 7, false)   -- short: an unshadowed light shines through the wall behind it
     end
 
     -- round foyer table with a big vase (part-built: keycard spot height is exact)
@@ -931,7 +1159,7 @@ function VillaBuilder:_hall(f, props, spots, hides)
 
     -- NE corner: floor lamp + plant (mirror of the planter, so the room balances)
     prop(props, "lampSquareFloor", 12.3, FLOOR, -56.6)
-    pointLight(lightHolder(f, Vector3.new(12.3, 7.3, -56.6)), WARM, 0.6, 11, false)
+    pointLight(lightHolder(f, Vector3.new(12.3, 7.3, -56.6)), LAMP_WARM, 0.7, 9, false)
     prop(props, "pottedPlant", 12.2, FLOOR, -53.2, nil, 1.5)
 
     -- benches under the front windows, plants beside the door
@@ -939,6 +1167,10 @@ function VillaBuilder:_hall(f, props, spots, hides)
         prop(props, "benchCushion", sx * 9.9, FLOOR, -39.9, NZ, 1.0)
         prop(props, "pottedPlant", sx * 6.3, FLOOR, -40.2, nil, 1.3)
     end
+
+    -- velvet curtains on the front windows
+    curtains(f, "x", -38.6, -12.8, -9.4, Color3.fromRGB(120, 30, 44))
+    curtains(f, "x", -38.6, 9.4, 12.8, Color3.fromRGB(120, 30, 44))
 
     -- paintings on the side walls
     painting(f, Vector3.new(-13.5, 8, -55), PX, 3.2, 3.6, 11)
@@ -990,16 +1222,17 @@ function VillaBuilder:_office(f, props, spots, loot)
     prop(props, "tableCoffeeGlass", -19.5, FLOOR, -51.3, PZ, 1.0)
     prop(props, "loungeChair", -23.4, FLOOR, -51.3, PX, 1.0)
     prop(props, "lampSquareFloor", -24.6, FLOOR, -56.8)
-    pointLight(lightHolder(f, Vector3.new(-24.6, 7.3, -56.8)), WARM, 0.6, 12, false)
+    pointLight(lightHolder(f, Vector3.new(-24.6, 7.3, -56.8)), LAMP_WARM, 0.8, 12, true)
 
     -- south wall: sideboard with a lamp + a globe
     prop(props, "sideTableDrawers", -29, FLOOR, -39.45, NZ)
     prop(props, "lampSquareTable", -30, 3.76, -39.4, nil, 1.0)
-    pointLight(lightHolder(f, Vector3.new(-30, 5.8, -39.6)), WARM, 0.5, 9, false)
+    pointLight(lightHolder(f, Vector3.new(-30, 5.8, -39.6)), LAMP_WARM, 0.6, 8, false)
     vcyl("GlobeStand", -35.5, FLOOR, 2.6, -41.5, 0.3, BRASS, M.Metal, f)
     ball("Globe", Vector3.new(-35.5, 3.5, -41.5), 1.8, Color3.fromRGB(70, 120, 170), M.SmoothPlastic, f)
     prop(props, "ceilingFan", -28, TOP - 1.15, -48)
 
+    curtains(f, "z", -41.4, -50, -46, Color3.fromRGB(110, 30, 40))
     painting(f, Vector3.new(-14.5, 8, -55.3), NX, 3.4, 2.6, 21)
     painting(f, Vector3.new(-35, 8, -57.5), PZ, 3.5, 2.6, 22)
     painting(f, Vector3.new(-37.5, 8, -38.5), NZ, 1.8, 2.6, 23)
@@ -1033,8 +1266,8 @@ function VillaBuilder:_kitchen(f, props, spots, loot)
     for _, x in ipairs({ 27, 31 }) do
         box("PendantCable", x - 0.05, 9.8, -48.05, x + 0.05, TOP, -47.95, STEEL, M.Metal, f, DECOR)
         vcyl("PendantShade", x, 9.1, 9.8, -48, 1.3, STEEL, M.Metal, f, DECOR)
-        local b = ball("PendantBulb", Vector3.new(x, 9.0, -48), 0.3, WARM, M.Neon, f, NOSHADOW)
-        pointLight(b, WARM, 0.9, 9, x == 27)
+        local b = ball("PendantBulb", Vector3.new(x, 9.0, -48), 0.3, Color3.fromRGB(240, 244, 255), M.Neon, f, NOSHADOW)
+        pointLight(b, Color3.fromRGB(236, 242, 255), 1.0, 10, x == 27)
     end
 
     -- dining table by the front windows
@@ -1042,7 +1275,7 @@ function VillaBuilder:_kitchen(f, props, spots, loot)
     for _, x in ipairs({ 18.8, 22.2 }) do
         prop(props, "chairCushion", x, FLOOR, -44.6, PZ)
     end
-    ceilingLamp(f, 20.5, -41.2, WARM, 0.7, 12, false, 10)
+    ceilingLamp(f, 20.5, -41.2, LAMP_WARM, 0.8, 11, true, 10)
 
     prop(props, "trashcan", 22.5, FLOOR, -56.6, nil, 1.0)
     prop(props, "pottedPlant", 15.8, FLOOR, -39.8, nil, 1.3)
@@ -1050,7 +1283,7 @@ function VillaBuilder:_kitchen(f, props, spots, loot)
     painting(f, Vector3.new(19, 8, -57.5), PZ, 3, 2.4, 42)
     -- window curtains on the front
     curtains(f, "x", -38.6, 20, 24, Color3.fromRGB(240, 220, 170))
-    curtains(f, "x", -38.6, 34, 38, Color3.fromRGB(240, 220, 170))
+    curtains(f, "x", -38.6, 32, 36, Color3.fromRGB(240, 220, 170))
 end
 
 -- ──────────────────────────────────────────────
@@ -1154,17 +1387,17 @@ function VillaBuilder:_corridor(f, props, loot, hides)
 
     -- LINEN CUPBOARD hide spot on the east end wall (built-in, doors face west)
     local cx0, cx1, cz0, cz1 = 38.8, 41.5, -66.2, -61.4
-    box("CupboardTop", cx0, 8.2, cz0, cx1, 8.5, cz1, TRIM, M.Wood, f)
-    box("CupboardSide", cx0, FLOOR, cz0, cx1, 8.2, cz0 + 0.25, TRIM, M.Wood, f)
-    box("CupboardSide", cx0, FLOOR, cz1 - 0.25, cx1, 8.2, cz1, TRIM, M.Wood, f)
-    box("CupboardShelf", cx0 + 0.3, 6.5, cz0 + 0.25, cx1, 6.7, cz1 - 0.25, TRIM, M.Wood, f)
+    box("CupboardTop", cx0, 8.2, cz0, cx1, 8.5, cz1, TRIM, M.Plaster, f)
+    box("CupboardSide", cx0, FLOOR, cz0, cx1, 8.2, cz0 + 0.25, TRIM, M.Plaster, f)
+    box("CupboardSide", cx0, FLOOR, cz1 - 0.25, cx1, 8.2, cz1, TRIM, M.Plaster, f)
+    box("CupboardShelf", cx0 + 0.3, 6.5, cz0 + 0.25, cx1, 6.7, cz1 - 0.25, TRIM, M.Plaster, f)
     for k = 0, 3 do   -- folded towels on the top shelf
         box("Towels", cx0 + 0.6, 6.7, cz0 + 0.5 + k * 1.1, cx1 - 0.3, 7.5, cz0 + 1.4 + k * 1.1,
             (k % 2 == 0) and Color3.fromRGB(245, 245, 240) or Color3.fromRGB(150, 205, 210), M.Fabric, f, NOSHADOW)
     end
     local doors = cpart("LinenCupboardDoors", Vector3.new(cz1 - cz0, 7.7, 0.2),
         CFrame.lookAt(Vector3.new(cx0 - 0.1, FLOOR + 3.85, (cz0 + cz1) / 2), Vector3.new(cx0 - 5, FLOOR + 3.85, (cz0 + cz1) / 2)),
-        Color3.fromRGB(226, 214, 196), M.Wood, f)
+        Color3.fromRGB(226, 214, 196), M.Plaster, f)
     local dg = surface(doors, Enum.NormalId.Front, 20, 1, 1)
     for i = 0, 1 do
         local d = frame({ Size = UDim2.fromScale(0.46, 0.92), Position = UDim2.fromScale(0.03 + i * 0.5, 0.04),
@@ -1319,7 +1552,7 @@ function VillaBuilder:_vault(f)
     box("VaultCeiling", -18, 12.5, -96, 18, 13, -82, STEEL, M.Metal, f)
     for _, x in ipairs({ -10, 0, 10 }) do
         local fx = box("VaultLight", x - 0.8, 12.35, -89.5, x + 0.8, 12.5, -88.5, BRASS, M.Metal, f, DECOR)
-        pointLight(fx, Color3.fromRGB(255, 200, 110), 1.1, 15, x == 0)
+        pointLight(fx, Color3.fromRGB(255, 200, 110), 1.2, 15, true)   -- shadowed: gold must not bleed into the rooms round the vault
     end
     -- safe-deposit wall on the east side
     local boxes = box("DepositBoxes", 16.9, 1, -93, 17.3, 10, -84, Color3.fromRGB(150, 130, 90), M.Metal, f)
@@ -1408,10 +1641,21 @@ function VillaBuilder:_bedroom(f, props, spots, loot)
     prop(props, "cabinetTelevision", -19.56, FLOOR, -86, NX)
     prop(props, "televisionModern", -19.6, FLOOR + 2.63, -86, NX)
     local tvGlow = lightHolder(f, Vector3.new(-21, 4.5, -86))
-    pointLight(tvGlow, Color3.fromRGB(120, 150, 255), 0.5, 10, false)
+    pointLight(tvGlow, Color3.fromRGB(120, 150, 255), 0.5, 6, false)
     prop(props, "loungeChairRelax", -23.2, FLOOR, -86, PX, 1.0)
     prop(props, "lampSquareFloor", -20, FLOOR, -94.5)
-    pointLight(lightHolder(f, Vector3.new(-20, 7.3, -94.5)), WARM, 0.6, 12, false)
+    pointLight(lightHolder(f, Vector3.new(-20, 7.3, -94.5)), LAMP_WARM, 0.6, 7, false)
+    -- brass sconces either side of the bed (visible bulbs)
+    for _, z in ipairs({ -86.8, -79.2 }) do
+        box("BedSconce", -41.5, 6.6, z - 0.25, -41.15, 7.2, z + 0.25, BRASS, M.Metal, f, DECOR)
+        local sb = ball("BedSconceBulb", Vector3.new(-40.95, 7.35, z), 0.3, LAMP_WARM, M.Neon, f, NOSHADOW)
+        pointLight(sb, LAMP_WARM, 0.5, 7, false)
+    end
+    -- MOONLIGHT through the sea-view windows: a cold shadowed spot outside, so
+    -- the floor gets two window-shaped pools of blue and the rest stays dark
+    local moon = lightHolder(f, Vector3.new(-30, 15, -101))
+    moon.CFrame = CFrame.lookAt(moon.Position, Vector3.new(-30, FLOOR, -85))
+    spotLight(moon, Enum.NormalId.Front, MOON, 1.3, 30, 55, true)
     prop(props, "pottedPlant", -23.5, FLOOR, -94.6, nil, 1.3)
     prop(props, "ceilingFan", -30, TOP - 1.15, -83)
 
@@ -1436,10 +1680,10 @@ function VillaBuilder:_closet(f, spots, hides)
         local z = -80 + k * 0.8
         box("Garment", -8.2, 3.5 - (k % 3) * 0.4, z - 0.12, -6.7, 7, z + 0.12, cols[(k % #cols) + 1], M.Fabric, f, DECOR)
     end
-    box("ShoeShelf", -8.4, FLOOR, -80.5, -6.5, 1.4, -72.5, TRIM, M.Wood, f)
+    box("ShoeShelf", -8.4, FLOOR, -80.5, -6.5, 1.4, -72.5, TRIM, M.Plaster, f)
 
     -- vanity shelf (keycard spot) in the NW corner
-    box("Vanity", -17.3, FLOOR, -81.3, -15, 3.4, -79.8, TRIM, M.Wood, f)
+    box("Vanity", -17.3, FLOOR, -81.3, -15, 3.4, -79.8, TRIM, M.Plaster, f)
     box("VanityTop", -17.4, 3.4, -81.4, -14.9, 3.55, -79.7, MARBLE, M.Marble, f)
     table.insert(spots, CFrame.new(-16.2, 3.56, -80.5))
 
@@ -1461,7 +1705,7 @@ function VillaBuilder:_closet(f, spots, hides)
     end
     tagHide(wdoors, hides, "Closet", Vector3.new((wx0 + wx1) / 2, FLOOR + 3, -71.7))
 
-    local l = ceilingLamp(f, -11.5, -75.5, WARM, 0.55, 14, false)
+    local l = ceilingLamp(f, -11.5, -75.5, WARM, 0.6, 16, true)
     return l
 end
 
@@ -1627,7 +1871,7 @@ function VillaBuilder:_serviceHall(f, props)
     prop(props, "kitchenSink", 39.97, FLOOR, -75, NX, 1.0)
     -- cool fluorescent tube (thin neon accent + a dim light)
     local tube = box("FluoroTube", 28, TOP - 0.3, -75.2, 32, TOP - 0.15, -74.8, COOL, M.Neon, f, NOSHADOW)
-    pointLight(tube, COOL, 0.6, 16, false)
+    spotLight(tube, Enum.NormalId.Bottom, COOL, 0.8, 17, 70, false)   -- a downward cone: keeps it in the hall
     -- signs above the doors (on the hall side of the north wall)
     local s1 = box("StaffSign", 33.5, 11, -79.5, 38.5, 12, -79.4, Color3.fromRGB(26, 26, 30), M.Metal, f)
     signText(s1, Enum.NormalId.Back, "STAFF ROOM", Color3.fromRGB(250, 204, 21), 50, 0)
@@ -1640,7 +1884,7 @@ function VillaBuilder:_laundry(f, props, hides)
     prop(props, "dryer", 20.15, FLOOR, -90.4, PX)
     prop(props, "washerDryerStacked", 20.15, FLOOR, -87.0, PX)
     -- folding table with towels + a wall shelf of detergent
-    box("FoldTable", 22.5, 3.0, -95.3, 27.3, 3.3, -93.3, TRIM, M.Wood, f)
+    box("FoldTable", 22.5, 3.0, -95.3, 27.3, 3.3, -93.3, TRIM, M.Plaster, f)
     for _, x in ipairs({ 22.7, 27.0 }) do
         box("FoldTableLeg", x - 0.1, FLOOR, -95.1, x + 0.1, 3.0, -93.5, STEEL, M.Metal, f)
     end
@@ -1648,7 +1892,7 @@ function VillaBuilder:_laundry(f, props, hides)
         box("TowelStack", 23.2 + k * 1.3, 3.3, -94.9, 24.2 + k * 1.3, 3.9 + (k % 2) * 0.3, -93.8,
             (k % 2 == 0) and Color3.fromRGB(245, 245, 240) or Color3.fromRGB(240, 170, 190), M.Fabric, f)
     end
-    box("WallShelf", 22.5, 6.2, -95.5, 27.3, 6.4, -94.7, TRIM, M.Wood, f)
+    box("WallShelf", 22.5, 6.2, -95.5, 27.3, 6.4, -94.7, TRIM, M.Plaster, f)
     for k = 0, 3 do
         box("Detergent", 22.9 + k * 1.1, 6.4, -95.3, 23.6 + k * 1.1, 7.4, -94.9,
             ({ Color3.fromRGB(240, 120, 40), Color3.fromRGB(60, 140, 230), Color3.fromRGB(240, 240, 240), Color3.fromRGB(90, 200, 120) })[k + 1],
@@ -1676,7 +1920,7 @@ function VillaBuilder:_laundry(f, props, hides)
     signText(front, Enum.NormalId.Front, "LAUNDRY", Color3.fromRGB(230, 236, 245), 30, 1)
     tagHide(front, hides, "Laundry cart", Vector3.new(cx, 3.2, cz))
 
-    ceilingLamp(f, 23, -88.5, COOL, 0.55, 14, false)
+    ceilingLamp(f, 23, -88.5, COOL, 0.6, 16, true)
 end
 
 function VillaBuilder:_staffRoom(f, props)
@@ -1762,28 +2006,254 @@ function VillaBuilder:_sideDoor(f, props)
     local lamp = box("DoorLamp", x + 0.1, top + 2.75, lz - 0.3, x + 0.55, top + 3.3, lz + 0.3, Color3.fromRGB(255, 214, 150), M.Neon, f, NOSHADOW)
     pointLight(lamp, Color3.fromRGB(255, 200, 140), 0.9, 14, true)
 
-    -- service yard: concrete pad + a path back to the street
-    box("ServicePad", x, 0, -97, 50, 0.12, -79, Color3.fromRGB(130, 128, 122), M.Concrete, f)
-    box("ServicePath", 44.5, 0, -79, 48.5, 0.12, -26.8, Color3.fromRGB(150, 146, 138), M.Concrete, f)
+    -- (v2.1) the yard itself — paving, bins, the getaway parking bay and the
+    -- vehicle gate — is built by _grounds below.
+end
 
-    -- wheelie bins (trash + recycling) and a Kenney trash can
-    local function bin(bx, bz, color, label)
-        box("BinBody", bx - 0.9, 0.3, bz - 1, bx + 0.9, 3.6, bz + 1, color, M.SmoothPlastic, f)
-        box("BinLid", bx - 1.0, 3.6, bz - 1.1, bx + 1.0, 3.8, bz + 1.1, color, M.SmoothPlastic, f)
-        for _, dz in ipairs({ -0.7, 0.7 }) do
-            disc("BinWheel", Vector3.new(bx + 1.0, 0.35, bz + dz), PX, 0.3, 0.7, Color3.fromRGB(24, 24, 26), M.Rubber, f, DECOR)
-        end
-        local lab = box("BinLabel", bx - 0.8, 2.2, bz + 1, bx + 0.8, 3.0, bz + 1.02, Color3.fromRGB(240, 240, 240), M.SmoothPlastic, f, NOSHADOW)
-        signText(lab, Enum.NormalId.Back, label, Color3.fromRGB(30, 30, 34), 40, 1)
+-- ──────────────────────────────────────────────
+-- 🧱 v2.1 THE GROUNDS — Malachi: "shouldn't be able to just walk out the heist
+-- to the outside and see the ugly green terrain". The villa now sits inside a
+-- walled property; the only way out is the getaway car through the yard gate.
+--
+--   Enclosure (outer faces) x -50.9..54.0, z -103.0..-26.8, minus the notch
+--   x 50.9..54.0 / z -47.8..-26.8 (that's CORAL's lot). Stays inside
+--   MiamiBuilder.KEEP_CLEAR (x ±54, z -106..-25).
+--     street  z -27.6..-26.8   stucco base + iron railing, CLOSED front gate x -4..4
+--     beach   z -103.0..-102.4 stucco base + iron railing (sea view)
+--     west    x -50.9..-50.1   solid stucco, 11 tall
+--     lane    x 50.2..50.9 (z -48.6..-26.8), yard south z -48.6..-47.8,
+--     yard E  x 53.2..54.0     solid stucco, 11 tall
+--   SERVICE YARD x 42.6..53.2, z -102.4..-48.6 (concrete) + DRIVEWAY LANE
+--   x 42.6..50.2 down the east side of the villa to the street.
+--   VEHICLE GATE: stands OPEN, clear opening x 42.6..50.2 at z -27.2.
+--   GETAWAY PARKING: car centre (45.6, 0, -72) facing south (+Z) at the gate;
+--   footprint x 43.25..47.95, z -77.6..-66.4. Straight line to the gate —
+--   nothing solid in x 43.0..48.3 from z -78 to the street.
+--   Invisible ClimbGuards stand on every wall top up to y 45 (nobody jumps off
+--   the villa roof over a wall), except over the vehicle gate.
+-- ──────────────────────────────────────────────
+local WALL_H = 11
+local GETAWAY_POS = Vector3.new(45.6, 0, -72)
+local GUARD = { Transparency = 1, CanQuery = false, CanTouch = false, CastShadow = false }
+
+-- bx: a box along a wall line. axis "x" = runs along X (t = z thickness span)
+local function lineBox(parent, axis, name, t0, t1, b0, b1, y0, y1, col, mat, extra)
+    if axis == "x" then
+        return box(name, b0, y0, t0, b1, y1, t1, col, mat, parent, extra)
     end
-    bin(45.2, -95.3, Color3.fromRGB(40, 110, 60), "TRASH")
-    bin(47.6, -95.3, Color3.fromRGB(40, 90, 180), "RECYCLE")
-    bin(45.2, -81.2, Color3.fromRGB(40, 90, 180), "RECYCLE")
-    prop(props, "trashcan", 48, 0.12, -81.5)
-    prop(props, "cardboardBoxOpen", 48.2, 0.12, -84.5)
-    -- AC condenser against the wall outside the corridor
-    box("ACUnit", 42.5, 0, -70, 44.3, 3, -66.5, Color3.fromRGB(200, 200, 196), M.Metal, f)
-    disc("ACFan", Vector3.new(44.35, 1.6, -68.25), PX, 0.1, 2.2, Color3.fromRGB(40, 40, 44), M.Metal, f, DECOR)
+    return box(name, t0, y0, b0, t1, y1, b1, col, mat, parent, extra)
+end
+
+local PIER_COL = WALL_PINK:Lerp(TRIM, 0.4)
+
+-- solid 11-tall stucco garden wall with piers every ~10 studs
+local function gardenWall(parent, axis, t0, t1, a0, a1)
+    lineBox(parent, axis, "GardenWall", t0, t1, a0, a1, 0, WALL_H, WALL_PINK, M.Plaster)
+    lineBox(parent, axis, "WallPlinth", t0 - 0.15, t1 + 0.15, a0, a1, 0, 1.1, PLINTH, M.Concrete)
+    lineBox(parent, axis, "WallCoping", t0 - 0.2, t1 + 0.2, a0, a1, WALL_H, WALL_H + 0.35, TRIM, M.Plaster)
+    local n = math.max(1, math.floor((a1 - a0) / 10))
+    for i = 0, n do
+        local a = a0 + (a1 - a0) * i / n
+        lineBox(parent, axis, "WallPier", t0 - 0.3, t1 + 0.3, math.max(a0, a - 0.8), math.min(a1, a + 0.8), 0, WALL_H + 0.8, PIER_COL, M.Plaster)
+    end
+    lineBox(parent, axis, "ClimbGuard", t0, t1, a0, a1, WALL_H, 45, Color3.new(0, 0, 0), M.SmoothPlastic, GUARD)
+end
+
+-- stucco base + wrought-iron railing between piers (you see out, you can't get out)
+local function railing(parent, axis, t0, t1, a0, a1, baseH)
+    local tc = (t0 + t1) / 2
+    lineBox(parent, axis, "RailBase", t0, t1, a0, a1, 0, baseH, WALL_PINK, M.Plaster)
+    lineBox(parent, axis, "RailBaseCap", t0 - 0.2, t1 + 0.2, a0, a1, baseH, baseH + 0.3, TRIM, M.Plaster)
+    -- one invisible collider for the whole run (bars stay decor = cheap physics)
+    lineBox(parent, axis, "RailCollider", tc - 0.2, tc + 0.2, a0, a1, baseH, 45, Color3.new(0, 0, 0), M.SmoothPlastic, GUARD)
+    local n = math.max(1, math.floor((a1 - a0) / 11))
+    local bay = (a1 - a0) / n
+    local yb, yt = baseH + 0.3, WALL_H - 0.3
+    for i = 0, n do
+        local a = a0 + bay * i
+        local p0, p1 = math.max(a0, a - 0.8), math.min(a1, a + 0.8)
+        lineBox(parent, axis, "RailPier", t0 - 0.35, t1 + 0.35, p0, p1, 0, WALL_H + 0.6, PIER_COL, M.Plaster)
+        lineBox(parent, axis, "RailPierCap", t0 - 0.5, t1 + 0.5, p0 - 0.15, p1 + 0.15, WALL_H + 0.6, WALL_H + 0.9, TRIM, M.Plaster, DECOR)
+        if i < n then
+            local s0, s1 = p1, math.min(a1, a + bay - 0.8)
+            lineBox(parent, axis, "RailTop", tc - 0.12, tc + 0.12, s0, s1, yt - 0.3, yt, IRON, M.Metal, DECOR)
+            local nb = math.floor((s1 - s0) / 1.9)
+            for k = 1, nb do
+                local b = s0 + (s1 - s0) * k / (nb + 1)
+                lineBox(parent, axis, "RailBar", tc - 0.09, tc + 0.09, b - 0.09, b + 0.09, yb, yt + 0.5, IRON, M.Metal, DECOR)
+            end
+        end
+    end
+end
+
+-- a caged wall lantern with a visible bulb. out = unit direction away from the wall
+local function wallLantern(parent, pos, out, color, brightness, range, shadows, down)
+    local cf = CFrame.lookAt(pos, pos + out)
+    cpart("LanternBracket", Vector3.new(0.3, 0.3, 0.9), cf * CFrame.new(0, 0.9, -0.3), IRON, M.Metal, parent, DECOR)
+    cpart("LanternGlass", Vector3.new(0.7, 1.1, 0.7), cf * CFrame.new(0, 0.1, -0.75), Color3.fromRGB(255, 226, 170), M.Glass, parent,
+        merge(NOSHADOW, { Transparency = 0.45 }))
+    local bulb = ball("LanternBulb", (cf * CFrame.new(0, 0.15, -0.75)).Position, 0.32, color, M.Neon, parent, NOSHADOW)
+    if down then
+        spotLight(lightHolder(parent, bulb.Position - Vector3.new(0, 0.3, 0)), Enum.NormalId.Bottom, color, brightness, range, 120, shadows)
+    else
+        pointLight(bulb, color, brightness, range, shadows)
+    end
+    return bulb
+end
+
+local function wheelieBin(parent, bx, bz, color, label)
+    box("BinBody", bx - 0.9, 0.1, bz - 1, bx + 0.9, 3.6, bz + 1, color, M.Plastic, parent)
+    box("BinLid", bx - 1.0, 3.6, bz - 1.1, bx + 1.0, 3.8, bz + 1.1, color:Lerp(Color3.new(0, 0, 0), 0.2), M.Plastic, parent)
+    local lab = box("BinLabel", bx - 0.8, 2.2, bz + 1, bx + 0.8, 3.0, bz + 1.02, Color3.fromRGB(240, 240, 240), M.SmoothPlastic, parent, NOSHADOW)
+    signText(lab, Enum.NormalId.Back, label, Color3.fromRGB(30, 30, 34), 40, 1)
+end
+
+local function gatePier(parent, x0, x1, z0, z1, h)
+    box("GatePier", x0, 0, z0, x1, h, z1, PIER_COL, M.Plaster, parent)
+    box("GatePierBand", x0 - 0.1, h - 1.6, z0 - 0.1, x1 + 0.1, h - 1.2, z1 + 0.1, TEAL, M.Plaster, parent, DECOR)
+    box("GatePierCap", x0 - 0.25, h, z0 - 0.25, x1 + 0.25, h + 0.4, z1 + 0.25, TRIM, M.Plaster, parent)
+    local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+    -- lantern on top
+    box("PierLanternBase", cx - 0.4, h + 0.4, cz - 0.4, cx + 0.4, h + 0.6, cz + 0.4, IRON, M.Metal, parent, DECOR)
+    box("PierLanternGlass", cx - 0.35, h + 0.6, cz - 0.35, cx + 0.35, h + 1.7, cz + 0.35, Color3.fromRGB(255, 226, 170), M.Glass, parent,
+        merge(NOSHADOW, { Transparency = 0.45 }))
+    box("PierLanternRoof", cx - 0.5, h + 1.7, cz - 0.5, cx + 0.5, h + 1.95, cz + 0.5, IRON, M.Metal, parent, DECOR)
+    local bulb = ball("PierLanternBulb", Vector3.new(cx, h + 1.15, cz), 0.35, WARM, M.Neon, parent, NOSHADOW)
+    pointLight(bulb, WARM, 1.1, 12, false)
+end
+
+-- one iron gate leaf in the X-Z plane from p0 to p1 (bottom y0 → top y1)
+local function gateLeaf(parent, p0, p1, y0, y1, bars, collide)
+    local mid = (p0 + p1) / 2
+    local len = (p1 - p0).Magnitude
+    local cf = CFrame.lookAt(Vector3.new(mid.X, 0, mid.Z), Vector3.new(mid.X, 0, mid.Z) + (p1 - p0).Unit) * CFrame.Angles(0, math.rad(90), 0)
+    -- cf: local X runs along the leaf
+    local extra = collide and nil or DECOR
+    local function piece(name, x0, x1, ya, yb, w)
+        cpart(name, Vector3.new(x1 - x0, yb - ya, w or 0.22), cf * CFrame.new((x0 + x1) / 2, (ya + yb) / 2, 0), IRON, M.Metal, parent, extra)
+    end
+    local h = len / 2
+    piece("GateStile", -h, -h + 0.25, y0, y1)
+    piece("GateStile", h - 0.25, h, y0, y1)
+    piece("GateRail", -h, h, y0, y0 + 0.25)
+    piece("GateRail", -h, h, y1 - 0.25, y1)
+    piece("GateRail", -h, h, y0 + 2.2, y0 + 2.4)
+    for k = 1, bars do
+        local x = -h + len * k / (bars + 1)
+        piece("GateBar", x - 0.08, x + 0.08, y0, y1 + 0.45, 0.16)
+    end
+    return cf
+end
+
+function VillaBuilder:_grounds(f, props)
+    local walls = sub(f, "Walls")
+    local yard = sub(f, "Yard")
+
+    -- ── the enclosure ──
+    gardenWall(walls, "z", -50.9, -50.1, -103.0, -26.8)          -- west
+    gardenWall(walls, "z", 50.2, 50.9, -48.6, -26.8)             -- driveway lane (along CORAL)
+    gardenWall(walls, "x", -48.6, -47.8, 50.2, 54.0)             -- yard south (behind CORAL)
+    gardenWall(walls, "z", 53.2, 54.0, -103.0, -47.8)            -- yard east
+    railing(walls, "x", -103.0, -102.4, -50.9, 54.0, 3)          -- beach
+    railing(walls, "x", -27.6, -26.8, -50.9, -5.4, 3.4)          -- street, west of the front gate
+    railing(walls, "x", -27.6, -26.8, 5.4, 41.4, 3.4)            -- street, east of the front gate
+
+    -- ── FRONT GATE (x -4..4): closed, locked, pretty ──
+    for _, sx in ipairs({ -1, 1 }) do
+        gatePier(walls, math.min(sx * 4, sx * 5.4), math.max(sx * 4, sx * 5.4), -28.0, -26.7, 12.5)
+        gateLeaf(walls, Vector3.new(sx * 4, 0, -27.2), Vector3.new(0, 0, -27.2), 0.5, 9.2, 4, false)
+    end
+    box("GateLock", -0.35, 4.4, -27.45, 0.35, 5.2, -26.95, BRASS, M.Metal, walls, DECOR)
+    -- one collider over the leaves AND the piers (the entrance canopy is close
+    -- enough to hop from onto a pier top otherwise)
+    box("GateCollider", -5.4, 0.45, -27.4, 5.4, 45, -27.0, Color3.new(0, 0, 0), M.SmoothPlastic, walls, GUARD)
+    box("GateArch", -5.4, 11.6, -27.5, 5.4, 12.1, -26.9, IRON, M.Metal, walls, DECOR)
+    local nameplate = box("GateNameplate", -3.2, 12.1, -27.3, 3.2, 13.5, -27.1, IRON, M.Metal, walls, DECOR)
+    signText(nameplate, Enum.NormalId.Back, "VILLA ROSA", Color3.fromRGB(236, 200, 120), 40, 1)
+    signText(nameplate, Enum.NormalId.Front, "VILLA ROSA", Color3.fromRGB(236, 200, 120), 40, 1)
+    local plaque = box("PrivateProperty", 5.5, 5, -26.7, 7.5, 6.2, -26.6, Color3.fromRGB(26, 20, 30), M.Metal, walls, DECOR)
+    signText(plaque, Enum.NormalId.Back, "PRIVATE", Color3.fromRGB(236, 200, 120), 50, 1)
+
+    -- ── VEHICLE GATE (x 42.6..50.2): open, leaves folded back inside ──
+    gatePier(walls, 41.4, 42.6, -28.0, -26.7, 12.5)
+    gatePier(walls, 50.2, 51.0, -28.0, -26.7, 12.5)
+    gateLeaf(walls, Vector3.new(42.7, 0, -27.8), Vector3.new(42.7, 0, -31.6), 0.1, 9.0, 4, false)
+    gateLeaf(walls, Vector3.new(50.1, 0, -27.8), Vector3.new(50.1, 0, -31.6), 0.1, 9.0, 4, false)
+    box("GateBeam", 41.4, 13.0, -27.6, 51.0, 13.5, -26.9, IRON, M.Metal, walls, DECOR)
+    local vsign = box("DeliveriesSign", 43.4, 13.5, -27.35, 49.4, 15.1, -27.15, IRON, M.Metal, walls, DECOR)
+    signText(vsign, Enum.NormalId.Back, "DELIVERIES", Color3.fromRGB(250, 204, 21), 40, 1)
+    signText(vsign, Enum.NormalId.Front, "EXIT", Color3.fromRGB(80, 230, 140), 40, 1)
+
+    -- ── ground cover: nothing inside the walls is bare terrain ──
+    box("YardPaving", 42.6, 0, -102.4, 53.2, 0.1, -48.6, Color3.fromRGB(128, 126, 120), M.Concrete, yard)
+    box("Driveway", 42.6, 0, -48.6, 50.2, 0.1, -26.7, Color3.fromRGB(56, 58, 62), M.Asphalt, yard)
+    box("WestPath", -50.1, 0, -102.4, -42.5, 0.1, -27.6, Color3.fromRGB(176, 166, 150), M.Pebble, yard)
+    box("WestHedge", -50.1, 0, -100.5, -48.7, 3.4, -29.5, Color3.fromRGB(40, 86, 48), M.LeafyGrass, yard)
+
+    -- driveway markings: parking bay round the getaway car + a centre dash to the gate
+    local Y = Color3.fromRGB(236, 196, 60)
+    local paint = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+    box("BayLine", 42.9, 0.1, -78.8, 43.1, 0.12, -65.2, Y, M.SmoothPlastic, yard, paint)
+    box("BayLine", 48.3, 0.1, -78.8, 48.5, 0.12, -65.2, Y, M.SmoothPlastic, yard, paint)
+    box("BayLine", 42.9, 0.1, -78.8, 48.5, 0.12, -78.6, Y, M.SmoothPlastic, yard, paint)
+    for z = -60, -32, 7 do
+        box("LaneDash", 46.3, 0.1, z, 46.5, 0.12, z + 3, Color3.fromRGB(226, 224, 214), M.SmoothPlastic, yard, paint)
+    end
+    -- hatched no-parking box outside the staff door (keeps the doorway readable)
+    for k = 0, 3 do
+        cpart("Hatch", Vector3.new(0.25, 0.02, 3.2), CFrame.new(46.8, 0.11, -91.5 + k * 1.9) * CFrame.Angles(0, math.rad(45), 0),
+            Y, M.SmoothPlastic, yard, paint)
+    end
+
+    -- ── yard dressing: north of the car, or east of x 49 beside it — the car's
+    --    path (x 43.0..48.3, z -78 → street) stays clear ──
+    wheelieBin(yard, 44.4, -100.9, Color3.fromRGB(40, 110, 60), "TRASH")
+    wheelieBin(yard, 46.8, -100.9, Color3.fromRGB(40, 90, 180), "RECYCLE")
+    -- dumpster in the NE corner
+    box("Dumpster", 49.2, 0.1, -102.2, 53.0, 3.4, -99.4, Color3.fromRGB(38, 92, 70), M.Metal, yard)
+    box("DumpsterLid", 49.1, 3.4, -102.3, 53.1, 3.6, -99.3, Color3.fromRGB(28, 70, 54), M.Metal, yard)
+    box("DumpsterStripe", 49.2, 2.4, -99.42, 53.0, 2.8, -99.38, Color3.fromRGB(236, 196, 60), M.SmoothPlastic, yard, NOSHADOW)
+    -- staff smoking bench against the east wall (cover near the door)
+    box("YardBenchSeat", 51.4, 1.8, -97.2, 53.1, 2.1, -92.8, Color3.fromRGB(150, 110, 72), M.WoodPlanks, yard)
+    for _, z in ipairs({ -96.8, -93.2 }) do
+        box("YardBenchLeg", 51.6, 0.1, z - 0.15, 52.9, 1.8, z + 0.15, IRON, M.Metal, yard)
+    end
+    -- pallets + crates by the east wall (Kenney factory kit — it arrives textured)
+    for k = 0, 2 do
+        box("Pallet", 49.6, 0.1 + k * 0.5, -90.8, 53.0, 0.5 + k * 0.5, -87.2, Color3.fromRGB(160, 124, 84), M.WoodPlanks, yard)
+    end
+    prop(props, "box-large", 51.3, 1.6, -89, NX, nil, "factory")
+    prop(props, "trashcan", 49.6, 0.1, -84.6)
+    prop(props, "box-large", 51.6, 0.1, -82.2, NX, nil, "factory")
+    prop(props, "box-wide", 51.7, 0.1, -78.2, NX, nil, "factory")
+    prop(props, "cardboardBoxOpen", 51.7, 0.1, -74.6)
+    -- AC condensers against the east wall (moved off the villa wall: that's the lane now)
+    for _, z in ipairs({ -64.5, -60.5 }) do
+        box("ACUnit", 51.0, 0.1, z - 1.6, 53.2, 3.1, z + 1.6, Color3.fromRGB(200, 200, 196), M.Metal, yard)
+        disc("ACFan", Vector3.new(50.95, 1.7, z), NX, 0.1, 2.2, Color3.fromRGB(40, 40, 44), M.Metal, yard, DECOR)
+    end
+    -- a planter at the lane mouth (inside the yard)
+    for _, pz in ipairs({ -52.5 }) do
+        box("Planter", 50.6, 0.1, pz - 1.3, 53.2, 1.6, pz + 1.3, Color3.fromRGB(176, 100, 70), M.Brick, yard)
+        box("PlanterSoil", 50.8, 1.6, pz - 1.1, 53.0, 1.7, pz + 1.1, Color3.fromRGB(60, 42, 30), M.Ground, yard, DECOR)
+        ball("PlanterShrub", Vector3.new(51.9, 2.8, pz), 2.6, LEAF, M.LeafyGrass, yard, DECOR)
+    end
+
+    -- ── lights: pools, not floodlit everywhere ──
+    -- the floodlight over the parking bay (shadowed: it points at the villa)
+    local fl = cpart("Floodlight", Vector3.new(1.4, 0.9, 0.6), CFrame.lookAt(Vector3.new(52.6, 10.5, -72), Vector3.new(45, 0, -72)),
+        IRON, M.Metal, yard, DECOR)
+    box("FloodlightArm", 52.8, 10.2, -72.3, 53.2, 10.8, -71.7, IRON, M.Metal, yard, DECOR)
+    local lens = cpart("FloodlightLens", Vector3.new(1.2, 0.7, 0.05), fl.CFrame * CFrame.new(0, 0, -0.32), Color3.fromRGB(255, 240, 210), M.Neon, yard, NOSHADOW)
+    spotLight(lens, Enum.NormalId.Front, YARD_LIGHT, 2.2, 30, 70, true)
+    -- lantern pools along the walls (spots pointing down so none shine into the villa)
+    wallLantern(yard, Vector3.new(53.1, 8, -95), NX, YARD_LIGHT, 1.3, 12, false, true)
+    wallLantern(yard, Vector3.new(53.1, 8, -57), NX, YARD_LIGHT, 1.3, 12, false, true)
+    wallLantern(yard, Vector3.new(50.1, 8, -44), NX, YARD_LIGHT, 1.2, 12, false, true)
+    wallLantern(yard, Vector3.new(50.1, 8, -34), NX, YARD_LIGHT, 1.2, 12, false, true)
+    wallLantern(yard, Vector3.new(-50.0, 8, -90), PX, YARD_LIGHT, 1.1, 11, false, true)
+    wallLantern(yard, Vector3.new(-50.0, 8, -64), PX, YARD_LIGHT, 1.1, 11, false, true)
+    wallLantern(yard, Vector3.new(-50.0, 8, -38), PX, YARD_LIGHT, 1.1, 11, false, true)
 end
 
 -- ──────────────────────────────────────────────
@@ -1869,6 +2339,92 @@ function VillaBuilder:_cameras(f)
 end
 
 -- ──────────────────────────────────────────────
+-- 🪑 v2.1 KENNEY RECOLOUR — in Malachi's video the furniture rendered as plain
+-- white blocks (the importer dropped the colours, and KenneyLoader only fixes
+-- parts that come in pure white). Every furniture model we place is recoloured
+-- here as it arrives: biggest part = body colour, the rest = trim colour,
+-- `top` (optional) = the highest part (plant leaves, lamp shades).
+-- Factory-kit crates carry their own texture atlas and are left alone.
+-- ──────────────────────────────────────────────
+local APPLIANCE  = Color3.fromRGB(214, 218, 222)
+local APPL_DARK  = Color3.fromRGB(52, 56, 64)
+local CABINET    = Color3.fromRGB(40, 70, 72)
+local SHADE      = Color3.fromRGB(246, 232, 204)
+local LEAVES     = Color3.fromRGB(56, 118, 66)
+local TERRACOTTA = Color3.fromRGB(176, 96, 64)
+
+local TINTS = {
+    washer              = { APPLIANCE, M.Metal, APPL_DARK, M.Metal },
+    dryer               = { APPLIANCE, M.Metal, APPL_DARK, M.Metal },
+    washerDryerStacked  = { APPLIANCE, M.Metal, APPL_DARK, M.Metal },
+    kitchenFridgeLarge  = { Color3.fromRGB(196, 200, 206), M.Metal, APPL_DARK, M.Metal },
+    kitchenFridgeSmall  = { Color3.fromRGB(196, 200, 206), M.Metal, APPL_DARK, M.Metal },
+    kitchenStove        = { APPL_DARK, M.Metal, APPLIANCE, M.Metal },
+    kitchenSink         = { CABINET, M.Wood, APPLIANCE, M.Metal },
+    kitchenCabinet      = { CABINET, M.Wood, BRASS, M.Metal },
+    kitchenCabinetUpper = { CABINET, M.Wood, BRASS, M.Metal },
+    kitchenCoffeeMachine = { Color3.fromRGB(40, 42, 48), M.Metal, APPLIANCE, M.Metal },
+    kitchenMicrowave    = { Color3.fromRGB(40, 42, 48), M.Metal, APPLIANCE, M.Metal },
+    bookcaseOpen        = { WALNUT, M.WoodPlanks, WALNUT_DK, M.Wood },
+    bookcaseClosedWide  = { WALNUT, M.WoodPlanks, WALNUT_DK, M.Wood },
+    bedDouble           = { Color3.fromRGB(236, 228, 214), M.Fabric, WALNUT, M.Wood },
+    loungeSofa          = { Color3.fromRGB(38, 92, 96), M.Fabric, WALNUT_DK, M.Wood },
+    loungeChair         = { Color3.fromRGB(196, 150, 64), M.Fabric, WALNUT_DK, M.Wood },
+    loungeChairRelax    = { Color3.fromRGB(150, 60, 76), M.Fabric, WALNUT, M.Wood },
+    benchCushion        = { Color3.fromRGB(160, 70, 86), M.Fabric, WALNUT, M.Wood },
+    chairDesk           = { Color3.fromRGB(34, 32, 34), M.Leather, Color3.fromRGB(120, 124, 130), M.Metal },
+    chairCushion        = { WALNUT, M.Wood, Color3.fromRGB(236, 226, 206), M.Fabric },
+    stoolBar            = { Color3.fromRGB(34, 32, 34), M.Leather, BRASS, M.Metal },
+    tableCloth          = { Color3.fromRGB(226, 208, 176), M.Fabric, WALNUT, M.Wood },
+    tableCoffeeGlass    = { Color3.fromRGB(170, 200, 200), M.Glass, BRASS, M.Metal },
+    sideTableDrawers    = { WALNUT, M.Wood, BRASS, M.Metal },
+    cabinetTelevision   = { WALNUT, M.Wood, BRASS, M.Metal },
+    televisionModern    = { Color3.fromRGB(18, 18, 22), M.Metal, Color3.fromRGB(40, 40, 46), M.Metal },
+    laptop              = { Color3.fromRGB(48, 50, 56), M.Metal, Color3.fromRGB(20, 20, 24), M.Metal },
+    computerKeyboard    = { Color3.fromRGB(48, 50, 56), M.Metal, Color3.fromRGB(20, 20, 24), M.Metal },
+    pottedPlant         = { LEAVES, M.LeafyGrass, TERRACOTTA, M.Plaster, top = { LEAVES, M.LeafyGrass } },
+    rugRound            = { Color3.fromRGB(150, 46, 56), M.Carpet, Color3.fromRGB(214, 180, 110), M.Carpet },
+    rugRectangle        = { Color3.fromRGB(110, 44, 52), M.Carpet, Color3.fromRGB(214, 180, 110), M.Carpet },
+    bear                = { Color3.fromRGB(150, 105, 70), M.Fabric, Color3.fromRGB(40, 30, 24), M.Fabric },
+    lampSquareFloor     = { SHADE, M.Fabric, BRASS, M.Metal, top = { SHADE, M.Fabric } },
+    lampSquareTable     = { SHADE, M.Fabric, BRASS, M.Metal, top = { SHADE, M.Fabric } },
+    lampRoundTable      = { SHADE, M.Fabric, BRASS, M.Metal, top = { SHADE, M.Fabric } },
+    ceilingFan          = { WALNUT, M.Wood, BRASS, M.Metal },
+    trashcan            = { Color3.fromRGB(60, 64, 70), M.Metal, Color3.fromRGB(40, 42, 46), M.Metal },
+    cardboardBoxClosed  = { Color3.fromRGB(176, 138, 92), M.Cardboard, Color3.fromRGB(150, 116, 76), M.Cardboard },
+    cardboardBoxOpen    = { Color3.fromRGB(176, 138, 92), M.Cardboard, Color3.fromRGB(150, 116, 76), M.Cardboard },
+}
+
+local function tintProp(m)
+    if not m or not m.Parent then return end
+    local t = TINTS[m.Name]
+    if not t then return end
+    local parts = {}
+    for _, d in ipairs(m:GetDescendants()) do
+        if d:IsA("BasePart") then table.insert(parts, d) end
+    end
+    if #parts == 0 then return end
+    local main, best, top, topY = nil, -1, nil, -math.huge
+    for _, p in ipairs(parts) do
+        local v = p.Size.X * p.Size.Y * p.Size.Z
+        if v > best then main, best = p, v end
+        local y = p.Position.Y + p.Size.Y / 2
+        if y > topY then top, topY = p, y end
+    end
+    for _, p in ipairs(parts) do
+        local col, mat = t[3], t[4]
+        if p == main then col, mat = t[1], t[2] end
+        if t.top and p == top then col, mat = t.top[1], t.top[2] end
+        pcall(function()
+            -- a MeshPart with a texture ignores Color; the furniture kit is flat-colour
+            if p:IsA("MeshPart") and p.TextureID ~= "" then p.TextureID = "" end
+        end)
+        p.Color = col
+        p.Material = mat
+    end
+end
+
+-- ──────────────────────────────────────────────
 -- BUILD
 -- ──────────────────────────────────────────────
 function VillaBuilder:build(folder)
@@ -1876,6 +2432,7 @@ function VillaBuilder:build(folder)
     root.Name = "VillaRosa"
     root.Parent = folder
 
+    SEGMENTS = {}
     local props = {}
     local keycardSpots = {}
     local lootSpots = {}
@@ -1908,6 +2465,7 @@ function VillaBuilder:build(folder)
     self:_laundry(serviceF, props, hideSpots)
     self:_staffRoom(sub(root, "StaffRoom"), props)
     self:_sideDoor(sub(root, "SideDoor"), props)
+    self:_grounds(sub(root, "Grounds"), props)
     self:_roof(roofF)
     local cameras = self:_cameras(sub(root, "Cameras"))
 
@@ -1919,8 +2477,18 @@ function VillaBuilder:build(folder)
     shadowZone(sz, shadowZones, "Shadow_OfficeSE", -20, -43.5, -14.5, -38.5)
     shadowZone(sz, shadowZones, "Shadow_Pantry", 33.5, -55.3, 41.5, -52)
 
-    -- Kenney props load async and never error
-    KenneyLoader.placeMany(props, sub(root, "Props"))
+    -- v2.1 finishes: per-room wallpaper / dado / skirting + patterned floors
+    local finishes = sub(root, "Finishes")
+    self:_paintWalls(finishes)
+    self:_floorDetail(finishes)
+
+    -- Kenney props load async and never error. v2.1: every furniture model is
+    -- recoloured as it arrives (they were rendering as plain white blocks).
+    local propsF = sub(root, "Props")
+    propsF.ChildAdded:Connect(function(m)
+        task.defer(tintProp, m)
+    end)
+    KenneyLoader.placeMany(props, propsF)
 
     local plaques = facadeRefs.plaques or {}
     local function openSign(open)
@@ -1950,7 +2518,9 @@ function VillaBuilder:build(folder)
             { kind = "roof", at = Vector3.new(-46.5, 3, -84), label = "Roof ladder" },
         },
         policeStop = Vector3.new(0, 0, -18),
-        getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -18), Vector3.new(-30, 0, -18)),
+        -- v2.1: parked INSIDE the walled service yard, nose to the open vehicle
+        -- gate (x 42.6..50.2, z -27.2). Drive straight ahead (south) to the street.
+        getawayCFrame = CFrame.lookAt(GETAWAY_POS, GETAWAY_POS + PZ * 10),
         openSign = openSign,
 
         vault = vault,

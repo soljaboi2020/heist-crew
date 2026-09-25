@@ -57,12 +57,30 @@ local SHADOW_MULT = 1.6    -- fill time x1.6 in a ShadowZone (stacks)
 local NOTICE_AT   = 0.4    -- meter level where a guard stops and turns to look
 local HIDDEN_KEEP_OUT = 6  -- guards never walk to a point this close to a hidden player
 
+-- v2.0 mask powers (masks agent): optional MaskService lookup, never a hard require
+local maskSvc = nil
+local function maskHas(player, abilityId)
+    if maskSvc == nil then
+        local mod = script.Parent:FindFirstChild("MaskService")
+        local ok, r = false, nil
+        if mod then ok, r = pcall(require, mod) end
+        maskSvc = (ok and type(r) == "table" and type(r.has) == "function") and r or false
+    end
+    if not maskSvc then return false end
+    local ok, yes = pcall(maskSvc.has, maskSvc, player, abilityId)
+    return ok and yes == true
+end
+
 -- Returns (cannotBeSeen, fillTimeMultiplier)
 function GuardService.stealthFactor(player)
     if player:GetAttribute("Hidden") or player:GetAttribute("Jailed") then return true, math.huge end
     local m = 1
     if player:GetAttribute("Crouching") then m = m * CROUCH_MULT end
-    if player:GetAttribute("InShadow") then m = m * SHADOW_MULT end
+    if player:GetAttribute("InShadow") then
+        -- v2.0 masks: Night Owl "NIGHT VISION" → shadows hide you 2x instead of 1.6x
+        local nv = maskHas(player, "nightvision") and ((Constants.MASK_POWERS or {}).NIGHT_SHADOW or 2)
+        m = m * (nv or SHADOW_MULT)
+    end
     return false, m
 end
 

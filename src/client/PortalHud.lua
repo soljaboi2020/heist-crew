@@ -1,8 +1,9 @@
 --[[
     HEIST CREW — PortalHud  (v2.0)
     ────────────────────────────────────────────────
-    When YOU are standing in a heist door's glowing floor zone, a panel at the
-    bottom-centre says what's going on, in 7-year-old words:
+    When YOU are standing in a heist door's glowing floor zone, a card in the
+    UITheme bottomCenter slot (door icon in the heist's colour) says what's
+    going on, in 7-year-old words:
 
         HEIST DOOR
         ● VILLA ROSA  ·  1 / 2 players  ·  Waiting for 1 more
@@ -65,29 +66,48 @@ function PortalHud:_build()
     local pg = localPlayer:WaitForChild("PlayerGui")
     local old = pg:FindFirstChild("PortalHud")
     if old then old:Destroy() end
-    local screen = Instance.new("ScreenGui")
-    screen.Name = "PortalHud"
-    screen.ResetOnSpawn = false
-    screen.IgnoreGuiInset = true
-    screen.DisplayOrder = 4
-    screen.Parent = pg
-
-    local panel = UITheme.panel({ Name = "Portal", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -118),
-        Size = UDim2.fromOffset(0, 66), AutomaticSize = Enum.AutomaticSize.X, radius = 18, transparency = 0.1, Visible = false })
-    panel.Parent = screen
-    local stroke = panel:FindFirstChildOfClass("UIStroke")
+    -- (v2.1) a chunky card in the UITheme bottomCenter slot
+    local panel = UITheme.card({ Name = "Portal", LayoutOrder = 40, Size = UDim2.fromOffset(0, 76),
+        AutomaticSize = Enum.AutomaticSize.X, radius = 20, Visible = false })
+    panel.Parent = UITheme.slot("bottomCenter")
+    local stroke = panel:FindFirstChild("Stroke")
+    local minW = Instance.new("UISizeConstraint")
+    minW.MinSize = Vector2.new(340, 76)
+    minW.Parent = panel
+    local scale = Instance.new("UIScale")
+    scale.Parent = panel
     local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 20)
-    pad.PaddingRight = UDim.new(0, 22)
+    pad.PaddingLeft = UDim.new(0, 12)
+    pad.PaddingRight = UDim.new(0, 24)
     pad.Parent = panel
-    UITheme.caption("Heist door", { Position = UDim2.fromOffset(0, 9), Size = UDim2.fromOffset(200, 14), TextColor3 = T.gold }).Parent = panel
+    local outer = Instance.new("UIListLayout")
+    outer.FillDirection = Enum.FillDirection.Horizontal
+    outer.VerticalAlignment = Enum.VerticalAlignment.Center
+    outer.SortOrder = Enum.SortOrder.LayoutOrder
+    outer.Padding = UDim.new(0, 14)
+    outer.Parent = panel
+    local badge = UITheme.badge(UITheme.ICON.door, T.gold, 52, { LayoutOrder = 1 })
+    badge.Parent = panel
+
+    local col = Instance.new("Frame")
+    col.LayoutOrder = 2
+    col.BackgroundTransparency = 1
+    col.Size = UDim2.fromOffset(0, 60)
+    col.AutomaticSize = Enum.AutomaticSize.X
+    col.Parent = panel
+    local cl = Instance.new("UIListLayout")
+    cl.SortOrder = Enum.SortOrder.LayoutOrder
+    cl.VerticalAlignment = Enum.VerticalAlignment.Center
+    cl.Parent = col
+    UITheme.caption("Heist door", { LayoutOrder = 1, Size = UDim2.fromOffset(200, 16), TextSize = 13,
+        TextColor3 = T.gold }).Parent = col
 
     local row = Instance.new("Frame")
+    row.LayoutOrder = 2
     row.BackgroundTransparency = 1
-    row.Position = UDim2.fromOffset(0, 24)
-    row.Size = UDim2.fromOffset(0, 34)
+    row.Size = UDim2.fromOffset(0, 36)
     row.AutomaticSize = Enum.AutomaticSize.X
-    row.Parent = panel
+    row.Parent = col
     local list = Instance.new("UIListLayout")
     list.FillDirection = Enum.FillDirection.Horizontal
     list.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -95,38 +115,35 @@ function PortalHud:_build()
     list.Padding = UDim.new(0, 10)
     list.Parent = row
 
-    local dot = Instance.new("Frame")
-    dot.LayoutOrder = 1
-    dot.Size = UDim2.fromOffset(12, 12)
-    dot.BorderSizePixel = 0
-    dot.Parent = row
-    UITheme.corner(dot, 6)
     local function lbl(order, props)
         local l = UITheme.label(props)
         l.LayoutOrder = order
         l.AutomaticSize = Enum.AutomaticSize.X
-        l.Size = UDim2.fromOffset(0, 34)
+        l.Size = UDim2.fromOffset(0, 36)
         l.Parent = row
         return l
     end
-    local name = lbl(2, { FontFace = UITheme.F.display, TextSize = 22 })
-    local sep1 = lbl(3, { Text = "·", TextColor3 = T.faint, TextSize = 22 })
-    local count = lbl(4, { FontFace = UITheme.F.bold, TextSize = 19 })
-    local sep2 = lbl(5, { Text = "·", TextColor3 = T.faint, TextSize = 22 })
-    local status = lbl(6, { FontFace = UITheme.F.display, TextSize = 21 })
+    local name = lbl(2, { FontFace = UITheme.F.display, TextSize = 26 })
+    local sep1 = lbl(3, { Text = "·", TextColor3 = T.faint, TextSize = 26 })
+    local count = lbl(4, { FontFace = UITheme.F.bold, TextSize = 20 })
+    local sep2 = lbl(5, { Text = "·", TextColor3 = T.faint, TextSize = 26 })
+    local status = lbl(6, { FontFace = UITheme.F.display, TextSize = 22 })
 
-    self._u = { panel = panel, stroke = stroke, dot = dot, name = name, sep1 = sep1, count = count, sep2 = sep2, status = status }
+    self._u = { panel = panel, stroke = stroke, badge = badge, scale = scale, name = name, sep1 = sep1, count = count,
+        sep2 = sep2, status = status }
 end
 
 function PortalHud:_render(jobId)
     local u = self._u
     local d = self._state[jobId] or {}
     local col = JOB_COLOR[jobId] or T.gold
-    u.dot.BackgroundColor3 = col
+    UITheme.setBadge(u.badge, UITheme.ICON.door, col)
     u.name.Text = jobName(jobId)
     u.name.TextColor3 = col
-    u.stroke.Color = col
-    u.stroke.Transparency = 0.5
+    if u.stroke then
+        u.stroke.Color = col
+        u.stroke.Transparency = 0.2
+    end
 
     local n = math.max(0, math.floor(tonumber(d.count) or 0))
     local need = tonumber(d.needed)
@@ -168,8 +185,8 @@ function PortalHud:_show(on)
     self._shown = on
     if on then
         u.panel.Visible = true
-        u.panel.Position = UDim2.new(0.5, 0, 1, -104)
-        TweenService:Create(u.panel, TweenInfo.new(0.22, Enum.EasingStyle.Quad), { Position = UDim2.new(0.5, 0, 1, -118) }):Play()
+        u.scale.Scale = 0.85
+        TweenService:Create(u.scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
     else
         u.panel.Visible = false
     end

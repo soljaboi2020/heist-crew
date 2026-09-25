@@ -7,7 +7,8 @@
 
     What it builds (coordinates: docs/V1_SPEC.md §1):
       • Midnight lighting preset (moon, stars, purple/teal haze, neon bloom)
-      • Lawn (Part, south of the beach) + Terrain beach, marina sand spit, ocean
+      • Ground (dark paved Part, south of the beach) + Terrain beach, marina sand spit, ocean
+        (v2.0.2: was a bright-green Lawn — see _cityGround)
       • Ocean Drive extension x -150..-120 / 120..150 (+ streetlights), and
         wet-street puddles that catch the neon
       • 7 art-deco buildings on the spec lots: pastel Plaster, white eyebrows,
@@ -40,8 +41,22 @@
         two parking lots, two deco rooftops you can climb (TrussPart ladders),
         beach promenade lamps.
 
+    v2.0.2 (2026-09-25, Malachi playtesting under Future lighting: "very simple /
+    bad", the open green terrain is ugly):
+      • The Lawn is now a dark Pavement base; _cityGround dresses every free
+        block on a 24-stud grid as a plaza (brick / cobble / slate, planters,
+        benches, a fountain at each street end), a small raised-bed park
+        (dark desaturated grass, palms + round trees, bushes, a path) or a
+        parking lot (bays, wheel stops, a few parked cars). Street-facing blocks
+        get a low wall. Beach promenade, road-end barriers + ROAD CLOSED boards,
+        two backdrop hotels (ATLANTIS / PELICAN) past the road ends.
+        Nothing that sticks up goes inside MiamiBuilder.KEEP_CLEAR.
+      • applyLighting retuned for Future (darker, less purple ambient, more
+        exposure, subtle bloom, more contrast, thinner haze).
+
     PUBLIC API:
         MiamiBuilder:applyLighting()
+        MiamiBuilder.KEEP_CLEAR = { {x0, z0, x1, z1}, ... }   (v2.0.2) no-clutter rects
         MiamiBuilder:build(folder) -> {
             jail = {
                 cells   = { { inside = CFrame, door = BasePart }, ... },  -- 3 cells
@@ -264,21 +279,27 @@ end
 -- 🌙 LIGHTING — midnight on Ocean Drive
 -- ──────────────────────────────────────────────
 function MiamiBuilder:applyLighting()
+    -- (v2.0.2) Retuned for Lighting.Technology = Future. Future lights every
+    -- pixel from real sources, so the old purple OutdoorAmbient washed the
+    -- whole city flat. Now: darker, less purple ambient + a little more
+    -- exposure → lamp pools and neon carry the image; subtle bloom (only HDR
+    -- neon blooms); a bit more contrast; thinner haze so buildings keep
+    -- their silhouettes.
     Lighting.ClockTime = 0.3              -- just after midnight, moon up
     Lighting.GeographicLatitude = 25.8    -- Miami
-    Lighting.Brightness = 1.4             -- moonlight strength
+    Lighting.Brightness = 1.2             -- moonlight strength
     -- Ambient = what reaches under roofs. Stays DARK so interiors are stealth
     -- spaces lit only by their own lamps. OutdoorAmbient keeps streets readable.
-    Lighting.Ambient = Color3.fromRGB(22, 20, 34)
-    Lighting.OutdoorAmbient = Color3.fromRGB(100, 70, 135)
-    Lighting.ColorShift_Top = Color3.fromRGB(120, 100, 200)    -- lilac moonlight on top faces
-    Lighting.ColorShift_Bottom = Color3.fromRGB(30, 16, 48)
-    Lighting.ExposureCompensation = 0.15
+    Lighting.Ambient = Color3.fromRGB(20, 20, 30)
+    Lighting.OutdoorAmbient = Color3.fromRGB(72, 64, 98)
+    Lighting.ColorShift_Top = Color3.fromRGB(110, 110, 175)    -- cool moonlight on top faces
+    Lighting.ColorShift_Bottom = Color3.fromRGB(24, 16, 36)
+    Lighting.ExposureCompensation = 0.3
     Lighting.GlobalShadows = true
-    Lighting.ShadowSoftness = 0.25
-    Lighting.EnvironmentDiffuseScale = 0.3
-    Lighting.EnvironmentSpecularScale = 1   -- wet, glossy look on glass/water/puddles
-    Lighting.FogColor = Color3.fromRGB(38, 20, 58)
+    Lighting.ShadowSoftness = 0.2
+    Lighting.EnvironmentDiffuseScale = 0.45
+    Lighting.EnvironmentSpecularScale = 0.8   -- wet, glossy look on glass/water/puddles
+    Lighting.FogColor = Color3.fromRGB(38, 24, 56)
     Lighting.FogStart = 180
     Lighting.FogEnd = 900
 
@@ -297,29 +318,28 @@ function MiamiBuilder:applyLighting()
     sky.SunAngularSize = 8
     sky.Parent = Lighting
 
-    -- Purple haze with a teal fall-off toward the horizon
+    -- Thin night haze: purple up high, teal toward the horizon
     local atmo = Instance.new("Atmosphere")
-    atmo.Density = 0.34
-    atmo.Offset = 0.12
-    atmo.Color = Color3.fromRGB(120, 80, 170)
-    atmo.Decay = Color3.fromRGB(40, 140, 160)
-    atmo.Glare = 0.25
-    atmo.Haze = 1.8
+    atmo.Density = 0.3
+    atmo.Offset = 0.08
+    atmo.Color = Color3.fromRGB(96, 76, 140)
+    atmo.Decay = Color3.fromRGB(44, 110, 140)
+    atmo.Glare = 0.1
+    atmo.Haze = 1.2
     atmo.Parent = Lighting
 
-    -- Only things brighter than white bloom: neon + lit signs glow, white
-    -- stucco under a streetlight does not smear.
+    -- Subtle: under Future only real HDR highlights (neon, bulbs) pass 1.05
     local bloom = Instance.new("BloomEffect")
-    bloom.Intensity = 0.55
-    bloom.Size = 26
-    bloom.Threshold = 0.97
+    bloom.Intensity = 0.4
+    bloom.Size = 22
+    bloom.Threshold = 1.05
     bloom.Parent = Lighting
 
     local cc = Instance.new("ColorCorrectionEffect")
-    cc.Brightness = 0
-    cc.Contrast = 0.12
-    cc.Saturation = 0.15
-    cc.TintColor = Color3.fromRGB(255, 236, 252)   -- slight magenta
+    cc.Brightness = 0.02
+    cc.Contrast = 0.2
+    cc.Saturation = 0.12
+    cc.TintColor = Color3.fromRGB(255, 244, 250)   -- a whisper of magenta
     cc.Parent = Lighting
 
     print("[MiamiBuilder] Midnight lighting applied 🌙")
@@ -450,15 +470,18 @@ function MiamiBuilder.palm(parent, position, height, leanDir, seed)
 end
 
 -- ──────────────────────────────────────────────
--- 🌍 GROUND: lawn part + Terrain beach / ocean
+-- 🌍 GROUND: paved base part + Terrain beach / ocean
 -- ──────────────────────────────────────────────
 function MiamiBuilder:_ground(f)
     -- v2: the sand starts at z -102 (WORLD.BEACH_Z0). Terrain boundaries sit on
     -- the 4-stud voxel grid, so the sand block runs z -100..-120 and the lawn
     -- part stops at -100 (a lawn part and sand both topping out at y 0 over
     -- the same strip would z-fight).
+    -- (v2.0.2) The bright-green Lawn is gone: the base is now dark city
+    -- paving (same extent + height — The Vault's ceiling sits under it).
+    -- Grass only survives in small raised beds (_cityGround).
     local lawnNorth = -100
-    box("Lawn", -300, -2, lawnNorth, 300, 0, 220, Color3.fromRGB(58, 112, 64), Enum.Material.Grass, f)
+    box("Ground", -300, -2, lawnNorth, 300, 0, 220, Color3.fromRGB(70, 68, 72), Enum.Material.Pavement, f)
 
     local T = workspace.Terrain
     T.WaterColor = Color3.fromRGB(20, 110, 130)
@@ -493,7 +516,9 @@ local function streetlight(f, x, side)
     box("LightArm", x - 0.15, 11.6, math.min(z, armEnd), x + 0.15, 11.9, math.max(z, armEnd), METAL_DARK, Enum.Material.Metal, f)
     local head = box("LightHead", x - 0.5, 11.3, armEnd - 0.9, x + 0.5, 11.8, armEnd + 0.9, METAL_DARK, Enum.Material.Metal, f)
     box("LightLens", x - 0.35, 11.2, armEnd - 0.7, x + 0.35, 11.3, armEnd + 0.7, WARM_LIGHT, Enum.Material.Neon, f, GLOW)
-    spotLight(head, Enum.NormalId.Bottom, WARM_LIGHT, 2.2, 22, 115, true)
+    -- (v2.0.2) no shadows out here: the few shadowed key lamps are the ones
+    -- outside the auto shop + the jewelry store + the mart (SafehouseBuilder)
+    spotLight(head, Enum.NormalId.Bottom, WARM_LIGHT, 2.2, 22, 115, false)
 end
 
 function MiamiBuilder:_streetExtension(f)
@@ -865,13 +890,19 @@ function MiamiBuilder:_buildings(f)
           sign = { kind = "band", text = "HOTEL", color = PINK } },
         { name = "NEPTUNE", north = true, cx = -62, w = 22, d = 18, h = 22, color = P[2], neon = PINK, neon2 = PURPLE,
           finU = -(22 / 2 - 1.8), sign = { kind = "side", text = "COCKTAILS", color = CYAN },
-          ladder = { side = 1, v = 12 } },      -- ladder in the alley toward the villa (x -51)
+          ladder = { side = -1, v = 12 } },     -- (v2.0.2) far side: the villa wall now fills the x -51 alley
         { name = "CORAL", north = true, cx = 62, w = 22, d = 18, h = 24, color = P[4], neon = CYAN, neon2 = ORANGE,
           finU = 22 / 2 - 1.8, sign = { kind = "window", text = "OPEN 24/7", color = PINK },
-          ladder = { side = -1, v = 12 } },     -- ladder in the alley toward the villa (x 51)
+          ladder = { side = 1, v = 12 } },      -- (v2.0.2) far side: the villa wall now fills the x 51 alley
         -- south side (front face z 1, facing north onto the street)
         { name = "LUNA", north = false, cx = -116, w = 24, d = 20, h = 28, color = P[5], neon = PURPLE, neon2 = PINK, finU = 0,
           sign = { kind = "side", text = "COCKTAILS", color = PINK } },
+        -- (v2.0.2) backdrop hotels past the road ends, so looking down Ocean
+        -- Drive ends on a building instead of an empty plain
+        { name = "ATLANTIS", north = true, cx = -176, w = 22, d = 18, h = 26, color = P[3], neon = CYAN, neon2 = PURPLE,
+          finU = 0, sign = { kind = "band", text = "HOTEL", color = PINK } },
+        { name = "PELICAN", north = false, cx = 176, w = 22, d = 20, h = 24, color = P[6], neon = PINK, neon2 = ORANGE,
+          finU = 22 / 2 - 1.8, sign = { kind = "side", text = "DINER", color = CYAN } },
     }
     for i, sp in ipairs(specs) do
         sp.n = sp.north and 1 or -1
@@ -904,7 +935,9 @@ function MiamiBuilder:_palms(f)
     -- Ocean Drive: between streetlights (+ the extension), outer edge.
     -- North skips x 94..122 (marina route) and the police cruiser pads
     -- (x -110..-104, -80..-73). South skips x 28..48 (car alley mouth).
-    for _, x in ipairs({ -130, -70, -49, 49, 76, 128, 146 }) do sidewalkPalm(x, northZ, toStreetN) end
+    -- (v2.0.2) ±49 blocked the villa gate · (v2.1) ±56 grew through the streetlights
+    -- (SafehouseBuilder lamps at x ±28/±56/±84): -42 (no gate on the west) and 63
+    for _, x in ipairs({ -130, -70, -42, 63, 76, 128, 146 }) do sidewalkPalm(x, northZ, toStreetN) end
     for _, x in ipairs({ -132, -98, -74, 70, 98, 126 }) do sidewalkPalm(x, southZ, toStreetS) end
 
     -- Villa Rosa front garden pair — at the garden's outer corners, well clear
@@ -936,7 +969,7 @@ function MiamiBuilder:_palms(f)
 
     -- A few on the lawns behind the lots (clear of the villa, the station,
     -- the bank lot and the marina route x 94..122)
-    for i, p in ipairs({ { -148, -60 }, { -120, -66 }, { -60, -68 }, { 70, -66 }, { 138, -60 }, { -146, 30 }, { 146, 30 } }) do
+    for i, p in ipairs({ { -148, -60 }, { -120, -66 }, { -60, -68 }, { 70, -66 }, { 138, -60 }, { -146, 30 }, { 150, 30 } }) do   -- (v2.1) 146 → 150: off the bank yard's east wall
         MiamiBuilder.palm(f, Vector3.new(p[1], 0, p[2]), 18 + (i % 3) * 1.5, nil, 950 + i)
     end
 end
@@ -1987,9 +2020,10 @@ function MiamiBuilder:_cityLife(f)
     for _, lx in ipairs({ bx0 + 2.3, bx1 - 2.5 }) do
         box("ShelterBenchLeg", lx, 0.5, 1.0, lx + 0.2, 1.7, 1.8, METAL_DARK, Enum.Material.Metal, bus)
     end
-    cyl("BusSignPole", Vector3.new(bx0 - 1.1, 0.5, SOUTH_EDGE), Vector3.new(bx0 - 1.1, 9, SOUTH_EDGE), 0.2, CHROME,
+    -- (v2.0.2) pole moved to the east end: at x -40.6 it blocked the Diamond Dolls getaway gate
+    cyl("BusSignPole", Vector3.new(bx1 + 1.1, 0.5, SOUTH_EDGE), Vector3.new(bx1 + 1.1, 9, SOUTH_EDGE), 0.2, CHROME,
         Enum.Material.Metal, bus)
-    local bs = box("BusSign", bx0 - 1.9, 7.0, SOUTH_EDGE - 0.05, bx0 - 0.3, 8.8, SOUTH_EDGE + 0.05, WHITE, Enum.Material.Metal, bus, DECO)
+    local bs = box("BusSign", bx1 + 0.3, 7.0, SOUTH_EDGE - 0.05, bx1 + 1.9, 8.8, SOUTH_EDGE + 0.05, WHITE, Enum.Material.Metal, bus, DECO)
     for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
         local g = gui(bs, face, 60, 1, 0.5)
         UITheme.label({ Text = "BUS", TextColor3 = Color3.fromRGB(20, 70, 160), FontFace = UITheme.F.display, TextScaled = true,
@@ -2021,19 +2055,7 @@ function MiamiBuilder:_cityLife(f)
     local alley = folder(f, "Alleys")
     local GREEN = Color3.fromRGB(40, 92, 64)
     local BLUE = Color3.fromRGB(40, 70, 120)
-    -- NEPTUNE ↔ villa (x -51..-42). The villa side (x -47..-42) stays open.
-    dumpster(alley, -49.3, 0, -47, Vector3.new(1, 0, 0), GREEN)
-    crate(alley, -49.8, 0, -34.5, 2.2, 0.1)
-    crate(alley, -49.9, 0, -32.1, 1.8, -0.2)
-    crate(alley, -49.8, 2.2, -34.4, 1.5, 0.4)
-    trashBags(alley, -47.6, 0, -50.5)
-    wallLamp(alley, Vector3.new(-50.6, 9, -44), Vector3.new(1, 0, 0))
-    -- CORAL ↔ villa (x 42..51)
-    dumpster(alley, 49.3, 0, -47, Vector3.new(-1, 0, 0), BLUE)
-    crate(alley, 49.8, 0, -34.5, 2.2, -0.15)
-    crate(alley, 49.6, 0, -32.2, 1.6, 0.3)
-    trashBags(alley, 46.6, 0, -50.5)
-    wallLamp(alley, Vector3.new(50.6, 9, -44), Vector3.new(-1, 0, 0))
+    -- (v2.0.2) the villa ↔ NEPTUNE / CORAL alleys are now inside the villa property wall
     -- behind the police station
     dumpster(alley, -98, 0, -53.9, Vector3.new(0, 0, -1), GREEN)
     crate(alley, -86, 0, -54, 2.2, 0.2)
@@ -2050,6 +2072,503 @@ function MiamiBuilder:_cityLife(f)
     dumpster(alley, 89.4, 0.5, -44.3, Vector3.new(0, 0, 1), GREEN)
     crate(alley, 78, 0.5, -44.6, 2, 0.25)
     lotLight(alley, 75, -45.4)
+end
+
+-- ──────────────────────────────────────────────
+-- 🏙 CITY GROUND (v2.0.2) — replaces the giant bright-green Lawn.
+-- Malachi, Future lighting: "very simple / bad", the open green terrain is
+-- ugly. Now: a dark paved city base, and every free block is dressed as a
+-- plaza, a small planted park or a parking lot, with bushes, trees,
+-- planters, benches and low walls — so nothing big and flat and empty is
+-- visible from the street. Grass only in small raised beds, darker and
+-- desaturated. Blocks sit on a 24-stud grid (12-stud where a building
+-- makes a 24 cell too tight), inset so paved walkways run between them.
+--
+-- MiamiBuilder.KEEP_CLEAR = { {x0, z0, x1, z1}, ... } — nothing that sticks
+-- up is ever placed in these (street, every heist lot + a service-yard
+-- margin, deco lots, marina route, beach). Flat paving under them is the
+-- base Ground part only.
+-- ──────────────────────────────────────────────
+local KEEP_CLEAR = {
+    { -300, -27.5, 300, -0.5 },     -- Ocean Drive + both sidewalks (+ road ends)
+    { -54, -106, 54, -25 },         -- Villa Rosa + garden + back terrace + its alleys
+    { -40, 2, -24.9, 44.2 },        -- (v2.0.2) Diamond Dolls service yard east strip
+    { -76, -50, -48, -26 },         -- NEPTUNE
+    { 48, -50, 76, -26 },           -- CORAL
+    { -146, -52, -114, -26 },       -- FLAMINGO
+    { -114, -58, -70, -26 },        -- police station, cruiser pads, back alley
+    { 72, -50, 94, -26 },           -- north parking lot
+    { 90, -130, 126, -24 },         -- marina drive route + drop-off
+    { -132, -2, -84, 26 },          -- LUNA + south parking lot
+    { -90, -2, -40, 44 },           -- Diamond Dolls (+ service-yard margin)
+    { -44, -2, -28, 10 },           -- bus stop + dev test pad
+    { -30, -2, 30, 48 },            -- auto shop + driveway palms
+    { 26, -2, 52, 24 },             -- car alley (V2 §1)
+    { 44, -2, 82, 34 },             -- Sunny's Mart (+ yard margin)
+    { 78, -2, 148, 64 },            -- Ocean Bank (+ yard margin)
+    { -300, -130, 300, -100.5 },    -- beach + ocean
+    { -190, -50, -162, -26 },       -- ATLANTIS backdrop hotel (street end, west)
+    { 162, -2, 190, 24 },           -- PELICAN backdrop hotel (street end, east)
+}
+MiamiBuilder.KEEP_CLEAR = KEEP_CLEAR
+
+-- existing lone palms / fixtures the dressing must not land on
+local AVOID = {
+    { -148, -60 }, { -120, -66 }, { -60, -68 }, { 70, -66 }, { 138, -60 }, { -146, 30 }, { 150, 30 },
+}
+
+local function rectClear(x0, z0, x1, z1)
+    for _, r in ipairs(KEEP_CLEAR) do
+        if x0 < r[3] and x1 > r[1] and z0 < r[4] and z1 > r[2] then return false end
+    end
+    return true
+end
+local function spotFree(x, z, rad)
+    for _, a in ipairs(AVOID) do
+        if (a[1] - x) ^ 2 + (a[2] - z) ^ 2 < (rad + 2.5) ^ 2 then return false end
+    end
+    return true
+end
+
+-- palette: night-city, desaturated
+local GROUND_COL = Color3.fromRGB(70, 68, 72)
+local GRASS_COL  = Color3.fromRGB(46, 60, 40)
+local GRASS_COL2 = Color3.fromRGB(54, 66, 44)
+local SOIL_COL   = Color3.fromRGB(58, 44, 34)
+local KERB_COL   = Color3.fromRGB(122, 118, 112)
+local BRICK_COL  = Color3.fromRGB(112, 70, 60)
+local COBBLE_COL = Color3.fromRGB(104, 98, 92)
+local SLATE_COL  = Color3.fromRGB(84, 86, 94)
+local LOT_COL    = Color3.fromRGB(42, 44, 48)
+local PLANTER_COL = Color3.fromRGB(150, 138, 124)
+local WALL_COL   = Color3.fromRGB(196, 180, 164)
+local BUSH_COLS  = { Color3.fromRGB(38, 64, 40), Color3.fromRGB(48, 76, 44), Color3.fromRGB(34, 56, 44),
+    Color3.fromRGB(58, 78, 46) }
+local TREE_COLS  = { Color3.fromRGB(40, 70, 44), Color3.fromRGB(50, 80, 46), Color3.fromRGB(36, 62, 50) }
+local BARK       = Color3.fromRGB(76, 58, 44)
+
+local lightBudget = 0     -- set per build; every extra light in the dressing spends one
+
+local function slab(p, name, x0, z0, x1, z1, h, color, mat)
+    return box(name, x0, 0, z0, x1, h, z1, color, mat, p)
+end
+
+local function bush(p, x, y, z, s, rng)
+    local col = BUSH_COLS[rng:NextInteger(1, #BUSH_COLS)]
+    ball("Bush", Vector3.new(x, y + s * 0.38, z), s, col, Enum.Material.LeafyGrass, p, DECO)
+    ball("Bush", Vector3.new(x + s * 0.35, y + s * 0.3, z + s * 0.2), s * 0.75,
+        col:Lerp(Color3.new(0, 0, 0), 0.12), Enum.Material.LeafyGrass, p, DECO)
+    if s > 2.6 then
+        ball("Bush", Vector3.new(x - s * 0.3, y + s * 0.28, z - s * 0.25), s * 0.7,
+            col:Lerp(Color3.fromRGB(80, 96, 60), 0.2), Enum.Material.LeafyGrass, p, DECO)
+    end
+end
+
+-- A round-crowned street tree (sea grape / ficus look) for variety next to the palms
+local function roundTree(p, x, y, z, h, rng)
+    local m = Instance.new("Model")
+    m.Name = "Tree"
+    cyl("Trunk", Vector3.new(x, y - 0.3, z), Vector3.new(x, y + h * 0.62, z), 0.9, BARK, Enum.Material.Wood, m)
+    local col = TREE_COLS[rng:NextInteger(1, #TREE_COLS)]
+    local cy = y + h * 0.72
+    ball("Crown", Vector3.new(x, cy, z), h * 0.5, col, Enum.Material.LeafyGrass, m, DECO)
+    for k = 0, 2 do
+        local a = rng:NextNumber(0, math.pi * 2)
+        local r = h * 0.2
+        ball("Crown", Vector3.new(x + math.cos(a) * r, cy - h * 0.06 + k * 0.4, z + math.sin(a) * r),
+            h * rng:NextNumber(0.3, 0.38), col:Lerp(Color3.new(0, 0, 0), 0.1 * k), Enum.Material.LeafyGrass, m, DECO)
+    end
+    m.Parent = p
+end
+
+local palmBudget = 0
+local palmsHere = false   -- set per block: only street-facing blocks get palms
+local function tree(p, x, y, z, rng)
+    if palmsHere and palmBudget > 0 and rng:NextNumber() < 0.5 then
+        palmBudget -= 1
+        MiamiBuilder.palm(p, Vector3.new(x, y, z), rng:NextNumber(15, 20), nil, math.floor(x * 31 + z * 17 + 20000))
+    else
+        roundTree(p, x, y, z, rng:NextNumber(8, 11), rng)
+    end
+end
+
+-- Raised grass bed: concrete kerb ring + dark grass fill. Top of grass y 0.3.
+local function grassBed(p, x0, z0, x1, z1, rng)
+    local k = 0.5
+    box("BedKerb", x0, 0, z0, x1, 0.45, z0 + k, KERB_COL, Enum.Material.Concrete, p)
+    box("BedKerb", x0, 0, z1 - k, x1, 0.45, z1, KERB_COL, Enum.Material.Concrete, p)
+    box("BedKerb", x0, 0, z0 + k, x0 + k, 0.45, z1 - k, KERB_COL, Enum.Material.Concrete, p)
+    box("BedKerb", x1 - k, 0, z0 + k, x1, 0.45, z1 - k, KERB_COL, Enum.Material.Concrete, p)
+    box("Grass", x0 + k, 0, z0 + k, x1 - k, 0.3, z1 - k, (rng:NextNumber() < 0.5) and GRASS_COL or GRASS_COL2,
+        Enum.Material.Grass, p)
+end
+
+local function planter(p, x, z, w, d, rng, withTree)
+    box("Planter", x - w / 2, 0, z - d / 2, x + w / 2, 1.3, z + d / 2, PLANTER_COL, Enum.Material.Concrete, p)
+    box("PlanterCap", x - w / 2 - 0.15, 1.3, z - d / 2 - 0.15, x + w / 2 + 0.15, 1.5, z + d / 2 + 0.15,
+        PLANTER_COL:Lerp(WHITE, 0.2), Enum.Material.Concrete, p)
+    box("PlanterSoil", x - w / 2 + 0.3, 1.3, z - d / 2 + 0.3, x + w / 2 - 0.3, 1.45, z + d / 2 - 0.3,
+        SOIL_COL, Enum.Material.Ground, p, DECO)
+    if withTree then
+        tree(p, x, 1.4, z, rng)
+        bush(p, x + w * 0.25, 1.4, z - d * 0.2, 1.6, rng)
+    else
+        local n = math.max(1, math.floor(math.max(w, d) / 3))
+        for i = 1, n do
+            local t = (i - 0.5) / n
+            local bx = (w >= d) and (x - w / 2 + w * t) or x
+            local bz = (w >= d) and z or (z - d / 2 + d * t)
+            bush(p, bx, 1.4, bz, rng:NextNumber(1.8, 2.5), rng)
+        end
+    end
+end
+
+local function bench(p, x, z, facing)
+    local m = Instance.new("Model")
+    m.Name = "Bench"
+    local cf = CFrame.lookAt(Vector3.new(x, 0, z), Vector3.new(x, 0, z) + facing)
+    local wood = Color3.fromRGB(122, 86, 58)
+    local function bp(name, size, off, col, mat, extra)
+        local props = { Name = name, Size = size, CFrame = cf * off, Color = col, Material = mat }
+        for kk, v in pairs(extra or {}) do props[kk] = v end
+        return part(props, m)
+    end
+    for _, sx in ipairs({ -1.9, 1.9 }) do
+        bp("BenchLeg", Vector3.new(0.25, 1.5, 1.6), CFrame.new(sx, 0.75, 0), METAL_DARK, Enum.Material.Metal)
+    end
+    bp("BenchSeat", Vector3.new(4.4, 0.2, 1.4), CFrame.new(0, 1.55, -0.05), wood, Enum.Material.WoodPlanks)
+    bp("BenchBack", Vector3.new(4.4, 1.0, 0.16), CFrame.new(0, 2.35, 0.8) * CFrame.Angles(math.rad(-12), 0, 0),
+        wood, Enum.Material.WoodPlanks, DECO)
+    bp("BenchRail", Vector3.new(4.5, 0.14, 0.2), CFrame.new(0, 1.5, -0.72), METAL_DARK, Enum.Material.Metal, DECO)
+    m.Parent = p
+end
+
+local function lowWall(p, x0, z0, x1, z1, h)
+    box("LowWall", x0, 0, z0, x1, h, z1, WALL_COL, Enum.Material.Plaster, p)
+    box("LowWallCap", x0 - 0.15, h, z0 - 0.15, x1 + 0.15, h + 0.25, z1 + 0.15, WALL_COL:Lerp(WHITE, 0.25),
+        Enum.Material.Concrete, p)
+end
+
+local function hedge(p, x0, z0, x1, z1, h)
+    box("Hedge", x0, 0, z0, x1, h, z1, BUSH_COLS[1], Enum.Material.LeafyGrass, p)
+end
+
+-- Short path light: dim, tight pool (art rule #2). Costs one light.
+local function bollard(p, x, z)
+    cyl("Bollard", Vector3.new(x, 0, z), Vector3.new(x, 2.6, z), 0.5, METAL_DARK, Enum.Material.Metal, p)
+    local cap = box("BollardGlow", x - 0.22, 2.2, z - 0.22, x + 0.22, 2.5, z + 0.22, WARM_LIGHT, Enum.Material.Neon, p, GLOW)
+    if lightBudget > 0 then
+        lightBudget -= 1
+        pointLight(cap, WARM_LIGHT, 0.9, 12)
+    end
+end
+
+local function fountain(p, x, z)
+    local f = Instance.new("Model")
+    f.Name = "Fountain"
+    local function disc(name, y0, y1, d, col, mat, extra)
+        local props = { Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(y1 - y0, d, d),
+            CFrame = CFrame.new(x, (y0 + y1) / 2, z) * CFrame.Angles(0, 0, math.rad(90)), Color = col, Material = mat }
+        for kk, v in pairs(extra or {}) do props[kk] = v end
+        return part(props, f)
+    end
+    disc("BasinRim", 0, 1.3, 13, Color3.fromRGB(170, 160, 146), Enum.Material.Concrete)
+    disc("Water", 1.3, 1.36, 12, Color3.fromRGB(30, 80, 100), Enum.Material.Glass,
+        { Transparency = 0.15, Reflectance = 0.25, CanCollide = false })
+    disc("Pedestal", 1.3, 4.2, 1.6, Color3.fromRGB(170, 160, 146), Enum.Material.Concrete)
+    disc("Bowl", 4.2, 4.8, 5, Color3.fromRGB(170, 160, 146), Enum.Material.Concrete)
+    disc("BowlWater", 4.8, 4.84, 4.4, Color3.fromRGB(30, 80, 100), Enum.Material.Glass,
+        { Transparency = 0.15, Reflectance = 0.25, CanCollide = false })
+    disc("Spout", 4.8, 6.4, 0.5, Color3.fromRGB(150, 200, 210), Enum.Material.Glass, { Transparency = 0.4, CanCollide = false })
+    local glow = disc("PoolLight", 1.0, 1.25, 1, CYAN, Enum.Material.Neon, GLOW)
+    if lightBudget > 0 then
+        lightBudget -= 1
+        spotLight(glow, Enum.NormalId.Top, Color3.fromRGB(120, 220, 255), 2, 14, 60)
+    end
+    f.Parent = p
+end
+
+local CAR_PAINTS = {
+    PASTEL[1], PASTEL[2], PASTEL[3], PASTEL[5], Color3.fromRGB(236, 236, 240), Color3.fromRGB(46, 50, 60),
+    Color3.fromRGB(120, 30, 40),
+}
+local carBudget = 0
+
+-- Parking lot on x0..x1 × z0..z1: asphalt, painted bays along both long
+-- edges, concrete wheel stops, a few parked cars, a lot light if affordable.
+local function parkingLot(p, x0, z0, x1, z1, rng, lit)
+    slab(p, "LotPaving", x0, z0, x1, z1, 0.08, LOT_COL, Enum.Material.Asphalt)
+    local paint = Color3.fromRGB(206, 204, 196)
+    local alongX = (x1 - x0) >= (z1 - z0)
+    local len = alongX and (x1 - x0) or (z1 - z0)
+    local depth = 10.5
+    local n = math.floor((len - 2) / 6)
+    local short = alongX and (z1 - z0) or (x1 - x0)
+    -- bays on both long edges only if a 6-stud aisle still fits between them
+    local sides = (short >= depth * 2 + 6) and { -1, 1 } or { -1 }
+    for _, side in ipairs(sides) do
+        for i = 0, n do
+            local u = (alongX and x0 or z0) + 1 + i * 6
+            if alongX then
+                local za, zb = (side < 0) and z0 or (z1 - depth), (side < 0) and (z0 + depth) or z1
+                box("BayLine", u - 0.12, 0.08, za, u + 0.12, 0.1, zb, paint, Enum.Material.SmoothPlastic, p, GLOW)
+            else
+                local xa, xb = (side < 0) and x0 or (x1 - depth), (side < 0) and (x0 + depth) or x1
+                box("BayLine", xa, 0.08, u - 0.12, xb, 0.1, u + 0.12, paint, Enum.Material.SmoothPlastic, p, GLOW)
+            end
+            if i < n then
+                local c = u + 3
+                local inset = 1.2
+                local pos, face
+                if alongX then
+                    local zs = (side < 0) and (z0 + inset) or (z1 - inset)
+                    box("WheelStop", c - 1.6, 0.08, zs - 0.25, c + 1.6, 0.45, zs + 0.25, KERB_COL, Enum.Material.Concrete, p)
+                    pos, face = Vector3.new(c, 0.08, (side < 0) and (z0 + depth / 2 + 1.3) or (z1 - depth / 2 - 1.3)),
+                        Vector3.new(0, 0, side)
+                else
+                    local xs = (side < 0) and (x0 + inset) or (x1 - inset)
+                    box("WheelStop", xs - 0.25, 0.08, c - 1.6, xs + 0.25, 0.45, c + 1.6, KERB_COL, Enum.Material.Concrete, p)
+                    pos, face = Vector3.new((side < 0) and (x0 + depth / 2 + 1.3) or (x1 - depth / 2 - 1.3), 0.08, c),
+                        Vector3.new(side, 0, 0)
+                end
+                if carBudget > 0 and rng:NextNumber() < 0.3 then
+                    carBudget -= 1
+                    -- parked nose-in: the front (-Z local) points at the wheel stop
+                    MiamiBuilder.buildCar(p, CFrame.lookAt(pos, pos + face), {
+                        paint = CAR_PAINTS[rng:NextInteger(1, #CAR_PAINTS)],
+                        stripe = (rng:NextNumber() < 0.5) and WHITE or PINK, name = "ParkedCar",
+                    })
+                end
+            end
+        end
+    end
+    if lit and lightBudget > 0 then
+        lightBudget -= 1
+        lotLight(p, (x0 + x1) / 2, (z0 + z1) / 2)
+    end
+end
+
+-- Paved plaza: brick / cobble / slate, planters on the corners, benches
+-- facing each other across the middle, a tree in the centre planter.
+local PLAZA_MATS = {
+    { BRICK_COL, Enum.Material.Brick }, { COBBLE_COL, Enum.Material.Cobblestone }, { SLATE_COL, Enum.Material.Slate },
+}
+local function plaza(p, x0, z0, x1, z1, rng, opts)
+    opts = opts or {}
+    local pm = PLAZA_MATS[opts.mat or rng:NextInteger(1, #PLAZA_MATS)]
+    slab(p, "PlazaPaving", x0, z0, x1, z1, 0.06, pm[1], pm[2])
+    local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+    local w, d = x1 - x0, z1 - z0
+    for _, sx in ipairs({ -1, 1 }) do
+        for _, sz in ipairs({ -1, 1 }) do
+            local px, pz = cx + sx * (w / 2 - 2.6), cz + sz * (d / 2 - 2.6)
+            if spotFree(px, pz, 2) then planter(p, px, pz, 3.2, 3.2, rng, false) end
+        end
+    end
+    if opts.fountain then
+        fountain(p, cx, cz)
+        bench(p, cx, cz - 9, Vector3.new(0, 0, 1))
+        bench(p, cx, cz + 9, Vector3.new(0, 0, -1))
+    elseif spotFree(cx, cz, 3) then
+        planter(p, cx, cz, 5, 5, rng, true)
+        bench(p, cx - 5.2, cz, Vector3.new(-1, 0, 0))
+        if opts.lit ~= nil then bench(p, cx + 5.2, cz, Vector3.new(1, 0, 0)) end
+    end
+    if opts.lit then
+        bollard(p, cx - w / 2 + 1, cz)
+    end
+    if rng:NextNumber() < 0.5 then litterBin(p, cx + w / 2 - 1.2, cz + 3) end
+end
+
+-- Small park: raised grass bed with a paved path through it, trees,
+-- bushes along the edges and a bench on the path.
+local function park(p, x0, z0, x1, z1, rng, opts)
+    opts = opts or {}
+    local alongX = (x1 - x0) >= (z1 - z0)
+    local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+    -- two beds either side of the path
+    if alongX then
+        grassBed(p, x0, z0, x1, cz - 1.6, rng)
+        grassBed(p, x0, cz + 1.6, x1, z1, rng)
+        slab(p, "ParkPath", x0, cz - 1.6, x1, cz + 1.6, 0.1, COBBLE_COL, Enum.Material.Cobblestone)
+    else
+        grassBed(p, x0, z0, cx - 1.6, z1, rng)
+        grassBed(p, cx + 1.6, z0, x1, z1, rng)
+        slab(p, "ParkPath", cx - 1.6, z0, cx + 1.6, z1, 0.1, COBBLE_COL, Enum.Material.Cobblestone)
+    end
+    -- trees + bushes in the beds
+    local nTrees = math.max(1, math.floor((x1 - x0) * (z1 - z0) / 180))
+    for _ = 1, nTrees do
+        for _try = 1, 6 do
+            local tx = rng:NextNumber(x0 + 2.5, x1 - 2.5)
+            local tz = rng:NextNumber(z0 + 2.5, z1 - 2.5)
+            local onPath = alongX and math.abs(tz - cz) < 3.5 or (not alongX and math.abs(tx - cx) < 3.5)
+            if not onPath and spotFree(tx, tz, 2) then
+                tree(p, tx, 0.3, tz, rng)
+                break
+            end
+        end
+    end
+    local nBush = math.floor(((x1 - x0) + (z1 - z0)) / 7)
+    for _ = 1, nBush do
+        local bx = rng:NextNumber(x0 + 1.4, x1 - 1.4)
+        local bz = rng:NextNumber(z0 + 1.4, z1 - 1.4)
+        local onPath = alongX and math.abs(bz - cz) < 2.8 or (not alongX and math.abs(bx - cx) < 2.8)
+        if not onPath and spotFree(bx, bz, 1) then bush(p, bx, 0.3, bz, rng:NextNumber(1.6, 2.8), rng) end
+    end
+    if alongX then
+        bench(p, cx, cz - 2.4, Vector3.new(0, 0, 1))
+    else
+        bench(p, cx - 2.4, cz, Vector3.new(1, 0, 0))
+    end
+    if opts.lit then
+        if alongX then bollard(p, cx + 6, cz + 2.2) else bollard(p, cx + 2.2, cz + 6) end
+    end
+end
+
+-- 12-stud leftover: a planted bed with a tree, or paving with a planter + bench
+local function smallBlock(p, x0, z0, x1, z1, rng)
+    if rng:NextNumber() < 0.55 then
+        grassBed(p, x0, z0, x1, z1, rng)
+        local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+        if spotFree(cx, cz, 2) then tree(p, cx, 0.3, cz, rng) end
+        if spotFree(x0 + 2, z0 + 2, 1.5) then bush(p, x0 + 2, 0.3, z0 + 2, 2, rng) end
+        if spotFree(x1 - 2, z1 - 2, 1.5) then bush(p, x1 - 2, 0.3, z1 - 2, 1.8, rng) end
+    else
+        local pm = PLAZA_MATS[rng:NextInteger(1, #PLAZA_MATS)]
+        slab(p, "Paving", x0, z0, x1, z1, 0.06, pm[1], pm[2])
+        local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
+        if spotFree(cx, cz, 2) then
+            planter(p, cx, cz - 1.5, 6, 2.4, rng, false)
+            if rng:NextNumber() < 0.35 then bench(p, cx, cz + 1.4, Vector3.new(0, 0, 1)) end
+        end
+    end
+end
+
+-- Road ends: Ocean Drive stops at x ±150. Jersey barriers + a ROAD CLOSED
+-- board at x ±158 (traffic turns round by x 155), then a planted strip, so
+-- looking down the street ends on trees and a hotel, not on nothing.
+function MiamiBuilder:_roadEnds(f, rng)
+    for _, sgn in ipairs({ -1, 1 }) do
+        local bx = sgn * 158.5
+        for z = -21, -9, 4.4 do
+            local m = Instance.new("Model")
+            m.Name = "JerseyBarrier"
+            box("Barrier", bx - 0.8, 0, z, bx + 0.8, 1.2, z + 4.2, Color3.fromRGB(196, 190, 180), Enum.Material.Concrete, m)
+            box("Barrier", bx - 0.45, 1.2, z, bx + 0.45, 2.6, z + 4.2, Color3.fromRGB(196, 190, 180), Enum.Material.Concrete, m)
+            box("BarrierStripe", bx - 0.47, 1.8, z + 0.3, bx + 0.47, 2.2, z + 3.9, Color3.fromRGB(210, 60, 50),
+                Enum.Material.SmoothPlastic, m, DECO)
+            m.Parent = f
+        end
+        -- ROAD CLOSED board on two posts, facing back down the street
+        for _, pz in ipairs({ -17.4, -10.6 }) do
+            cyl("SignPole", Vector3.new(bx + sgn * 1.5, 0, pz), Vector3.new(bx + sgn * 1.5, 5.4, pz), 0.3, METAL_DARK,
+                Enum.Material.Metal, f)
+        end
+        local board = box("RoadClosed", bx + sgn * 1.5 - 0.1, 3.2, -18, bx + sgn * 1.5 + 0.1, 5.4, -10, Color3.fromRGB(236, 232, 224),
+            Enum.Material.Metal, f)
+        local g = gui(board, (sgn < 0) and Enum.NormalId.Right or Enum.NormalId.Left, 40, 1, 0.6)
+        local bg = gframe(g, 0, 0, 1, 1, Color3.fromRGB(236, 232, 224))
+        gframe(bg, 0, 0, 1, 0.18, Color3.fromRGB(210, 60, 50))
+        gframe(bg, 0, 0.9, 1, 0.1, Color3.fromRGB(210, 60, 50))
+        UITheme.label({ Text = "ROAD CLOSED", TextColor3 = Color3.fromRGB(30, 30, 34), FontFace = UITheme.F.display,
+            TextScaled = true, Size = UDim2.fromScale(0.9, 0.6), Position = UDim2.fromScale(0.05, 0.3),
+            TextXAlignment = Enum.TextXAlignment.Center }).Parent = bg
+        -- blinking-amber lamp on the middle barrier (static neon bulb + small light)
+        local bulb = ball("BarrierLamp", Vector3.new(bx, 3.0, -14.3), 0.45, ORANGE, Enum.Material.Neon, f, GLOW)
+        if lightBudget > 0 then
+            lightBudget -= 1
+            pointLight(bulb, ORANGE, 0.8, 9)
+        end
+        -- behind it: hedge + a park strip, so the vista closes on greenery
+        local hx0, hx1 = (sgn < 0) and -161 or 160, (sgn < 0) and -160 or 161
+        hedge(f, hx0, -25.5, hx1, -2.5, 3.2)
+        local px0, px1 = (sgn < 0) and -228 or 162, (sgn < 0) and -162 or 228
+        -- round trees only here: palm fronds would reach into the backdrop hotels
+        palmsHere = false
+        park(f, px0, -25.5, px1, -2.5, rng, { lit = false })
+    end
+end
+
+function MiamiBuilder:_cityGround(f)
+    local rng = Random.new(2026)
+    lightBudget = 16
+    carBudget = 8
+    palmBudget = 18
+
+    self:_roadEnds(folder(f, "RoadEnds"), rng)
+
+    local blocks = folder(f, "Blocks")
+    local X0, X1 = -228, 228
+    -- (north rows start at -96.5: z -100..-97 is the beach promenade)
+    local rows = { { -96.5, -76 }, { -76, -52 }, { -52, -28 } }
+    -- south: 4 rows (to z 96) — past that only rooftops see it, and it's hazed
+    for z = 0, 72, 24 do table.insert(rows, { z, z + 24 }) end
+    local fountains = 0
+    for _, row in ipairs(rows) do
+        local z0, z1 = row[1], row[2]
+        local frontage = (z1 == -28) or (z0 == 0)
+        for x = X0, X1 - 24, 24 do
+            local seed = math.floor((x + 1000) * 7 + (z0 + 1000) * 13)
+            local crng = Random.new(seed)
+            local bx0, bz0, bx1, bz1 = x + 1.5, z0 + 1.5, x + 22.5, z1 - 1.5
+            if z1 - z0 < 24 then bz0 = z0 + 0.5 end
+            palmsHere = frontage
+            if rectClear(bx0, bz0, bx1, bz1) then
+                local cell = folder(blocks, string.format("B_%d_%d", x, z0))
+                if frontage then
+                    -- the blocks you see from the street: plazas + parks, lit
+                    local roll = crng:NextNumber()
+                    if fountains < 2 and ((x == 132 and z0 == -52) or (x == -156 and z0 == 0)) then
+                        fountains += 1
+                        plaza(cell, bx0, bz0, bx1, bz1, crng, { fountain = true, lit = true, mat = 1 })
+                    elseif roll < 0.5 then
+                        plaza(cell, bx0, bz0, bx1, bz1, crng, { lit = crng:NextNumber() < 0.5 })
+                    else
+                        park(cell, bx0, bz0, bx1, bz1, crng, { lit = crng:NextNumber() < 0.5 })
+                    end
+                    -- a low wall with a hedge along the street edge, gap in the middle
+                    local ez = (z1 == -28) and (z1 - 1.5) or (z0 + 1.1)
+                    lowWall(cell, bx0, ez - 0.2, bx0 + 7.5, ez + 0.2, 1.4)
+                    lowWall(cell, bx1 - 7.5, ez - 0.2, bx1, ez + 0.2, 1.4)
+                else
+                    local roll = crng:NextNumber()
+                    if roll < 0.34 then
+                        parkingLot(cell, bx0, bz0, bx1, bz1, crng, crng:NextNumber() < 0.15)
+                        hedge(cell, bx0, bz0 - 0.9, bx1, bz0 - 0.1, 1.6)
+                    elseif roll < 0.72 then
+                        park(cell, bx0, bz0, bx1, bz1, crng)
+                    else
+                        plaza(cell, bx0, bz0, bx1, bz1, crng)
+                    end
+                end
+            else
+                -- try the four 12-stud quarters (a building clips this cell)
+                for qx = 0, 1 do
+                    for qz = 0, 1 do
+                        local ax0, az0 = x + qx * 12 + 1, z1 - 24 + qz * 12 + 1
+                        local ax1, az1 = ax0 + 10, az0 + 10
+                        if az0 < z0 then az0 = z0 + 0.5 end
+                        if rectClear(ax0, az0, ax1, az1) then
+                            smallBlock(folder(blocks, string.format("S_%d_%d", ax0, az0)), ax0, az0, ax1, az1, crng)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- A beach promenade: paving strip along the top of the sand, planters
+    -- every so often (skips the villa terrace and the marina drive route)
+    local prom = folder(f, "Promenade")
+    for _, seg in ipairs({ { -228, -56 }, { 56, 88 }, { 128, 228 } }) do
+        slab(prom, "PromenadePaving", seg[1], -100, seg[2], -97, 0.1, Color3.fromRGB(150, 138, 120), Enum.Material.Brick)
+        for x = seg[1] + 8, seg[2] - 8, 26 do
+            if spotFree(x, -98.5, 2) then planter(prom, x, -98.5, 4, 1.8, rng, false) end
+        end
+    end
+
+    print(string.format("[MiamiBuilder] city ground dressed (%d spare lights, %d spare cars)", lightBudget, carBudget))
 end
 
 -- ──────────────────────────────────────────────
@@ -2189,6 +2708,9 @@ function MiamiBuilder:build(parentFolder)
     end
     local okCity, err = pcall(self._cityLife, self, folder(root, "CityLife"))
     if not okCity then warn("[MiamiBuilder] ❌ city life failed: " .. tostring(err)) end
+    -- (v2.0.2) plazas / parks / lots on every free block (isolated like the rest)
+    local okGround, gerr = pcall(self._cityGround, self, folder(root, "CityGround"))
+    if not okGround then warn("[MiamiBuilder] ❌ city ground failed: " .. tostring(gerr)) end
 
     print("[MiamiBuilder] Neon Miami built 🌴")
     return { jail = jail }

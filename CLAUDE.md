@@ -484,6 +484,25 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   ⚠️ NOT yet played in Studio — first playtest will surface prop orientation (Kenney FRONT_YAW), ladder
   climbability, pathfinding, balance (villa take ~$18.4k).
 
+- **2026-09-25** — **v2.0.1 → v2.1 "LOOKS REAL"** (Malachi's 2nd video: door opened too early, could walk out onto
+  ugly green lawn, graphics + UI "very simple / bad"). v2.0.1: portal doors open only at launchIn <= 1.2, "Heist in
+  progress" text, bots side-by-side, Give-bag prompt only when carrying. v2.1 (7 agents + tester, 251/251 mock checks):
+  - Every heist **walled in** with a SERVICE YARD; the **getaway car parks in the yard** and drives out a gate:
+    villa (45.6,0,-72) · jewelry (-42.4,0,13) · mart (78.25,0,10) · bank (135.9,0.25,15), all facing the gate.
+  - MiamiBuilder: lawn → dark paved `Ground` + `_cityGround` plazas/parks/lots, `KEEP_CLEAR` rects, Future-tuned
+    lighting. KenneyLoader recolours untextured props by name (opts.color/material/recolor, setStyle/styleFor).
+    ClubBuilder: steel elevator heist doors. NpcFactory.OUTFITS / outfit() / outfitFor().
+  - **UI overhaul:** UITheme slots (topCenter/topRight/rightEdge/left/bottomLeft/bottomCenter) + scale(); one
+    objective bar; ≤3 waypoints; tips queue; ShopUI with **real mask pictures (rbxthumb)** + 3D bag/car previews +
+    **CASH tab**. Mockup: `docs/mockups/shop-masks-v2.png`.
+  - **Mask powers** (MaskService; `Constants.MASKS[i].ability`, `MASK_POWERS`): lucky · toughguy · nightvision ·
+    foxspeed · powerthrow · ghost · surprise · hackchip.
+  - **Robux cash packs LIVE on Roblox** (RobuxService ProcessReceipt, idempotent): universe **10127256584**,
+    products 3714635306 / 3714635777 / 3714635779 / 3714635781 ($5K/25 · $30K/99 · $100K/249 · $500K/799 R$),
+    icons in `docs/icons/`. Created + iconed via **Open Cloud** (`~/.claude/roblox-opencloud-key`, scope
+    developer-product:read+write; PATCH with multipart `imageFile` sets the icon — no asset scope needed).
+  - Malachi must set in Studio: Lighting.Technology = Future; Game Settings → Security → Studio API access ON.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

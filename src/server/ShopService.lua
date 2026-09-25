@@ -17,6 +17,14 @@
     actions: getState · buyGear{id} · buyMask{id} · equipMask{id} · redeemCode{code} · buyVIP
              · buyCosmetic{id} · equipCosmetic{id}                                   (v2.0)
     state.cosmetics = { catalog = {items}, owned = {ids}, equipped = {bag, car, trail} }
+    (v2.0 masks agent)
+      · MASK POWERS — every Constants.MASKS entry has `ability = {id,name,desc}`.
+        wearMask/removeMask switch the power on/off through MaskService.
+        state.maskPower = active ability id (or nil) · each state.maskList row
+        = { id, name, price, owned, equipped, ability = {id,name,desc} }
+      · ROBUX PACKS — state.robuxPacks = { {id, name, cash, robux, available} }
+        (available = productId ~= 0). action buyRobuxPack{id} opens the Roblox
+        purchase prompt; RobuxService.ProcessReceipt grants the cash.
     Every rule is enforced HERE (price, ownership, once-per-code); the client
     only asks.
 
@@ -25,6 +33,7 @@
         ShopService:onPlayerJoined(player)       -- attributes, VIP check
         ShopService:hasGear(player, id) -> bool
         ShopService:wearMask(player) / ShopService:removeMask(player)
+        ShopService:getEquippedMask(player) -> maskId        (v2.0, MaskService reads it)
 --]]
 
 local Players = game:GetService("Players")
@@ -51,6 +60,25 @@ do
         else
             warn("[ShopService] CosmeticsService failed to load: " .. tostring(result))
         end
+    end
+end
+
+-- v2.0 mask powers (masks agent) — optional, looked up lazily so there's no
+-- require cycle (MaskService reads the equipped mask back through this file).
+local maskServiceCache = nil
+local function maskService()
+    if maskServiceCache ~= nil then return maskServiceCache or nil end
+    local mod = script.Parent:FindFirstChild("MaskService")
+    local ok, result = false, nil
+    if mod then ok, result = pcall(require, mod) end
+    maskServiceCache = (ok and type(result) == "table") and result or false
+    return maskServiceCache or nil
+end
+local function maskPower(method, player)
+    local MS = maskService()
+    if MS and type(MS[method]) == "function" then
+        local ok, err = pcall(MS[method], MS, player)
+        if not ok then warn("[ShopService] MaskService:" .. method, err) end
     end
 end
 
@@ -91,8 +119,28 @@ local function stateFor(player)
             cosmetics = cs
         end
     end
+    -- v2.0: masks with their powers (so the shop can say what each one does)
+    local maskList = {}
+    for _, m in ipairs(Constants.MASKS) do
+        table.insert(maskList, {
+            id = m.id, name = m.name, price = m.price, assetId = m.assetId,
+            owned = d.masks[m.id] == true, equipped = d.mask == m.id,
+            ability = m.ability,
+        })
+    end
+    -- v2.0: Robux → cash packs (hidden until the owner pastes a productId)
+    local robuxPacks = {}
+    for _, pk in ipairs(Constants.ROBUX_PACKS or {}) do
+        table.insert(robuxPacks, {
+            id = pk.id, name = pk.name, cash = pk.cash, robux = pk.robux,
+            available = (tonumber(pk.productId) or 0) ~= 0,
+        })
+    end
     return {
         cash = d.cash, gear = gear, masks = masks, mask = d.mask,
+        maskList = maskList,
+        maskPower = player:GetAttribute("MaskPower"),
+        robuxPacks = robuxPacks,
         vip = player:GetAttribute("VIP") == true,
         vipPassId = Constants.GAMEPASSES.VIP or 0,
         codesRedeemed = codes,
@@ -129,7 +177,7 @@ function actions.buyGear(player, payload)
     syncAttributes(player)
     if g.id == "Sneakers" and not player:GetAttribute("CarryingLoot") then
         local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 18 end
+        if hum then hum.WalkSpeed = 18 * (tonumber(player:GetAttribute("SpeedMult")) or 1) end
     end
     return true, g.name .. " unlocked"
 end
@@ -143,6 +191,11 @@ function actions.buyMask(player, payload)
     d.masks[m.id] = true
     d.mask = m.id
     syncAttributes(player)
+    -- (v2.1 fix) buying = equipping, so mid-heist swap the worn mask + its power
+    -- too (it used to leave the old mask on with the OLD power)
+    if wearing[player] or (player.Character and player.Character:FindFirstChild("HC_Mask")) then
+        ShopService:wearMask(player)
+    end
     return true, m.name .. " mask equipped"
 end
 
@@ -153,8 +206,8 @@ function actions.equipMask(player, payload)
     if not d.masks[m.id] then return false, "You don't own that mask" end
     d.mask = m.id
     syncAttributes(player)
-    if player.Character and player.Character:FindFirstChild("HC_Mask") then
-        ShopService:wearMask(player)   -- swap it live if they're wearing one
+    if wearing[player] or (player.Character and player.Character:FindFirstChild("HC_Mask")) then
+        ShopService:wearMask(player)   -- swap it live if they're wearing one (v2.0: + its power)
     end
     return true, m.name .. " equipped"
 end
@@ -175,6 +228,21 @@ function actions.buyVIP(player)
     if id == 0 then return false, "VIP isn't available yet" end
     MarketplaceService:PromptGamePassPurchase(player, id)
     return true, ""
+end
+
+-- v2.0: Robux → cash. This only OPENS the Roblox purchase prompt; the cash is
+-- granted by RobuxService's ProcessReceipt (never here — the client can't be trusted).
+function actions.buyRobuxPack(player, payload)
+    local id = payload and payload.id
+    for _, pk in ipairs(Constants.ROBUX_PACKS or {}) do
+        if pk.id == id then
+            local productId = tonumber(pk.productId) or 0
+            if productId == 0 then return false, "That cash pack isn't in the store yet" end
+            MarketplaceService:PromptProductPurchase(player, productId)
+            return true, ""
+        end
+    end
+    return false, "Unknown cash pack"
 end
 
 function actions.buyCosmetic(player, payload)
@@ -205,6 +273,7 @@ function ShopService:wearMask(player)
     self:removeMask(player)
     wearing[player] = true
     local m = MASK_BY_ID[d.mask] or MASK_BY_ID.Bandit
+    maskPower("activate", player)   -- v2.0: the mask's power turns on with it
     task.spawn(function()
         local template = getMaskTemplate(m.assetId)
         -- (fix v1.1) the load can finish after the run already ended
@@ -220,9 +289,17 @@ end
 
 function ShopService:removeMask(player)
     wearing[player] = nil
+    maskPower("deactivate", player)   -- v2.0: power off with the mask
     local char = player.Character
     local old = char and char:FindFirstChild("HC_Mask")
     if old then old:Destroy() end
+end
+
+-- v2.0: the mask the player has picked (MaskService reads this)
+function ShopService:getEquippedMask(player)
+    local d = PlayerData and PlayerData:getData(player)
+    local id = d and d.mask
+    return (id and MASK_BY_ID[id]) and id or "Bandit"
 end
 
 function ShopService:hasGear(player, id)
@@ -233,6 +310,17 @@ end
 function ShopService:onPlayerJoined(player)
     syncAttributes(player)
     checkVIP(player)
+    -- (v2.1 fix) died / reset mid-heist: the new body had no mask while the power
+    -- stayed on. Put it back on (after init.server / MaskService fix WalkSpeed).
+    player.CharacterAdded:Connect(function(char)
+        if not wearing[player] then return end
+        task.delay(1, function()
+            if wearing[player] and player.Character == char and char.Parent
+                and not char:FindFirstChild("HC_Mask") then
+                ShopService:wearMask(player)
+            end
+        end)
+    end)
 end
 
 function ShopService:init(playerDataService, economyService, notifyFn)

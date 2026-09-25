@@ -29,8 +29,33 @@
             spec.pants       : number?   (classic pants asset id)
             spec.hats        : {number}? (hat accessory ids)
             spec.bodyColors  : { head, torso, arms, legs }  (Color3s, used always as the fallback)
+            spec.face        : number?   (face accessory id, e.g. sunglasses)  (v2.0.2)
         NpcFactory.animate(humanoid) -> controller
             Hooks Humanoid.Running so idle / walk / run switch automatically.
+
+    (v2.0.2) CREW OUTFITS — so bots stop looking like bright purple blocks:
+        NpcFactory.OUTFITS[name]  = { label, shirt, pants, hats, bodyColors }
+        NpcFactory.OUTFIT_ORDER   = { "jacket", "denim", "biker", "hoodie", "plaid", "suit" }
+        NpcFactory.SKIN_TONES     = { Color3 × 6 }
+        NpcFactory.outfit(name, opts?) -> spec      (ready for NpcFactory.build)
+            name        : key of OUTFITS (unknown / nil → "jacket")
+            opts.name   : spec.name (default "Crew")
+            opts.skin   : Color3 for head (+ arms under short sleeves); or
+            opts.skinIndex : 1..#SKIN_TONES
+            opts.mask   : hat/mask asset id worn IN ADDITION to the outfit's hat
+                          (e.g. Constants.MASKS[1].assetId) — the outfit's own
+                          hat is dropped so the two don't clip
+            opts.noHat  : true = no hat at all
+        NpcFactory.outfitFor(i, opts?) -> spec   i-th crew look (wraps OUTFIT_ORDER;
+            skin tone rotates too) — e.g. bot #1, #2 get different looks
+        Usage (BotService):
+            local spec = NpcFactory.outfitFor(botIndex, { name = "Bot_" .. name, mask = maskId })
+            local model, humanoid, root = NpcFactory.build(spec)
+        Every shirt / pants / hat id below was checked against the live catalog
+        (economy.roblox.com asset details) on 2026-09-25; all Roblox-made and
+        free except the TIX suit (already used by the Boss). If an item ever
+        disappears, build() falls back to a plain body in the outfit's
+        bodyColors — which are dark clothing tones, not neon, on purpose.
 --]]
 
 local Players = game:GetService("Players")
@@ -76,6 +101,7 @@ local function buildDescription(spec, plain)
             for _, id in ipairs(spec.hats) do table.insert(ids, tostring(id)) end
             desc.HatAccessory = table.concat(ids, ",")
         end
+        if spec.face then desc.FaceAccessory = tostring(spec.face) end
     else
         applyColors(desc, spec.bodyColors)
     end
@@ -83,6 +109,85 @@ local function buildDescription(spec, plain)
     -- and there is no outfit (otherwise we'd paint over the uniform).
     if not spec.outfitId then applyColors(desc, spec.bodyColors) end
     return desc
+end
+
+-- ──────────────────────────────────────────────
+-- 👕 CREW OUTFITS (v2.0.2)
+-- ──────────────────────────────────────────────
+local C = Color3.fromRGB
+
+NpcFactory.SKIN_TONES = {
+    C(234, 184, 146), C(204, 142, 105), C(160, 106, 72),
+    C(124, 82, 56), C(92, 60, 42), C(245, 205, 172),
+}
+
+-- Fallback body colours = the outfit's own clothing tones, so even a plain
+-- body (catalog down) reads as "a person in dark clothes", never a neon block.
+NpcFactory.OUTFITS = {
+    jacket = { label = "Black jacket",
+        shirt = 382538295,          -- Guitar Tee with Black Jacket (Roblox)
+        pants = 382538503,          -- Black Jeans with Sneakers (Roblox)
+        hats  = { 81708856 },       -- Robber Beanie (Roblox)
+        bodyColors = { torso = C(30, 30, 34), arms = C(30, 30, 34), legs = C(24, 26, 32) } },
+    denim = { label = "Denim jacket",
+        shirt = 144076436,          -- Grey Striped Shirt with Denim Jacket (Roblox)
+        pants = 382537569,          -- Black Jeans (Roblox)
+        hats  = { 45178010 },       -- Leather Baseball Cap (Roblox)
+        bodyColors = { torso = C(62, 86, 120), arms = C(62, 86, 120), legs = C(26, 28, 34) } },
+    biker = { label = "Biker",
+        shirt = 144076358,          -- Blue and Black Motorcycle Shirt (Roblox)
+        pants = 398633812,          -- Black Jeans with White Shoes (Roblox)
+        hats  = { 3756428149 },     -- Black Forehead Sunglasses (Roblox)
+        bodyColors = { torso = C(34, 48, 86), arms = C(24, 24, 30), legs = C(24, 26, 32) } },
+    hoodie = { label = "Hoodie",
+        shirt = 398633584,          -- Denim Jacket with White Hoodie (Roblox)
+        pants = 398635338,          -- Ripped Skater Pants (Roblox)
+        hats  = { 61886689 },       -- Black Sk8er Beanie with Visor (Roblox)
+        bodyColors = { torso = C(70, 96, 130), arms = C(70, 96, 130), legs = C(46, 52, 64) } },
+    plaid = { label = "Plaid shirt",
+        shirt = 398635081,          -- Blue Plaid Shirt (Roblox)
+        pants = 144076760,          -- Dark Green Jeans (Roblox)
+        hats  = { 243773374 },      -- Hip Grey Beanie (Roblox)
+        bodyColors = { torso = C(48, 70, 120), arms = C(48, 70, 120), legs = C(40, 56, 44) } },
+    suit = { label = "The inside man",
+        shirt = 6554200369,         -- Grey Suit w/ Black Vest (TIX Clothing +, same as the Boss)
+        pants = 6555797786,
+        hats  = { 168167624 },      -- Fedora and Shades (Roblox)
+        bodyColors = { torso = C(88, 90, 96), arms = C(88, 90, 96), legs = C(70, 72, 78) } },
+}
+NpcFactory.OUTFIT_ORDER = { "jacket", "denim", "biker", "hoodie", "plaid", "suit" }
+
+function NpcFactory.outfit(name, opts)
+    opts = opts or {}
+    local o = NpcFactory.OUTFITS[name or ""] or NpcFactory.OUTFITS.jacket
+    local skin = opts.skin
+        or NpcFactory.SKIN_TONES[((tonumber(opts.skinIndex) or 1) - 1) % #NpcFactory.SKIN_TONES + 1]
+    local hats = {}
+    if opts.mask then
+        table.insert(hats, opts.mask)
+    elseif not opts.noHat then
+        for _, id in ipairs(o.hats or {}) do table.insert(hats, id) end
+    end
+    return {
+        name = opts.name or "Crew",
+        shirt = o.shirt,
+        pants = o.pants,
+        hats = (#hats > 0) and hats or nil,
+        bodyColors = {
+            head = skin,
+            torso = o.bodyColors.torso,
+            arms = o.bodyColors.arms or skin,
+            legs = o.bodyColors.legs,
+        },
+    }
+end
+
+function NpcFactory.outfitFor(i, opts)
+    i = math.max(1, math.floor(tonumber(i) or 1))
+    opts = table.clone(opts or {})
+    if opts.skin == nil and opts.skinIndex == nil then opts.skinIndex = i * 2 - 1 end
+    local order = NpcFactory.OUTFIT_ORDER
+    return NpcFactory.outfit(order[(i - 1) % #order + 1], opts)
 end
 
 function NpcFactory.build(spec)

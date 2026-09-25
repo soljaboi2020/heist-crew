@@ -15,6 +15,7 @@
       • Other HUDs are hidden during the fly-over and restored after.
       • Local attributes on the player (client-side only, other HUDs read them):
           IntroPlaying = true while it runs · IntroCamDone = true after.
+        (DailyRewardUI waits for IntroCamDone before its card may pop up.)
 
     PUBLIC API: IntroCam:start()
 --]]
@@ -81,16 +82,19 @@ function IntroCam:_build()
         Size = UDim2.new(1, 0, 0, 100), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextSize = 96, TextTransparency = 1, TextStrokeTransparency = 1, TextStrokeColor3 = Color3.new(), ZIndex = 6 })
     title.Parent = screen
-    local sub = UITheme.label({ Text = "WELCOME TO THE VAULT", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.4, 66),
+    UITheme.autoScale(title)     -- v2.1: title reads the same on 1080p, 1440p and phones
+    local sub = UITheme.label({ Text = "WELCOME TO THE VAULT", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.4, 66 * UITheme.scale()),
         Size = UDim2.new(1, 0, 0, 26), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
         TextSize = 22, TextColor3 = T.gold, TextTransparency = 1, TextStrokeTransparency = 1, TextStrokeColor3 = Color3.new(), ZIndex = 6 })
     sub.Parent = screen
+    UITheme.autoScale(sub)
 
     local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
     local skip = UITheme.label({ Text = touch and "Tap to skip" or "Press any key to skip", AnchorPoint = Vector2.new(1, 1),
         Position = UDim2.new(1, -24, 1, -16), Size = UDim2.fromOffset(260, 22), TextXAlignment = Enum.TextXAlignment.Right,
         FontFace = UITheme.F.bold, TextSize = 16, TextColor3 = T.muted, ZIndex = 6 })
     skip.Parent = screen
+    UITheme.autoScale(skip)
 
     self._u = { screen = screen, bars = bars, black = black, title = title, sub = sub, skip = skip }
 end
