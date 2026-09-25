@@ -244,7 +244,8 @@ function JobHud:_buildUi()
     cap.Parent = header
     local name = UITheme.label({ Name = "JobName", RichText = true, Position = UDim2.fromOffset(46, 15),
         Size = UDim2.new(1, -110, 0, 24), FontFace = UITheme.F.display, TextSize = 19,
-        TextTruncate = Enum.TextTruncate.AtEnd, Text = "" })
+        TextScaled = true, Text = "" })   -- (v3.1.1) was TextTruncate ("DIAMOND…"): shrink to fit instead
+    do local c = Instance.new("UITextSizeConstraint") c.MaxTextSize = 19 c.MinTextSize = 11 c.Parent = name end
     name.Parent = header
     local stage = UITheme.label({ Name = "Stage", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -28, 0.5, 0),
         Size = UDim2.fromOffset(0, 22), AutomaticSize = Enum.AutomaticSize.X, Text = "READY",

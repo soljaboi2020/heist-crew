@@ -504,7 +504,7 @@ function LootHud:start()
         if launch then
             launch.OnClientEvent:Connect(function(payload)
                 if type(payload) == "table" and payload.phase == "title" then
-                    task.delay(2.8, function() self:_jackpotBanner() end)
+                    task.delay(4.6, function() self:_jackpotBanner() end)   -- (v3.1.1) after the title card has faded
                 end
             end)
         end
