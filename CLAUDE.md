@@ -449,7 +449,12 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   security room right beside the breaker (no camera there; Guard B's x=20 route is >40° off). East fake
   window at z -57 skipped. **Jewelry:** east alley z 18.3..21.7 → back office (no guard/camera; closet +
   breaker next door; keycard door still gates the safe). Office bookcase moved off the doorway.
-  ⏭️ Malachi is sending a **screen recording** next — pull frames with ffmpeg + Whisper his narration.
+- **2026-09-25** — **v1.2.4** from Malachi's first screen recording (`_recordings/roblox.mp4`, gitignored):
+  he was **BUSTED at 0:06** — Guard B walked through the security-room doorway right after the drop-in
+  and filled the meter in <1s. Fixes: detection 0.4/1.4s → **1.2/3.0s**, **8s drop-in grace**
+  (`GuardService.graceUntil`), villa Guard B now patrols the **gallery only**, drop-in moved **INSIDE**
+  (villa security room / jewelry back office). His verdict on the build: *"isn't playable… needs to be
+  bigger… doesn't give Roblox game"* → pitched a direction (see chat 2026-09-25), awaiting his pick.
 
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
