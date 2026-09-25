@@ -535,6 +535,29 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     file `~/.claude/roblox-opencloud-key` was briefly overwritten, restored from transcript, but Roblox now answers 401
     → new assets key needed before any more Kenney uploads.
 
+- **2026-09-25** — **🎮 CLAUDE CAN PLAY THE GAME NOW (Roblox Studio built-in MCP).** Malachi wanted Claude to "almost
+  play and see" (not via JARVIS). Setup: Studio → Assistant → Settings → MCP Servers → *Enable Studio as MCP server*;
+  **`tools/studio-mcp-bridge.bat`** (Windows, needs Node) runs `supergateway` around the newest
+  `%LOCALAPPDATA%\Roblox\Versions\*\StudioMCP.exe` (NOT `mcp.bat` — it breaks under `cmd /c`), stateful
+  streamable-HTTP on **:8792**. Claude reaches it at `http://host.docker.internal:8792/mcp` (also registered as
+  `roblox-studio` in `~/.claude/settings.json`, backup made). Curl helpers: `/tmp/mcp.sh <tool> '<json>'`
+  (session id cached), `/tmp/shot.sh <out.png> '"capture_id":"X"'`, `/tmp/lua.sh <Server|Client|Edit> file.lua`
+  — /tmp is wiped on rebuild, recreate from this note. Tools that matter: `list_roblox_studios` (studio_id),
+  `start_stop_play`, `screen_capture` (needs capture_id; works during Play; **CoreGui prompts don't show in
+  shots**), `character_navigation` (Client), `user_keyboard_input` (`key_code`, `wait_time_ms`, needs
+  datamodel_type Client; number keys are CoreGui-bound), `user_mouse_input`, `execute_luau` (Edit/Server/Client),
+  `get_console_output`, `search_asset` (Creator Store — found the working sounds).
+  - **First Claude playtest (Sunny's Mart) → v3.0.1 fixes:** escape auto-started solo with 1/5 loot (now GO only
+    unless alarm / all loot) · heli locked by a guard kick-back (only jail/out lock it) · vent/hatch prompts stole E
+    → **V** · hide spots stole E → **H** · Golden Ticket prompt 2.7 studs from the safe drill (moved) · carried
+    bag covered half the screen (≤2.5 studs now) · 3 non-audio sound ids (now APM "Miami Nights A" 1846431634,
+    built-in victory.wav, sad trombone 116298781032555 — all verified loading) · `CorrugatedSteel` is the real
+    material (CorrugatedMetal is NOT) · duplicate countdown toast · vote card overlap · cinematic cut glitch +
+    skyline final shots · mart overexposure · black-hole puddles · Kitsune slot → Roblox **Steampunk Fox Mask**
+    2830768205 (the Roblox Kitsune 3210207381 is side-worn). Only Roblox-made masks load via InsertService (UGC won't).
+  - ⚠️ **Invisicam was tried and REVERTED:** ProximityPrompt line-of-sight is checked from the CAMERA, so a camera
+    behind a wall hides every prompt in small rooms. Don't re-add it.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot
