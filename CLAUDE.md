@@ -455,6 +455,12 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   (`GuardService.graceUntil`), villa Guard B now patrols the **gallery only**, drop-in moved **INSIDE**
   (villa security room / jewelry back office). His verdict on the build: *"isn't playable… needs to be
   bigger… doesn't give Roblox game"* → pitched a direction (see chat 2026-09-25), awaiting his pick.
+- **2026-09-25** — **v1.2.5 KICK-BACK RULE** (Malachi: *"too hard… one guard sees you and they all
+  come running, it's confusing"*). A guard spotting/grabbing you in stealth → `kickBack()`: drop bag +
+  keycard, teleport to `sneakIn`, guard stunned 3s, **no alarm**, still in the run. Alarm now only from
+  cameras / lasers / the jewelry silent alarm; during the loud escape a guard grab is still "caught".
+  Kid rule on screen: *guard sees you → back to the door; camera sees you → alarm + police.*
+  Still open from the pitch: bigger rooms · more feedback/juice · auto-role · jail/respawn instead of out.
 
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
