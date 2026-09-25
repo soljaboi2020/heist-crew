@@ -326,6 +326,9 @@ function CrewHud:_refresh()
     elseif (info.launchAt or 0) > 0 then
         local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))
         self:_setObjective("Rolling out", string.format("Heist starting in %d!", left), I.wait, false, { done = 3, total = 3 })
+    elseif localPlayer:GetAttribute("Tutorial") then
+        -- v3.1: the tutorial's own step card is the guide — no competing lobby steps
+        self:_setObjective("Tutorial", "Follow the gold arrow!", I.wait, false, nil)
     elseif localPlayer:GetAttribute("InPortal") then
         self:_setObjective("Step 3 of 3", "Wait here — the heist starts soon", I.wait, false, { done = 2, total = 3 })
     elseif localPlayer:GetAttribute("HeardPlan") then

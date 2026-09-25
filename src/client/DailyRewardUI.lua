@@ -53,7 +53,7 @@ local DEFAULT_REWARDS = { 250, 400, 600, 800, 1000, 1500, 3000 }
 local INTRO_FALLBACK = 6         -- seconds after spawn when there's no fly-over
 local DEFAULT_SUB = "Every day in a row pays more. Day 7 = the big one!"
 -- other big screens: the daily card never pops up on top of these
-local BUSY_SCREENS = { "ShopUI", "PayoutScreen", "IntroCam" }
+local BUSY_SCREENS = { "ShopUI", "PayoutScreen", "IntroCam", "TutorialOffer" }   -- v3.1: never under the tutorial offer
 
 local function tween(obj, t, props, style, dir)
     local tw = TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad,

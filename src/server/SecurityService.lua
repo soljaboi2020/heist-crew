@@ -32,6 +32,8 @@
         SecurityService:dropKeycard(player)      -- holder got caught/left
         SecurityService:camerasCut() -> bool
         SecurityService:doorsOpen() -> bool      -- every keycard door open
+    v3.1 [HOOK: GuardCones]: every camera model (tag SecurityCamera) carries
+        attribute Live (bool) — false when cut at the breaker or the job is disarmed.
 --]]
 
 local Players = game:GetService("Players")
@@ -132,6 +134,8 @@ end
 -- ── cameras ──────────────────────────────────────────────────────────
 local function setCameraLive(cam, live)
     if cam.light then cam.light.Enabled = live end
+    -- [HOOK: GuardCones] v3.1 — the client hides this camera's floor cone when it's not live
+    if cam.model then cam.model:SetAttribute("Live", live) end
     if cam.led then
         cam.led.Material = live and Enum.Material.Neon or Enum.Material.SmoothPlastic
         cam.led.Color = live and RED or Color3.fromRGB(40, 40, 44)
@@ -212,6 +216,10 @@ local function tickCameras(dt)
                     local rate = (Shop and Shop:hasGear(player, "Jammer")) and 0.5 or 1
                     -- v2.0 masks: Catrina "GHOST" → cameras take 2x longer (stacks with the Jammer)
                     if maskHas(player, "ghost") then rate = rate * ((Constants.MASK_POWERS or {}).GHOST_CAMERA or 0.5) end
+                    -- (tutorial hook, v3.1 TutorialService) first-run rookie: cameras take
+                    -- TutorialStealthMult x longer too (nil for everyone else = no change)
+                    local tm = player:GetAttribute("TutorialStealthMult")
+                    if type(tm) == "number" and tm > 1 then rate = rate / tm end
                     seen[i] = (seen[i] or 0) + dt * rate
                     if cam.led then cam.led.Color = (math.floor(t * 8) % 2 == 0) and RED or Color3.fromRGB(255, 200, 60) end
                     if seen[i] >= S.CAMERA_DETECT_TIME then

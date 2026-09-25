@@ -28,6 +28,12 @@
         at you and says "Huh?"; when he fully spots you he shouts "HEY!"
         (short NPC speech bubble — the allowed floating-text exception).
     GuardService.stealthFactor(player) -> (hidden:boolean, fillMultiplier:number)
+
+    v3.1 (vision-cones agent) — [HOOK: GuardCones] per-guard attributes on the
+    guard MODEL so the client can draw + colour each guard's floor cone:
+      Sus_<UserId> (number 0..1, stepped 0.05) — this guard's meter on that player
+      Stunned (bool) — knocked out (no cone)
+      Chasing (bool) — alarm is on, he's hunting (red cone)
 --]]
 
 local RunService = game:GetService("RunService")
@@ -81,6 +87,11 @@ function GuardService.stealthFactor(player)
         local nv = maskHas(player, "nightvision") and ((Constants.MASK_POWERS or {}).NIGHT_SHADOW or 2)
         m = m * (nv or SHADOW_MULT)
     end
+    -- (tutorial hook, v3.1 TutorialService) a brand-new player's first Sunny's Mart
+    -- run: guards take TutorialStealthMult (2) x longer to notice. Only set for a
+    -- solo rookie / an all-rookie crew; nil for everyone else = no change.
+    local tm = player:GetAttribute("TutorialStealthMult")
+    if type(tm) == "number" and tm > 1 then m = m * tm end
     return false, m
 end
 
@@ -373,6 +384,37 @@ local function checkVision(guard, dt)
     end
 end
 
+-- ── [HOOK: GuardCones] v3.1 — mirror this guard's meters onto his model ──
+-- Only writes when a value changes by a 0.05 step, so replication stays cheap.
+local function publishConeAttrs(guard)
+    local model = guard.model
+    if not model or not model.Parent then return end
+    guard._pub = guard._pub or {}
+    for player, v in pairs(guard.sus or {}) do
+        if player.Parent then
+            local q = math.floor(v * 20 + 0.5) / 20
+            if guard._pub[player] ~= q then
+                guard._pub[player] = q
+                model:SetAttribute("Sus_" .. player.UserId, q)
+            end
+        else
+            guard.sus[player] = nil
+            guard._pub[player] = nil
+        end
+    end
+    for player, q in pairs(guard._pub) do   -- meters wiped by reset() -> publish 0
+        if (guard.sus == nil or guard.sus[player] == nil) and q ~= 0 then
+            guard._pub[player] = 0
+            if player.Parent then model:SetAttribute("Sus_" .. player.UserId, 0) end
+        end
+    end
+    local stunned = guard.stunnedUntil ~= nil and os.clock() < guard.stunnedUntil
+    if model:GetAttribute("Stunned") ~= stunned then model:SetAttribute("Stunned", stunned) end
+    local chasing = guard.alarmActive == true
+    if model:GetAttribute("Chasing") ~= chasing then model:SetAttribute("Chasing", chasing) end
+end
+-- ── [/HOOK: GuardCones] ──
+
 -- ──────────────────────────────────────────────
 -- Public API
 -- ──────────────────────────────────────────────
@@ -472,6 +514,7 @@ function GuardService:spawnPatrols(cb, routes)
                 for _, guard in pairs(guards) do
                     local ok, err = pcall(checkVision, guard, step)
                     if not ok then warn("[GuardService] vision:", err) end
+                    pcall(publishConeAttrs, guard)   -- [HOOK: GuardCones] v3.1
                 end
                 for _, p in ipairs(Players:GetPlayers()) do
                     local m = frameMax[p]

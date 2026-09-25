@@ -58,8 +58,8 @@ end
 local ORDER = {
     "CashHud", "Notifications", "FeelFX", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "LootMinigames", "CrouchController", "AbilityHud", "ShopUI", "DailyRewardUI", "CarHud",
-    "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud",
-    "ClubFX", "PortalHud", "IntroCam", "GetawayVote", "GetawayCinematic",   -- v2.0
+    "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud", "TutorialHud",
+    "ClubFX", "PortalHud", "IntroCam", "GetawayVote", "GetawayCinematic", "GuardCones", "MusicController",   -- v2.0
 }
 
 for _, name in ipairs(ORDER) do

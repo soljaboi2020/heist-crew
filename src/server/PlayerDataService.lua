@@ -26,6 +26,14 @@
         lifetimeEarned    heist cash ever paid out (LeaderboardService "TOP EARNERS")
         cosmetics         { [itemId] = true }  owned bag skins / car colors / trails
         equippedCosmetics { bag = id, car = id, trail = id }  (CosmeticsService)
+
+    v3.1 SAVE FIELD (first-time tutorial, TutorialService):
+        tutorialDone      bool. New players start false (TutorialService offers the
+                          Sunny's Mart walkthrough). OLD saves with no field are
+                          migrated to `heistsCompleted > 0` so veterans never get it.
+        PlayerDataService:isTutorialDone(player)   -> bool (true if not loaded yet / load failed:
+                                                      never nag someone whose real save we can't see)
+        PlayerDataService:markTutorialDone(player) -> bool  true only the FIRST time (reward-once guard)
 --]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -72,6 +80,7 @@ local function makeDefaultData()
         lifetimeEarned = 0,     -- v2: heist cash ever earned (leaderboard)
         cosmetics = {},         -- v2: [itemId] = true
         equippedCosmetics = {}, -- v2: { bag, car, trail }
+        tutorialDone = false,   -- v3.1: finished or skipped the first-time tutorial
     }
 end
 
@@ -90,6 +99,11 @@ local function migrate(data)
     if data.lifetimeEarned == nil and tonumber(data.cash) then
         data.lifetimeEarned = math.max(0, math.floor(data.cash - Constants.STARTING_CASH))
     end
+    -- v3.1: the first-time tutorial. An old save (no field) that already
+    -- finished a heist doesn't need it; an old save with 0 heists gets offered it.
+    if data.tutorialDone == nil then
+        data.tutorialDone = (tonumber(data.heistsCompleted) or 0) > 0
+    end
     local defaults = makeDefaultData()
     for k, v in pairs(defaults) do
         if data[k] == nil then data[k] = v end
@@ -103,6 +117,7 @@ local function migrate(data)
         if type(data[k]) ~= "number" then data[k] = tonumber(data[k]) or 0 end
     end
     data.dailyStreak = math.clamp(math.floor(data.dailyStreak), 0, 7)
+    data.tutorialDone = data.tutorialDone == true
     return data
 end
 
@@ -178,6 +193,21 @@ function PlayerDataService:addLifetimeEarned(player, amount)
     if not data or not amount or amount <= 0 then return data and data.lifetimeEarned or 0 end
     data.lifetimeEarned = math.floor((tonumber(data.lifetimeEarned) or 0) + amount)
     return data.lifetimeEarned
+end
+
+-- v3.1 first-time tutorial (TutorialService)
+function PlayerDataService:isTutorialDone(player)
+    local data = cache[player.UserId]
+    if not data or loadFailed[player.UserId] then return true end
+    return data.tutorialDone == true
+end
+
+-- true only the first time (so the tutorial reward can never be paid twice)
+function PlayerDataService:markTutorialDone(player)
+    local data = cache[player.UserId]
+    if not data or data.tutorialDone == true then return false end
+    data.tutorialDone = true
+    return true
 end
 
 function PlayerDataService:getData(player)

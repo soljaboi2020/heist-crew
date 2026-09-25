@@ -5,32 +5,47 @@
     jewelry boutique on the south side of Ocean Drive. Rebuilt at Roblox
     scale after Malachi's playtest ("cramped", "needs to be bigger").
 
-    FOOTPRINT x -82..-46, z -1..35 (Constants.WORLD.JEWELRY_*). Floor top
-    y 0.5, ceiling y 15.5, roof deck y 16.5, parapet y 18.5, deco tower ~28.
-    Doorways 7-8 wide, 10.5-11 tall. The shopfront faces NORTH (z -1).
+    FOOTPRINT (v3.1) x -82..-46, z -1..44 + the ANNEX x -46..-40, z 22..44.
+    Floor top y 0.5, ceiling y 15.5, roof deck y 16.5, parapet y 18.5, deco
+    tower ~28. Doorways 7-8 wide, 11 tall. The shopfront faces NORTH (z -1).
 
         z -1 ┌──── glass ──── FRONT DOOR (x -68..-60) ──── glass ────┐
-             │ [W1]   [I1][I1]         chandelier       [I3][I3] [E1]│
-             │ [W2]   [I2][I2]    SHOWROOM (34 x 16)    [I4][I4] [E2]│
-             │ ···· guard A lane (z 11.5) ·························· │
-             │ [ COUNTER + mirror ]                sofa  vent  plant│
+             │ [W1]   [I1][I1]         chandelier       [I3][I3] [E1]│  yard: car
+             │ [W2]   [I2][I2]    SHOWROOM (34 x 16)    [I4][I4] [E2]│  (-42.4, 13)
+             │ ···· guard A lane (z 11.5) ·························· │  nose at the
+             │ [ COUNTER + mirror ]                sofa  vent  plant│  gate (z 2.6)
         z 16 ├─────────────────┬── ARCHWAY ──┬───────────────────────┤
-             │ LASER CORRIDOR  K  BACK HALL  D  OFFICE (desk, CCTV)  │
-             │  (2 rows)       K  guard B    D                        │
-        z 24 ├── laser 2 ──┬───┤  (N-S)      ├──── door ─────────────┤
-             │ SAFE ROOM   │   │ lockers     │  BREAK ROOM (sneakIn) ═ STAFF DOOR
-             │  pedestal   │   ├─ doorway ───┤   fridge · vending    ═ (east alley)
-             │  [ SAFE ]   │   │ CLOSET      │   vent ▪              │
-        z 34 └─────────────┴───┴─ breaker ───┴───────────────────────┘
-            x -81        -68  -67         -57                      -47
+             │ LASER CORRIDOR  K  BACK HALL  D  OFFICE   watch  cabs │
+             │  (2 rows)       K  guard B    D           rug         └─────┐ z 22
+        z 24 ├── laser 2 ──┬───┤  (N-S)      D                  bay: desk  ← roof ladder
+             │ SAFE ROOM   │   │ lockers  $  │  ────── door ───────────────┤ z 29
+             │  Duchess    │   ├─ doorway ───┤  BREAK ROOM (sneakIn)       ═ STAFF DOOR
+             │  cabinets   │   │ CLOSET      │  kitchenette  table         ═ (z 31.5..39.5)
+             │  [ SAFE ]   │   │ breaker sink│  vending  cooler  vent      │
+        z 44 └─────────────┴───┴─────────────┴─────────────────────────────┘
+            x -81        -68  -67         -57                       -41 -40
         K = keycard door (slides into the wall)   D = office door
-        Roof: ladder on the store's east wall (z 21.5, in the yard) → roof → hatch → closet.
+        Roof: ladder on the annex's east wall (z 25, in the yard) → roof → hatch → closet.
         Crawl vent: break room (south wall) ↔ showroom (back wall, behind the sofa).
+
+    v3.1 ROOMY BACK (2026-09-25, first Studio playtest: cramped back rooms —
+    the camera jams and the E prompts crowd):
+      • the back wall moved z 35 → z 44 (the old yard back strip) and an ANNEX
+        (x -46..-40, z 22..44, south of the car's tail at z 19.1) widens the
+        east column. OFFICE 9 × 12 + a 6 × 6 bay (was 9 × 8) · BREAK ROOM
+        15 × 13 (was 9 × 8) · CLOSET 10 × 10 (was 10 × 5) · BACK HALL 10 × 15
+        (was 10 × 11) · SAFE ROOM 13 × 18 (was 13 × 9: the safe moved 9 south).
+        Doorways 8 wide / 11 tall (the keycard door + laser opening keep 7).
+      • E prompts >= 6 apart in the back of house: keypad · courier case ·
+        breaker · stash · keycard spots (office filing cabinets, closet shelf) ·
+        watch · appraisal tray · Duchess · drill. Vents (V) / hide spots (H)
+        >= 4 from every E prompt. The staff door + roof ladder moved to the
+        annex's east wall; the back-strip props moved into the yard.
 
     v2.0.2 (2026-09-25, Malachi: "shouldn't be able to walk out the heist and see
     the ugly green terrain" + "the graphics are very simple / bad"):
-      • WALLED SERVICE YARD x -46..-25.1, z 2.6..44 (+ a strip behind the store,
-        x -82.6..-46, z 35..44): 12-tall brick all round, sliding chain-link
+      • WALLED SERVICE YARD x -46..-25.1, z 2.6..44 (v3.1: the strip behind the
+        store is now inside the store): 12-tall brick all round, sliding chain-link
         vehicle gate x -46..-37.4 on the north side (z 2.6), the getaway car
         parked inside at (-42.4, 0, 13) facing north. Dumpsters, crates, drums,
         puddles, a shadowed key lamp over the car.
@@ -89,14 +104,23 @@ local W = Constants.WORLD
 local FLOOR = W.FLOOR                                                  -- 0.5
 local CX, CZ = W.JEWELRY_CENTER.x, W.JEWELRY_CENTER.z                  -- -64, 17
 local X0, X1 = CX - W.JEWELRY_HALF_WIDTH, CX + W.JEWELRY_HALF_WIDTH    -- -82, -46
-local Z0, Z1 = CZ - W.JEWELRY_HALF_DEPTH, CZ + W.JEWELRY_HALF_DEPTH    -- -1, 35
-local IX0, IX1 = X0 + 1, X1 - 1        -- -81, -47 (inner faces of the side walls)
-local IZ0, IZ1 = Z0 + 1, Z1 - 1        -- 0, 34 (inner face of the shopfront / back wall)
+local Z0 = CZ - W.JEWELRY_HALF_DEPTH   -- -1 (Constants' z 35 back line is the OLD back wall)
+-- (v3.1 ROOMY BACK) the back of house grew: the back wall moved from z 34..35
+-- to z 43..44 (the old yard back-strip wall line), and an ANNEX pushes the
+-- east wall out to x -40 south of the getaway car (z 22..44). All inside
+-- MiamiBuilder.KEEP_CLEAR (x -90..-40, z <= 44); the car's run to the gate
+-- (x -45.1..-39.7, z <= 19.1, northward) is untouched.
+local Z1 = 44
+local IX0, IX1 = X0 + 1, X1 - 1        -- -81, -47 (inner faces of the side walls, north of the annex)
+local IZ0, IZ1 = Z0 + 1, Z1 - 1        -- 0, 43 (inner face of the shopfront / back wall)
+local ANNEX_X1 = -40                   -- annex east wall x -41..-40 (outer face)
+local AIX1 = ANNEX_X1 - 1              -- -41, its inner face
+local ANNEX_Z0 = 22                    -- annex north wall z 22..23 (x -46..-40)
 local CEIL = FLOOR + 15                -- 15.5
 local ROOF_Y = CEIL + 1                -- 16.5 (walk on the roof here)
 local TOP = ROOF_Y + 2                 -- 18.5 (parapet top)
 local ZF = Z0 - 0.25                   -- -1.25, front face of the shopfront
-local DOOR_H = FLOOR + 10.5            -- 11, top of the interior doorways
+local DOOR_H = FLOOR + 11              -- 11.5, top of the interior doorways (v3.1: 11 tall)
 
 -- showroom (z 0..16) + back-of-house (z 17..34)
 local SHOW_Z1 = 16                                -- showroom back wall z 16..17
@@ -107,26 +131,28 @@ local ARCH_X0, ARCH_X1 = -66, -58                 -- archway showroom → back h
 local ARCH_TOP = FLOOR + 11
 -- back hall (interior x -67..-57), walls x -68..-67 (W) and x -57..-56 (E)
 local HALL_X0, HALL_X1 = -67, -57
-local HALL_Z1 = 28                                -- closet wall z 28..29
-local CLOSET_Z0 = 29
-local CLOSET_DOOR_X0, CLOSET_DOOR_X1 = -65.5, -58.5
+local HALL_Z1 = 32                                -- closet wall z 32..33 (v3.1: hall 10 x 15, was 10 x 11)
+local CLOSET_Z0 = 33                              -- closet 10 x 10 (was 10 x 5)
+local CLOSET_DOOR_X0, CLOSET_DOOR_X1 = -66, -58     -- 8 wide
 -- keycard door: in the hall's WEST wall, z 17..24, slides south into that wall
 local KC_Z0, KC_Z1 = 17, 24
--- laser corridor x -81..-68, z 17..24; wall z 24..25 (opening x -80..-73); safe room z 25..34
+-- laser corridor x -81..-68, z 17..24; wall z 24..25 (opening x -80..-73); safe room z 25..43 (13 x 18, was 13 x 9)
 local LC_WALL0, LC_WALL1 = 24, 25
 local SR_OPEN_X0, SR_OPEN_X1 = -80, -73
 local SR_Z0 = 25
--- east column (interior x -56..-47): office z 17..25, wall 25..26, break room z 26..34
+-- east column: office x -56..-47, z 17..29 + the annex bay x -47..-41, z 23..29
+-- (9 x 12 + 6 x 6 = 144, was 9 x 8); wall z 29..30; break room x -56..-41,
+-- z 30..43 (15 x 13, was 9 x 8)
 local EC_X0 = -56
-local OFFICE_DOOR_Z0, OFFICE_DOOR_Z1 = 17.5, 24.5     -- office door in the hall's east wall
-local OB_Z0, OB_Z1 = 25, 26                           -- office | break room wall
-local OB_DOOR_X0, OB_DOOR_X1 = -53.5, -47.5
-local BREAK_Z0 = 26
-local SIDE_Z0, SIDE_Z1 = 26.8, 33.8                   -- staff door in the east exterior wall
--- (v2.0.2) the roof ladder moved from z 10 to z 21.5 so the getaway car can
--- park beside the store in the service yard with a clear run to the gate
-local NOTCH_Z0, NOTCH_Z1 = 20, 23                     -- parapet notch over the roof ladder
-local LADDER_Z = 21.5
+local OFFICE_DOOR_Z0, OFFICE_DOOR_Z1 = 18, 26         -- office door in the hall's east wall (8 wide)
+local OB_Z0, OB_Z1 = 29, 30                           -- office | break room wall
+local OB_DOOR_X0, OB_DOOR_X1 = -54, -46               -- 8 wide
+local BREAK_Z0 = 30
+local SIDE_Z0, SIDE_Z1 = 31.5, 39.5                   -- staff door in the annex's east wall (8 wide)
+-- (v3.1) the roof ladder moved to the annex's east wall (the old spot on the
+-- store's east wall, z 21.5, is now the annex's north wall)
+local NOTCH_Z0, NOTCH_Z1 = 23.5, 26.5                 -- parapet notch over the roof ladder
+local LADDER_Z = 25
 
 -- ── the walled SERVICE YARD (v2.0.2) ──
 -- East of the store, wrapping round behind it. The staff door opens into it;
@@ -134,8 +160,7 @@ local LADDER_Z = 21.5
 -- Brick walls on every side: from the yard you see brick, the street and sky.
 local YARD_X1 = -25.1                   -- east wall outer face (safehouse skin trim starts at -25.05)
 local YARD_Z0 = 2.6                     -- north wall z 2.6..3.2 (just behind the bus stop)
-local YARD_Z1 = 44                      -- south wall z 43.4..44
-local BACK_X0 = -82.6                   -- west wall of the strip behind the store
+local YARD_Z1 = Z1                      -- south wall z 43.4..44 (flush with the store's back wall)
 local YWALL_T = 0.6                     -- yard wall thickness
 local YWALL_H = 12                      -- yard wall height
 local GATE_X0, GATE_X1 = -46, -37.4     -- vehicle gate opening (8.6 wide, store wall to gate post)
@@ -158,7 +183,7 @@ local SPIN_DEG_PER_SEC = 24                           -- the turntable's Spin at
 
 -- the safe (against the safe room's south wall, door facing north)
 local SAFE_X = -74.5
-local SAFE_Z0, SAFE_Z1 = 30.5, 33.9                   -- front face .. back
+local SAFE_Z0, SAFE_Z1 = 39.5, 42.9                   -- front face .. back (v3.1: 9 further south)
 local SAFE_HW = 3                                     -- x -77.5 .. -71.5
 local SAFE_Y = FLOOR + 3.6                            -- door centre height
 local SAFE_TOP = FLOOR + 7
@@ -531,11 +556,12 @@ function JewelryBuilder:_shell(f)
     box("FloorShowroom", X0, 0, Z0, X1, FLOOR, 16.5, rgb(34, 26, 40), M.Marble, f, { Reflectance = 0.08 })
     box("FloorSecure", X0, 0, 16.5, -67.5, FLOOR, Z1, rgb(76, 79, 86), M.DiamondPlate, f)
     box("FloorHall", -67.5, 0, 16.5, -56.5, FLOOR, Z1, rgb(132, 128, 124), M.Slate, f)
-    box("FloorOffice", -56.5, 0, 16.5, X1, FLOOR, 25.5, rgb(78, 44, 66), M.Carpet, f)
-    local fb = box("FloorBreak", -56.5, 0, 25.5, X1, FLOOR, Z1, rgb(200, 226, 216), M.CeramicTiles, f)
+    box("FloorOffice", -56.5, 0, 16.5, X1, FLOOR, OB_Z0 + 0.5, rgb(78, 44, 66), M.Carpet, f)
+    box("FloorOffice", X1, 0, ANNEX_Z0, ANNEX_X1, FLOOR, OB_Z0 + 0.5, rgb(78, 44, 66), M.Carpet, f)
+    local fb = box("FloorBreak", -56.5, 0, OB_Z0 + 0.5, ANNEX_X1, FLOOR, Z1, rgb(200, 226, 216), M.CeramicTiles, f)
     -- (v2.0.2) diner checker on the break-room floor (2-stud tiles, lit by the room)
     local cg = lit(surface(fb, Enum.NormalId.Top, 6, 1))
-    local nx, nz = 5, 5
+    local nx, nz = 8, 7
     for i = 0, nx - 1 do
         for j = 0, nz - 1 do
             if (i + j) % 2 == 0 then
@@ -547,20 +573,26 @@ function JewelryBuilder:_shell(f)
     -- step between the sidewalk (ends z -1.4) and the shopfront
     box("Threshold", X0, 0, Z0 - 0.4, X1, FLOOR, Z0, rgb(214, 206, 198), M.Concrete, f)
 
-    -- exterior walls (the front is the facade, built in _facade)
+    -- exterior walls (the front is the facade, built in _facade). (v3.1) the
+    -- back wall moved to z 43..44; the ANNEX (x -46..-40, z 22..44) replaces the
+    -- store's east wall south of z 23, with the roof-ladder notch + staff door
+    -- in its east wall.
     box("WallWest", X0, FLOOR, Z0, IX0, TOP, Z1, LILAC, M.Plaster, f)
-    box("WallSouth", IX0, FLOOR, IZ1, IX1, TOP, Z1, LILAC, M.Plaster, f)
-    -- east wall: roof-ladder notch (z 8.5..11.5 stops at the roof deck) + staff door
-    box("WallEast", IX1, FLOOR, Z0, X1, TOP, NOTCH_Z0, LILAC, M.Plaster, f)
-    box("WallEastNotch", IX1, FLOOR, NOTCH_Z0, X1, ROOF_Y, NOTCH_Z1, LILAC, M.Plaster, f)
-    box("WallEast", IX1, FLOOR, NOTCH_Z1, X1, TOP, SIDE_Z0, LILAC, M.Plaster, f)
-    box("StaffDoorHeader", IX1, DOOR_H, SIDE_Z0, X1, TOP, SIDE_Z1, LILAC, M.Plaster, f)
-    box("WallEast", IX1, FLOOR, SIDE_Z1, X1, TOP, Z1, LILAC, M.Plaster, f)
+    box("WallSouth", IX0, FLOOR, IZ1, AIX1, TOP, Z1, LILAC, M.Plaster, f)
+    box("WallEast", IX1, FLOOR, Z0, X1, TOP, ANNEX_Z0 + 1, LILAC, M.Plaster, f)
+    box("AnnexWallN", X1, FLOOR, ANNEX_Z0, ANNEX_X1, TOP, ANNEX_Z0 + 1, LILAC, M.Plaster, f)
+    box("AnnexWallE", AIX1, FLOOR, ANNEX_Z0, ANNEX_X1, TOP, NOTCH_Z0, LILAC, M.Plaster, f)
+    box("AnnexWallENotch", AIX1, FLOOR, NOTCH_Z0, ANNEX_X1, ROOF_Y, NOTCH_Z1, LILAC, M.Plaster, f)
+    box("AnnexWallE", AIX1, FLOOR, NOTCH_Z1, ANNEX_X1, TOP, SIDE_Z0, LILAC, M.Plaster, f)
+    box("StaffDoorHeader", AIX1, DOOR_H, SIDE_Z0, ANNEX_X1, TOP, SIDE_Z1, LILAC, M.Plaster, f)
+    box("AnnexWallE", AIX1, FLOOR, SIDE_Z1, ANNEX_X1, TOP, Z1, LILAC, M.Plaster, f)
     -- coping caps on the parapet
     box("CopingW", X0 - 0.15, TOP, Z0 - 0.45, IX0 + 0.05, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    box("CopingE", IX1 - 0.05, TOP, Z0 - 0.45, X1 + 0.15, TOP + 0.3, NOTCH_Z0, STUCCO, M.Plaster, f)
-    box("CopingE", IX1 - 0.05, TOP, NOTCH_Z1, X1 + 0.15, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    box("CopingS", IX0, TOP, IZ1 - 0.05, IX1, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
+    box("CopingE", IX1 - 0.05, TOP, Z0 - 0.45, X1 + 0.15, TOP + 0.3, ANNEX_Z0 - 0.15, STUCCO, M.Plaster, f)
+    box("CopingN", IX1 - 0.05, TOP, ANNEX_Z0 - 0.15, ANNEX_X1 + 0.15, TOP + 0.3, ANNEX_Z0 + 1.05, STUCCO, M.Plaster, f)
+    box("CopingE", AIX1 - 0.05, TOP, ANNEX_Z0 + 1.05, ANNEX_X1 + 0.15, TOP + 0.3, NOTCH_Z0, STUCCO, M.Plaster, f)
+    box("CopingE", AIX1 - 0.05, TOP, NOTCH_Z1, ANNEX_X1 + 0.15, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
+    box("CopingS", IX0, TOP, IZ1 - 0.05, AIX1, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
     -- a downpipe + pilasters down the yard side (moved off the gate post in v2.0.2)
     box("Downpipe", X1, FLOOR, 5.2, X1 + 0.35, TOP, 5.55, STEEL_LT, M.Metal, f)
     for _, pz in ipairs({ 4, 18 }) do
@@ -569,9 +601,11 @@ function JewelryBuilder:_shell(f)
 
     -- ceiling (dark plum, seen from inside) + roof deck (walk on it)
     box("Ceiling", IX0, CEIL, IZ0, IX1, CEIL + 0.5, IZ1, rgb(50, 30, 58), M.Plaster, f)
+    box("Ceiling", IX1, CEIL, ANNEX_Z0 + 1, AIX1, CEIL + 0.5, IZ1, rgb(50, 30, 58), M.Plaster, f)
     box("Roof", IX0, CEIL + 0.5, IZ0, IX1, ROOF_Y, IZ1, rgb(160, 158, 164), M.Concrete, f)
-    -- the notch: the roof deck runs out over the east wall so you can step onto it
-    box("RoofLip", IX1, ROOF_Y - 0.5, NOTCH_Z0, X1, ROOF_Y, NOTCH_Z1, rgb(160, 158, 164), M.Concrete, f)
+    box("Roof", IX1, CEIL + 0.5, ANNEX_Z0 + 1, AIX1, ROOF_Y, IZ1, rgb(160, 158, 164), M.Concrete, f)
+    -- the notch: the roof deck runs out over the annex wall so you can step onto it
+    box("RoofLip", AIX1, ROOF_Y - 0.5, NOTCH_Z0, ANNEX_X1, ROOF_Y, NOTCH_Z1, rgb(160, 158, 164), M.Concrete, f)
     box("RoofAC1", -76, ROOF_Y, 8, -72.5, ROOF_Y + 2.4, 11.5, STEEL_LT, M.Metal, f)
     box("RoofACFan", -75.3, ROOF_Y + 2.4, 8.7, -73.2, ROOF_Y + 2.5, 10.8, STEEL_DK, M.Metal, f, nc())
     box("RoofAC2", -55, ROOF_Y, 20, -51.5, ROOF_Y + 2.2, 23.5, STEEL_LT, M.Metal, f)
@@ -594,8 +628,8 @@ function JewelryBuilder:_shell(f)
         BOH, M.Plaster, f)
     -- laser corridor | safe room, with the 7-wide opening (laser row 2 sits in it)
     wallX("SafeRoomWall", LC_WALL0, LC_WALL1, IX0, -68, { { SR_OPEN_X0, SR_OPEN_X1, DOOR_H } }, STEEL, M.Metal, f)
-    -- office | break room
-    wallX("BreakRoomWall", OB_Z0, OB_Z1, EC_X0, IX1, { { OB_DOOR_X0, OB_DOOR_X1, DOOR_H } }, BOH, M.Plaster, f)
+    -- office | break room (runs out to the annex's east wall)
+    wallX("BreakRoomWall", OB_Z0, OB_Z1, EC_X0, AIX1, { { OB_DOOR_X0, OB_DOOR_X1, DOOR_H } }, BOH, M.Plaster, f)
 end
 
 -- ──────────────────────────────────────────────
@@ -719,8 +753,11 @@ function JewelryBuilder:_facade(f)
     end
     tube("SpireTube", Vector3.new(CX, 25.6, ZF + 0.15), Vector3.new(CX, 27.9, ZF + 0.15), HOT_PINK, fa, 0.14)
     tube("Roofline", Vector3.new(X0 - 0.1, TOP - 0.3, Z0), Vector3.new(X0 - 0.1, TOP - 0.3, Z1), HOT_PINK, fa)
-    tube("Roofline", Vector3.new(X1 + 0.1, TOP - 0.3, Z0), Vector3.new(X1 + 0.1, TOP - 0.3, NOTCH_Z0), HOT_PINK, fa)
-    tube("Roofline", Vector3.new(X1 + 0.1, TOP - 0.3, NOTCH_Z1), Vector3.new(X1 + 0.1, TOP - 0.3, Z1), HOT_PINK, fa)
+    -- (v3.1) east side: along the store wall to the annex, round the annex's north face, down its east face
+    tube("Roofline", Vector3.new(X1 + 0.1, TOP - 0.3, Z0), Vector3.new(X1 + 0.1, TOP - 0.3, ANNEX_Z0 - 0.1), HOT_PINK, fa)
+    tube("Roofline", Vector3.new(X1 + 0.1, TOP - 0.3, ANNEX_Z0 - 0.1), Vector3.new(ANNEX_X1 + 0.1, TOP - 0.3, ANNEX_Z0 - 0.1), HOT_PINK, fa)
+    tube("Roofline", Vector3.new(ANNEX_X1 + 0.1, TOP - 0.3, ANNEX_Z0 - 0.1), Vector3.new(ANNEX_X1 + 0.1, TOP - 0.3, NOTCH_Z0), HOT_PINK, fa)
+    tube("Roofline", Vector3.new(ANNEX_X1 + 0.1, TOP - 0.3, NOTCH_Z1), Vector3.new(ANNEX_X1 + 0.1, TOP - 0.3, Z1), HOT_PINK, fa)
 
     -- ── striped awning over the entrance only ──
     -- (x -71..-57: clear of the palm at x -74 and the streetlight pole at x -56;
@@ -1476,15 +1513,15 @@ function JewelryBuilder:_hall(f, refs, loot)
         box("Skirting", seg[1], FLOOR, BOH_Z0, seg[2], FLOOR + 0.6, BOH_Z0 + 0.12, BOH_DARK, M.Plaster, h, nc())
     end
     -- poster above the lockers (it used to sit behind them)
-    local poster = box("Poster", HALL_X1 - 0.08, 8.2, 25.2, HALL_X1, 11.2, 27.6, rgb(250, 196, 220), M.Fabric, h, nc())
+    local poster = box("Poster", HALL_X1 - 0.08, 8.2, 27.8, HALL_X1, 11.2, 30.2, rgb(250, 196, 220), M.Fabric, h, nc())
     local pg = lit(surface(poster, Enum.NormalId.Left, 40, 1))
     text({ Text = "EMPLOYEE\nOF THE\nMONTH", Size = UDim2.fromScale(0.9, 0.6), Position = UDim2.fromScale(0.05, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(120, 20, 70) }, pg)
     frame({ Size = UDim2.fromScale(0.5, 0.26), Position = UDim2.fromScale(0.25, 0.68), BackgroundColor3 = rgb(120, 20, 70) }, pg)
 
-    -- staff lockers against the east wall (HideSpot)
-    local lx0, lx1, lz0, lz1 = HALL_X1 - 1.5, HALL_X1, 25.0, 27.8
+    -- staff lockers against the east wall, south of the office door (HideSpot)
+    local lx0, lx1, lz0, lz1 = HALL_X1 - 1.5, HALL_X1, 27.6, 30.4
     local lockers = box("StaffLockers", lx0, FLOOR, lz0, lx1, FLOOR + 7.2, lz1, rgb(70, 110, 140), M.Metal, h)
     local lg = lit(surface(lockers, Enum.NormalId.Left, 30, 1))
     for k = 0, 1 do
@@ -1499,10 +1536,12 @@ function JewelryBuilder:_hall(f, refs, loot)
     tag(lockers, "HideSpot", { Label = "Lockers" })
     table.insert(refs.hideSpots, lockers)
 
-    -- stock boxes on the west wall (cover), south of the keypad
-    box("StockShelf", HALL_X0, FLOOR, 26.2, HALL_X0 + 1.4, FLOOR + 0.3, 27.9, STEEL_LT, M.Metal, h)
-    box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 26.3, HALL_X0 + 1.3, FLOOR + 1.6, 27.1, rgb(176, 140, 96), M.Cardboard, h)
-    box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 27.1, HALL_X0 + 1.3, FLOOR + 1.9, 27.8, rgb(186, 150, 104), M.Cardboard, h)
+    -- stock boxes on the west wall (cover), well south of the keypad (v3.1: the
+    -- courier case's E prompt used to sit 3 studs from the keypad's)
+    local SZ = 29.4 - 26.2                            -- shift vs the v3.0 spot
+    box("StockShelf", HALL_X0, FLOOR, 26.2 + SZ, HALL_X0 + 1.4, FLOOR + 0.3, 27.9 + SZ, STEEL_LT, M.Metal, h)
+    box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 26.3 + SZ, HALL_X0 + 1.3, FLOOR + 1.6, 27.1 + SZ, rgb(176, 140, 96), M.Cardboard, h)
+    box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 27.1 + SZ, HALL_X0 + 1.3, FLOOR + 1.9, 27.8 + SZ, rgb(186, 150, 104), M.Cardboard, h)
 
     -- (v3.0) LOOT: an aluminium courier case of ring repairs, lid open, on top
     -- of the stock boxes — back from the workshop, waiting to go in the safe
@@ -1510,7 +1549,7 @@ function JewelryBuilder:_hall(f, refs, loot)
     cs.Name = "RepairCase"
     cs.Parent = h
     local ALU = rgb(196, 200, 208)
-    local cx0, cx1, cz0, cz1 = HALL_X0 + 0.15, HALL_X0 + 1.25, 26.35, 27.05
+    local cx0, cx1, cz0, cz1 = HALL_X0 + 0.15, HALL_X0 + 1.25, 26.35 + SZ, 27.05 + SZ
     local cy0, cy1 = FLOOR + 1.6, FLOOR + 1.95
     box("CaseShell", cx0, cy0, cz0, cx1, cy1, cz1, ALU, M.DiamondPlate, cs, nc({ Reflectance = 0.1 }))
     box("CaseFoam", cx0 + 0.06, cy1, cz0 + 0.06, cx1 - 0.06, cy1 + 0.02, cz1 - 0.06, rgb(40, 40, 46), M.Fabric, cs, nc())
@@ -1534,15 +1573,15 @@ function JewelryBuilder:_hall(f, refs, loot)
         end
     end
     box("RepairTag", cx1 - 0.2, cy1 + 0.02, cz1 - 0.2, cx1 - 0.05, cy1 + 0.03, cz1 - 0.08, rgb(250, 240, 180), M.Fabric, cs, nc())
-    local cstand = Vector3.new(-64.4, FLOOR + 3, 26.7)
-    table.insert(loot, { kind = "Jewels", cframe = CFrame.lookAt(cstand, Vector3.new(HALL_X0, cstand.Y, 26.7)),
+    local cstand = Vector3.new(-63.6, FLOOR + 3, 30.2)
+    table.insert(loot, { kind = "Jewels", cframe = CFrame.lookAt(cstand, Vector3.new(HALL_X0, cstand.Y, 30.2)),
         visual = cs, pool = "backhall", inVault = false })
 
     -- the key light of the hall casts shadows (the guard walks under it)
     local hallTube = tubeLight(h, -62, 19.5, false, 0.8, 14)
     for _, l in ipairs(hallTube:GetChildren()) do if l:IsA("PointLight") then l.Shadows = true end end
-    tubeLight(h, -62, 25.5, false, 0.35, 9)      -- the dim end (shadow zone below)
-    table.insert(refs.shadowZones, shadowZone("ShadowHallEnd", HALL_X0, 24.4, -63, HALL_Z1, h))
+    tubeLight(h, -62, 28.5, false, 0.35, 9)      -- the dim end (shadow zone below)
+    table.insert(refs.shadowZones, shadowZone("ShadowHallEnd", HALL_X0, 25.6, -63.8, HALL_Z1, h))
 end
 
 function JewelryBuilder:_keycardDoor(f)
@@ -1632,14 +1671,16 @@ function JewelryBuilder:_lasers(f)
 end
 
 function JewelryBuilder:_closet(f, refs, loot)
-    -- utility closet x -67..-57, z 29..34: breaker, shelves, janitor cart,
-    -- and the ladder up to the roof hatch (inside end of the roof "vent")
+    -- utility closet x -67..-57, z 33..43 (v3.1: 10 x 10, was 10 x 5): breaker,
+    -- shelves, janitor cart, a mop sink, and the ladder up to the roof hatch
+    -- (inside end of the roof "vent"). E prompts >= 6 apart: breaker (east
+    -- wall, z 36.1) · stash (z 36.4, west half) · keycard shelf (south wall).
     local c = Instance.new("Folder")
     c.Name = "Closet"
     c.Parent = f
 
     -- breaker panel on the east wall (faces west into the closet)
-    local bz0, bz1 = 30.4, 32.6
+    local bz0, bz1 = 35, 37.2
     local breaker = box("BreakerPanel", HALL_X1 - 0.45, FLOOR + 2.6, bz0, HALL_X1, FLOOR + 6.2, bz1, rgb(96, 102, 110), M.Metal, c)
     local bg = lit(surface(breaker, Enum.NormalId.Left, 50, 1.1))
     text({ Text = "SECURITY", Size = UDim2.new(1, 0, 0.16, 0), Position = UDim2.fromScale(0, 0.04),
@@ -1658,9 +1699,9 @@ function JewelryBuilder:_closet(f, refs, loot)
         local lz = bz0 + 0.4 + (k - 1) * 0.4
         box("BreakerLed", HALL_X1 - 0.52, FLOOR + 5.8, lz - 0.07, HALL_X1 - 0.45, FLOOR + 5.94, lz + 0.07, col, M.Neon, c, nc())
     end
-    box("Conduit", HALL_X1 - 0.3, FLOOR + 6.2, 31.4, HALL_X1 - 0.12, CEIL, 31.6, STEEL_LT, M.Metal, c, nc())
+    box("Conduit", HALL_X1 - 0.3, FLOOR + 6.2, 36, HALL_X1 - 0.12, CEIL, 36.2, STEEL_LT, M.Metal, c, nc())
     -- hazard sign over the panel
-    local warn = box("HighVoltage", HALL_X1 - 0.08, FLOOR + 6.6, 30.8, HALL_X1, FLOOR + 7.6, 32.2, rgb(250, 204, 21), M.Metal, c, nc())
+    local warn = box("HighVoltage", HALL_X1 - 0.08, FLOOR + 6.6, bz0 + 0.4, HALL_X1, FLOOR + 7.6, bz1 - 0.4, rgb(250, 204, 21), M.Metal, c, nc())
     lit(printOn(warn, Enum.NormalId.Left, "DANGER", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
     -- metal shelving on the south wall; the keycard can turn up on the middle shelf
@@ -1677,7 +1718,7 @@ function JewelryBuilder:_closet(f, refs, loot)
     end
 
     -- janitor cart (HideSpot) in the middle of the south wall
-    local cx0, cx1, cz0, cz1 = -65.4, -62.6, 32.1, 33.95
+    local cx0, cx1, cz0, cz1 = -65.4, -62.6, IZ1 - 1.9, IZ1 - 0.05
     local cart = box("JanitorCart", cx0, FLOOR + 0.5, cz0, cx1, FLOOR + 3.6, cz1, rgb(240, 200, 40), M.Rubber, c)
     for _, wx in ipairs({ cx0 + 0.3, cx1 - 0.3 }) do
         for _, wz in ipairs({ cz0 + 0.3, cz1 - 0.3 }) do
@@ -1692,7 +1733,7 @@ function JewelryBuilder:_closet(f, refs, loot)
     table.insert(refs.hideSpots, cart)
 
     -- ladder up the west wall to the ceiling hatch
-    local lz0, lz1 = 29.7, 31.9
+    local lz0, lz1 = 38.5, 40.7
     for _, rz in ipairs({ lz0, lz1 }) do
         box("LadderRail", HALL_X0, FLOOR, rz - 0.1, HALL_X0 + 0.6, CEIL, rz + 0.1, STEEL_LT, M.Metal, c, nc())
     end
@@ -1708,9 +1749,27 @@ function JewelryBuilder:_closet(f, refs, loot)
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
         TextColor3 = rgb(30, 30, 30) }, ig)
 
-    local bulb = box("ClosetBulb", -61.3, CEIL - 0.3, 30.7, -60.7, CEIL, 31.3, STEEL_DK, M.Metal, c, nc())
-    box("ClosetBulbLens", -61.2, CEIL - 0.34, 30.8, -60.8, CEIL - 0.3, 31.2, COOL, M.Neon, c, nc())
-    point(bulb, COOL, 0.6, 11, false)
+    -- two bare bulbs: one over the breaker end, one (dimmer) over the shelves
+    for _, bl in ipairs({ { -60.5, 36.2, 0.55 }, { -61.5, 40.6, 0.35 } }) do
+        local bulb = box("ClosetBulb", bl[1] - 0.3, CEIL - 0.3, bl[2] - 0.3, bl[1] + 0.3, CEIL, bl[2] + 0.3, STEEL_DK, M.Metal, c, nc())
+        box("ClosetBulbLens", bl[1] - 0.2, CEIL - 0.34, bl[2] - 0.2, bl[1] + 0.2, CEIL - 0.3, bl[2] + 0.2, COOL, M.Neon, c, nc())
+        point(bulb, COOL, bl[3], 10, false)
+    end
+    -- (v3.1) finish the bigger room: a utility sink + a mop on the east wall
+    -- south of the breaker, a paint-can shelf by the door, BOH skirting
+    local skx0, skx1, skz0, skz1 = HALL_X1 - 1.6, HALL_X1 - 0.05, 38.4, 40.4
+    box("MopSink", skx0, FLOOR, skz0, skx1, FLOOR + 2.6, skz1, rgb(200, 204, 210), M.Metal, c)
+    box("MopSinkBasin", skx0 + 0.15, FLOOR + 2.3, skz0 + 0.15, skx1 - 0.15, FLOOR + 2.62, skz1 - 0.15, rgb(120, 124, 130), M.Metal, c, nc())
+    bar("Faucet", Vector3.new(skx1 - 0.2, FLOOR + 2.6, (skz0 + skz1) / 2), Vector3.new(skx1 - 0.2, FLOOR + 3.6, (skz0 + skz1) / 2),
+        0.12, STEEL_LT, M.Metal, c, nc())
+    bar("Mop", Vector3.new(skx0 + 0.3, FLOOR, skz1 + 0.4), Vector3.new(skx1 - 0.1, FLOOR + 5.2, skz1 + 0.2), 0.12,
+        WALNUT, M.Wood, c, nc())
+    box("PaintShelf", HALL_X1 - 1, FLOOR, CLOSET_Z0 + 0.1, HALL_X1 - 0.05, FLOOR + 3.4, CLOSET_Z0 + 1.3, STEEL_LT, M.Metal, c)
+    for k = 0, 2 do
+        vcyl("PaintCan", Vector3.new(HALL_X1 - 0.55, FLOOR + 3.6, CLOSET_Z0 + 0.4 + k * 0.35), 0.32, 0.4,
+            ({ rgb(230, 57, 70), rgb(240, 240, 232), rgb(33, 158, 188) })[k + 1], M.Metal, c, nc())
+    end
+    box("Skirting", HALL_X0, FLOOR, IZ1 - 0.12, HALL_X1, FLOOR + 0.6, IZ1, BOH_DARK, M.Plaster, c, nc())
 
     -- (v3.0) 🤫 SECRET STASH (hidden: ~1 run in 20): a loose floor tile just
     -- inside the closet door is propped up — someone's rainy-day pouch is
@@ -1719,7 +1778,7 @@ function JewelryBuilder:_closet(f, refs, loot)
     local st = Instance.new("Model")
     st.Name = "SecretStash"
     st.Parent = c
-    local tx, tz = -60.4, 30.0
+    local tx, tz = -63.5, 37.6          -- (v3.1) west half of the bigger closet, off the breaker
     box("StashHole", tx - 0.6, FLOOR + 0.004, tz - 0.6, tx + 0.6, FLOOR + 0.02, tz + 0.6, rgb(8, 8, 10), M.Concrete, st, nc())
     part({ Name = "LooseTile", Size = Vector3.new(1.3, 0.1, 1.3),
         CFrame = CFrame.new(tx, FLOOR + 0.62, tz - 0.62) * CFrame.Angles(math.rad(70), 0, 0),
@@ -1742,46 +1801,61 @@ function JewelryBuilder:_closet(f, refs, loot)
 end
 
 function JewelryBuilder:_office(f, loot)
-    -- back office x -56..-47, z 17..25: desk + CCTV + files. The crew walks
-    -- through here from the break room to the hall.
+    -- (v3.1 ROOMY BACK) back office x -56..-47, z 17..29 + the annex bay
+    -- x -47..-41, z 23..29 (was 9 x 8). The crew walks through here from the
+    -- break room to the hall. E prompts >= 6 apart: the watch cabinet (north
+    -- wall, west) · the keycard spot on the filing cabinets (north wall, east)
+    -- · the appraisal tray on the desk in the bay.
     local o = Instance.new("Folder")
     o.Name = "Office"
     o.Parent = f
-    local dx0, dx1, dz0, dz1 = IX1 - 2.6, IX1, 18.2, 22.6
+    local BAY_Z0 = ANNEX_Z0 + 1                       -- 23
+    local dx0, dx1, dz0, dz1 = AIX1 - 2.6, AIX1, BAY_Z0 + 0.4, OB_Z0 - 1.4   -- desk in the bay, against the annex wall
     local topY = FLOOR + 2.9
 
     -- (v2.0.2) walls: bottle-green painted wainscot + white rail + striped
-    -- wallpaper on the north and east walls (behind the cabinets / desk)
+    -- wallpaper on the north wall, the store's old east wall and the bay's east wall
     local WAINSCOT = rgb(34, 70, 58)
     local RAIL = rgb(226, 222, 210)
     box("Wainscot", EC_X0, FLOOR, BOH_Z0, IX1, FLOOR + 4, BOH_Z0 + 0.08, WAINSCOT, M.Plaster, o, nc())
     box("ChairRail", EC_X0, FLOOR + 4, BOH_Z0, IX1, FLOOR + 4.25, BOH_Z0 + 0.14, RAIL, M.Plaster, o, nc())
     local wpN = box("Wallpaper", EC_X0, FLOOR + 4.25, BOH_Z0, IX1, CEIL, BOH_Z0 + 0.05, rgb(214, 196, 160), M.Fabric, o, nc())
     wallpaper(wpN, Enum.NormalId.Back, rgb(206, 190, 152), rgb(150, 110, 70), 7)
-    box("Wainscot", IX1 - 0.08, FLOOR, BOH_Z0, IX1, FLOOR + 4, OB_Z0, WAINSCOT, M.Plaster, o, nc())
-    box("ChairRail", IX1 - 0.14, FLOOR + 4, BOH_Z0, IX1, FLOOR + 4.25, OB_Z0, RAIL, M.Plaster, o, nc())
-    local wpE = box("Wallpaper", IX1 - 0.05, FLOOR + 4.25, BOH_Z0, IX1, CEIL, OB_Z0, rgb(214, 196, 160), M.Fabric, o, nc())
-    wallpaper(wpE, Enum.NormalId.Left, rgb(206, 190, 152), rgb(150, 110, 70), 6)
+    for _, w in ipairs({ { IX1, BOH_Z0, BAY_Z0 }, { AIX1, BAY_Z0, OB_Z0 } }) do
+        box("Wainscot", w[1] - 0.08, FLOOR, w[2], w[1], FLOOR + 4, w[3], WAINSCOT, M.Plaster, o, nc())
+        box("ChairRail", w[1] - 0.14, FLOOR + 4, w[2], w[1], FLOOR + 4.25, w[3], RAIL, M.Plaster, o, nc())
+        local wpE = box("Wallpaper", w[1] - 0.05, FLOOR + 4.25, w[2], w[1], CEIL, w[3], rgb(214, 196, 160), M.Fabric, o, nc())
+        wallpaper(wpE, Enum.NormalId.Left, rgb(206, 190, 152), rgb(150, 110, 70), math.max(2, math.floor((w[3] - w[2]) / 1.2)))
+    end
+    -- the bay's north face (the annex's north wall, inside)
+    box("Wainscot", IX1, FLOOR, BAY_Z0, AIX1, FLOOR + 4, BAY_Z0 + 0.08, WAINSCOT, M.Plaster, o, nc())
+    box("ChairRail", IX1, FLOOR + 4, BAY_Z0, AIX1, FLOOR + 4.25, BAY_Z0 + 0.14, RAIL, M.Plaster, o, nc())
+    box("WallLining", IX1, FLOOR + 4.25, BAY_Z0, AIX1, CEIL, BAY_Z0 + 0.05, rgb(206, 190, 152), M.Plaster, o, nc())
     box("Skirting", EC_X0, FLOOR, OB_Z0 - 0.1, OB_DOOR_X0, FLOOR + 0.6, OB_Z0, rgb(26, 30, 28), M.Plaster, o, nc())
+    box("Skirting", OB_DOOR_X1, FLOOR, OB_Z0 - 0.1, AIX1, FLOOR + 0.6, OB_Z0, rgb(26, 30, 28), M.Plaster, o, nc())
+    -- a rug in the middle of the main room
+    box("Rug", -54.6, FLOOR, 20.4, -48.6, FLOOR + 0.04, 27.2, rgb(40, 58, 52), M.Fabric, o, nc({ CastShadow = false }))
+    box("RugBorder", -54.3, FLOOR + 0.04, 20.7, -48.9, FLOOR + 0.05, 26.9, rgb(196, 160, 90), M.Fabric, o,
+        nc({ CastShadow = false, Transparency = 0.55 }))
 
-    -- desk (satin walnut — the old WoodPlanks read as stripes at this size)
+    -- desk in the bay, against the annex's east wall (satin walnut)
     box("DeskTop", dx0, topY - 0.25, dz0, dx1, topY, dz1, WALNUT, M.Wood, o)
     box("DeskSide", dx0 + 0.05, FLOOR, dz0, dx1, topY - 0.25, dz0 + 0.2, WALNUT, M.Wood, o)
     box("DeskSide", dx0 + 0.05, FLOOR, dz1 - 0.2, dx1, topY - 0.25, dz1, WALNUT, M.Wood, o)
     box("DeskModesty", dx0 + 0.05, FLOOR + 0.8, dz0, dx0 + 0.25, topY - 0.25, dz1, WALNUT, M.Wood, o)
-    box("DeskBlotter", dx0 + 0.4, topY, 19.4, dx1 - 0.3, topY + 0.03, 21.6, rgb(30, 60, 44), M.Fabric, o, nc())
-    point(lightAnchor("MonitorGlow", Vector3.new(dx0 + 1, topY + 1.2, 20.4), o), rgb(150, 200, 255), 0.6, 8)
+    box("DeskBlotter", dx0 + 0.4, topY, dz0 + 1.6, dx1 - 0.3, topY + 0.03, dz1 - 0.4, rgb(30, 60, 44), M.Fabric, o, nc())
+    point(lightAnchor("MonitorGlow", Vector3.new(dx0 + 1, topY + 1.2, (dz0 + dz1) / 2 + 0.6), o), rgb(150, 200, 255), 0.6, 8)
 
     -- banker's lamp: the office's key light (shadows on), everything else stays dim
-    local lx, lz = dx1 - 0.7, dz0 + 0.55
+    local lx, lz = dx1 - 0.7, dz1 - 0.55
     box("LampBase", lx - 0.3, topY, lz - 0.2, lx + 0.3, topY + 0.12, lz + 0.2, BRASS, M.Metal, o, nc())
     bar("LampStem", Vector3.new(lx, topY + 0.12, lz), Vector3.new(lx, topY + 1.1, lz), 0.08, BRASS, M.Metal, o, nc())
     local shade = box("LampShade", lx - 0.45, topY + 1.05, lz - 0.2, lx + 0.45, topY + 1.35, lz + 0.2, rgb(20, 110, 60),
         M.Glass, o, nc({ Transparency = 0.1 }))
     spot(shade, Enum.NormalId.Bottom, rgb(255, 214, 160), 1.8, 10, 80, true)
 
-    -- CCTV monitor on the east wall above the desk
-    local mon = box("CctvMonitor", IX1 - 0.25, FLOOR + 5, 18.8, IX1, FLOOR + 7.4, 22.2, rgb(20, 20, 24), M.Metal, o)
+    -- CCTV monitor on the bay wall above the desk
+    local mon = box("CctvMonitor", AIX1 - 0.25, FLOOR + 5, dz0 + 0.8, AIX1, FLOOR + 7.4, dz1 - 0.3, rgb(20, 20, 24), M.Metal, o)
     local mg = surface(mon, Enum.NormalId.Left, 50, 1.1)
     local feeds = { "CAM 1 · SHOWROOM", "CAM 2 · SAFE ROOM", "CAM 3 · —", "NO SIGNAL" }
     for k, label in ipairs(feeds) do
@@ -1792,10 +1866,12 @@ function JewelryBuilder:_office(f, loot)
             TextScaled = true, FontFace = UITheme.F.mono, TextColor3 = rgb(140, 220, 200) }, cell)
     end
 
-    -- filing cabinets along the north wall (cover)
+    -- filing cabinets along the north wall, east end (cover). The keycard can
+    -- turn up on top of the east one (refs.keycardSpots).
+    local cabTop = FLOOR + 4.6
     for k = 0, 1 do
-        local x0 = EC_X0 + 0.2 + k * 1.9
-        local cab = box("FilingCabinet", x0, FLOOR, BOH_Z0, x0 + 1.8, FLOOR + 4.6, BOH_Z0 + 1.6, rgb(120, 126, 136), M.Metal, o)
+        local x0 = IX1 - 3.9 + k * 1.95
+        local cab = box("FilingCabinet", x0, FLOOR, BOH_Z0, x0 + 1.8, cabTop, BOH_Z0 + 1.6, rgb(120, 126, 136), M.Metal, o)
         local cg = lit(surface(cab, Enum.NormalId.Back, 30, 1))
         for d = 0, 2 do
             frame({ Size = UDim2.fromScale(0.9, 0.28), Position = UDim2.fromScale(0.05, 0.04 + d * 0.32),
@@ -1804,8 +1880,9 @@ function JewelryBuilder:_office(f, loot)
                 BackgroundColor3 = STEEL_DK }, cg)
         end
     end
-    -- cork board with notes (sits proud of the wallpaper)
-    local cork = box("CorkBoard", -52.4, 5.6, BOH_Z0 + 0.05, -48.2, 8.6, BOH_Z0 + 0.17, rgb(180, 140, 96), M.Wood, o, nc())
+    local keySpot = CFrame.new(IX1 - 1.05, cabTop, BOH_Z0 + 0.8)
+    -- cork board with notes (sits proud of the wallpaper), over the watch cabinet
+    local cork = box("CorkBoard", -55.7, 5.6, BOH_Z0 + 0.05, -52.2, 8.6, BOH_Z0 + 0.17, rgb(180, 140, 96), M.Wood, o, nc())
     local ng = lit(surface(cork, Enum.NormalId.Back, 40, 1))
     for k, col in ipairs({ rgb(250, 240, 140), rgb(250, 196, 220), rgb(170, 230, 255), rgb(250, 240, 140) }) do
         frame({ Size = UDim2.fromScale(0.2, 0.3), Position = UDim2.fromScale(0.06 + (k - 1) * 0.23, 0.12 + (k % 2) * 0.35),
@@ -1813,23 +1890,24 @@ function JewelryBuilder:_office(f, loot)
     end
 
     -- the ceiling tube is dimmed right down: the desk lamp does the work
-    tubeLight(o, -51.5, 21, true, 0.35, 11, WARM)
+    tubeLight(o, -51.5, 22.5, true, 0.35, 12, WARM)
 
     local METAL_DK = { rgb(36, 38, 44), M.Metal, 0.05 }
-    prop("furniture", "computerScreen", Vector3.new(dx1 - 0.9, topY, 20.4), Vector3.new(-1, 0, 0), o,
+    prop("furniture", "computerScreen", Vector3.new(dx1 - 0.9, topY, (dz0 + dz1) / 2 + 0.6), Vector3.new(-1, 0, 0), o,
         { main = METAL_DK, byName = { screen = { rgb(40, 90, 140), M.Glass, 0.2 } } })
-    -- (v3.0) chair slid to the south end of the desk so the watch cabinet has room
-    prop("furniture", "chairDesk", Vector3.new(dx0 - 1.3, FLOOR, 22.0), Vector3.new(1, 0, 0), o,
-        { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } })
-    prop("furniture", "pottedPlant", Vector3.new(EC_X0 + 0.9, FLOOR, 23.8), Vector3.new(1, 0, 0), o,
+    prop("furniture", "chairDesk", Vector3.new(dx0 - 1.3, FLOOR, (dz0 + dz1) / 2 + 1), Vector3.new(1, 0, 0), o,
+        { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } }, { collide = false })
+    prop("furniture", "pottedPlant", Vector3.new(EC_X0 + 0.9, FLOOR, OB_Z0 - 1), Vector3.new(1, 0, 0), o,
         { main = { rgb(52, 120, 70), M.Grass }, accent = { rgb(176, 96, 64), M.Concrete },
-          byName = { pot = { rgb(176, 96, 64), M.Concrete }, leaf = { rgb(52, 120, 70), M.Grass }, plant = { rgb(52, 120, 70), M.Grass } } })
-    prop("furniture", "trashcan", Vector3.new(EC_X0 + 0.9, FLOOR, 21.2), Vector3.new(1, 0, 0), o,
-        { main = { rgb(60, 64, 72), M.Metal, 0.05 } }, { collide = false })   -- (v3.0) it sat in the doorway
+          byName = { pot = { rgb(176, 96, 64), M.Concrete }, leaf = { rgb(52, 120, 70), M.Grass }, plant = { rgb(52, 120, 70), M.Grass } } },
+        { collide = false })
+    prop("furniture", "trashcan", Vector3.new(dx0 - 0.6, FLOOR, dz1 + 0.6), Vector3.new(1, 0, 0), o,
+        { main = { rgb(60, 64, 72), M.Metal, 0.05 } }, { collide = false })
 
     -- (v3.0) LOOT 1: the owner's watch collection — a walnut cabinet with a
-    -- glass top against the north wall, six watches on little velvet pillows
-    local wx0, wx1, wz0, wz1 = -51.95, -49.75, BOH_Z0 + 0.05, BOH_Z0 + 1.15
+    -- glass top against the north wall (west end), six watches on velvet pillows
+    local wx0, wx1, wz0, wz1 = -55.6, -53.4, BOH_Z0 + 0.05, BOH_Z0 + 1.15
+    local wmid = (wx0 + wx1) / 2
     local wTop = FLOOR + 2.9
     box("WatchCabinet", wx0, FLOOR, wz0, wx1, wTop - 0.1, wz1, WALNUT, M.Wood, o)
     box("WatchCabinetKick", wx0 + 0.05, FLOOR, wz1, wx1 - 0.05, FLOOR + 0.3, wz1 + 0.03, BRASS, M.Metal, o, nc())
@@ -1837,10 +1915,10 @@ function JewelryBuilder:_office(f, loot)
     box("WatchPad", wx0 + 0.08, wTop, wz0 + 0.08, wx1 - 0.08, wTop + 0.04, wz1 - 0.08, BLACK_VELVET, M.Fabric, o, nc())
     box("WatchGlass", wx0, wTop, wz0, wx1, wTop + 0.75, wz1, rgb(214, 236, 246), M.Glass, o,
         { Transparency = 0.7, Reflectance = 0.25, CastShadow = false })
-    box("WatchLock", -50.95, wTop - 0.08, wz1 + 0.03, -50.75, wTop + 0.12, wz1 + 0.06, BRASS, M.Metal, o, nc())
-    local plaque = box("WatchPlaque", -51.5, FLOOR + 1.8, wz1 + 0.03, -50.2, FLOOR + 2.2, wz1 + 0.05, BRASS, M.Metal, o, nc())
+    box("WatchLock", wmid - 0.1, wTop - 0.08, wz1 + 0.03, wmid + 0.1, wTop + 0.12, wz1 + 0.06, BRASS, M.Metal, o, nc())
+    local plaque = box("WatchPlaque", wmid - 0.65, FLOOR + 1.8, wz1 + 0.03, wmid + 0.65, FLOOR + 2.2, wz1 + 0.05, BRASS, M.Metal, o, nc())
     lit(printOn(plaque, Enum.NormalId.Back, "PRIVATE COLLECTION", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
-    point(lightAnchor("WatchCaseGlow", Vector3.new(-50.85, wTop + 0.6, (wz0 + wz1) / 2), o), rgb(255, 236, 214), 0.7, 4, false)
+    point(lightAnchor("WatchCaseGlow", Vector3.new(wmid, wTop + 0.6, (wz0 + wz1) / 2), o), rgb(255, 236, 214), 0.7, 4, false)
     local wv = Instance.new("Model")
     wv.Name = "Watches"
     wv.Parent = o
@@ -1863,14 +1941,13 @@ function JewelryBuilder:_office(f, loot)
         bar("Hand", c + Vector3.new(0, 0.255, 0), c + Vector3.new(-0.03, 0.255, -0.09), 0.015, lk[1], M.Metal, wv, nc())
         box("Crown", c.X + 0.15, c.Y + 0.18, c.Z - 0.02, c.X + 0.19, c.Y + 0.22, c.Z + 0.02, lk[1], M.Metal, wv, nc())
     end
-    -- (stands clear of the desk chair)
-    local wstand = Vector3.new(-50.9, FLOOR + 3, 19.2)
-    table.insert(loot, { kind = "Watch", cframe = CFrame.lookAt(wstand, Vector3.new(-50.85, wstand.Y, (wz0 + wz1) / 2)),
+    local wstand = Vector3.new(wmid, FLOOR + 3, 19.3)
+    table.insert(loot, { kind = "Watch", cframe = CFrame.lookAt(wstand, Vector3.new(wmid, wstand.Y, (wz0 + wz1) / 2)),
         visual = wv, pool = "office", inVault = false })
 
     -- (v3.0) LOOT 2: the jeweller's appraisal tray on the desk — loose stones,
-    -- a loupe, tweezers and an open diamond paper (clear of the keycard spot)
-    local ax0, ax1, az0, az1 = -49.4, -48.5, 20.4, 21.3
+    -- a loupe, tweezers and an open diamond paper (north end of the desk)
+    local ax0, ax1, az0, az1 = dx0 + 0.6, dx0 + 1.5, dz0 + 0.3, dz0 + 1.2
     box("AppraisalTray", ax0, topY, az0, ax1, topY + 0.05, az1, BLACK_VELVET, M.Fabric, o, nc())
     box("TrayRim", ax0 - 0.03, topY, az0 - 0.03, ax1 + 0.03, topY + 0.07, az0, BRASS, M.Metal, o, nc())
     local tv = Instance.new("Model")
@@ -1886,27 +1963,39 @@ function JewelryBuilder:_office(f, loot)
     box("DiamondPaper", ax0 - 0.05, topY + 0.03, az1 + 0.05, ax0 + 0.45, topY + 0.05, az1 + 0.47, rgb(250, 250, 246), M.Fabric, tv, nc())
     box("PaperLining", ax0, topY + 0.05, az1 + 0.1, ax0 + 0.4, topY + 0.055, az1 + 0.42, rgb(120, 170, 230), M.Fabric, tv, nc())
     stone(tv, Vector3.new(ax0 + 0.2, topY + 0.11, az1 + 0.26), 0.15, STONE.diamond)
-    vcyl("Loupe", Vector3.new(ax0 + 0.15, topY + 0.13, az0 - 0.25), 0.22, 0.2, rgb(20, 20, 24), M.Metal, o, nc())
-    vcyl("LoupeLens", Vector3.new(ax0 + 0.15, topY + 0.24, az0 - 0.25), 0.18, 0.02, rgb(200, 230, 250), M.Glass, o,
+    vcyl("Loupe", Vector3.new(ax1 + 0.35, topY + 0.13, az0 + 0.2), 0.22, 0.2, rgb(20, 20, 24), M.Metal, o, nc())
+    vcyl("LoupeLens", Vector3.new(ax1 + 0.35, topY + 0.24, az0 + 0.2), 0.18, 0.02, rgb(200, 230, 250), M.Glass, o,
         nc({ Transparency = 0.3, Reflectance = 0.4 }))
-    bar("Tweezers", Vector3.new(ax0 + 0.4, topY + 0.06, az0 - 0.45), Vector3.new(ax1 - 0.05, topY + 0.06, az0 - 0.2), 0.03,
+    bar("Tweezers", Vector3.new(ax1 + 0.2, topY + 0.06, az1 + 0.1), Vector3.new(ax1 + 0.6, topY + 0.06, az1 + 0.5), 0.03,
         STEEL_LT, M.Metal, o, nc())
-    local tstand = Vector3.new(-53.25, FLOOR + 3, 21.0)
+    local tstand = Vector3.new(dx0 - 2.2, FLOOR + 3, (az0 + az1) / 2)
     table.insert(loot, { kind = "Jewels", cframe = CFrame.lookAt(tstand, Vector3.new(ax0, tstand.Y, (az0 + az1) / 2)),
         visual = tv, pool = "office", inVault = false })
 
-    return CFrame.new(dx0 + 0.9, topY, 21.8)
+    return keySpot
 end
 
--- 🚪 the staff break room + the sneaky east-alley door (sneakIn lives here)
+-- 🚪 the staff break room + the sneaky yard door (sneakIn lives here).
+-- (v3.1 ROOMY BACK) x -56..-41, z 30..43 (15 x 13, was 9 x 8): kitchenette on
+-- the west wall, a table in the middle, vending machine + crawl vent on the
+-- south wall, the staff door in the annex's east wall.
 function JewelryBuilder:_breakRoom(f, refs)
     local b = Instance.new("Folder")
     b.Name = "BreakRoom"
     b.Parent = f
 
-    -- mint wainscot on the west + south walls
-    box("Wainscot", EC_X0, FLOOR, BREAK_Z0, EC_X0 + 0.1, FLOOR + 4, IZ1, rgb(150, 225, 200), M.Plaster, b, nc())
-    box("Wainscot", EC_X0, FLOOR, IZ1 - 0.1, IX1, FLOOR + 4, IZ1, rgb(150, 225, 200), M.Plaster, b, nc())
+    -- mint wainscot on the west + south + east walls, soft grey-green paint above
+    local MINT_W = rgb(150, 225, 200)
+    local PAINT = rgb(150, 160, 156)
+    box("Wainscot", EC_X0, FLOOR, BREAK_Z0, EC_X0 + 0.1, FLOOR + 4, IZ1, MINT_W, M.Plaster, b, nc())
+    box("Wainscot", EC_X0, FLOOR, IZ1 - 0.1, AIX1, FLOOR + 4, IZ1, MINT_W, M.Plaster, b, nc())
+    box("WallLining", EC_X0 + 0.1, FLOOR + 4, IZ1 - 0.06, AIX1, CEIL, IZ1, PAINT, M.Plaster, b, nc())
+    for _, zz in ipairs({ { BREAK_Z0, SIDE_Z0 }, { SIDE_Z1, IZ1 } }) do
+        box("Wainscot", AIX1 - 0.1, FLOOR, zz[1], AIX1, FLOOR + 4, zz[2], MINT_W, M.Plaster, b, nc())
+        box("WallLining", AIX1 - 0.06, FLOOR + 4, zz[1], AIX1, CEIL, zz[2], PAINT, M.Plaster, b, nc())
+    end
+    box("WallLining", AIX1 - 0.06, DOOR_H, SIDE_Z0, AIX1, CEIL, SIDE_Z1, PAINT, M.Plaster, b, nc())
+    box("WainscotCap", EC_X0, FLOOR + 4, IZ1 - 0.16, AIX1, FLOOR + 4.2, IZ1, rgb(40, 110, 100), M.Plaster, b, nc())
 
     -- fridge in the north-west corner
     local fz0, fz1 = BREAK_Z0 + 0.2, BREAK_Z0 + 2.6
@@ -1924,19 +2013,45 @@ function JewelryBuilder:_breakRoom(f, refs)
         TextColor3 = rgb(40, 40, 60) }, ng)
 
     -- kitchenette counter along the west wall
-    local kz0, kz1 = 29.2, IZ1
+    local kz0, kz1 = 34.6, IZ1 - 0.1
     local topY = FLOOR + 3.3
     -- (v2.0.2) painted cabinets (not stripy wood), door seams, a white tile splashback
     local CAB = rgb(70, 140, 134)
     box("Kitchenette", EC_X0, FLOOR, kz0, EC_X0 + 1.9, topY - 0.2, kz1, CAB, M.Plaster, b)
     box("KitchenetteTop", EC_X0, topY - 0.2, kz0, EC_X0 + 2.05, topY, kz1, rgb(236, 232, 226), M.Marble, b)
     box("UpperCabinet", EC_X0, FLOOR + 6.2, kz0, EC_X0 + 1.3, FLOOR + 8.8, kz1, CAB, M.Plaster, b)
-    for _, sz in ipairs({ 30.8, 32.4 }) do
+    for sz = kz0 + 1.7, kz1 - 0.5, 1.7 do
         box("CabinetSeam", EC_X0 + 1.9, FLOOR + 0.3, sz - 0.04, EC_X0 + 1.93, topY - 0.4, sz + 0.04, rgb(40, 90, 86), M.Plaster, b, nc())
         box("CabinetSeam", EC_X0 + 1.3, FLOOR + 6.4, sz - 0.04, EC_X0 + 1.33, FLOOR + 8.6, sz + 0.04, rgb(40, 90, 86), M.Plaster, b, nc())
     end
+    box("Sink", EC_X0 + 0.5, topY - 0.25, 37.6, EC_X0 + 1.7, topY + 0.01, 38.9, rgb(180, 186, 194), M.Metal, b, nc())
+    bar("SinkTap", Vector3.new(EC_X0 + 0.3, topY, 38.25), Vector3.new(EC_X0 + 0.3, topY + 0.8, 38.25), 0.1, STEEL_LT, M.Metal, b, nc())
     box("Splashback", EC_X0, topY, kz0, EC_X0 + 0.06, FLOOR + 6.2, kz1, rgb(240, 240, 234), M.CeramicTiles, b, nc())
-    box("Skirting", EC_X0 + 0.1, FLOOR, IZ1 - 0.16, IX1, FLOOR + 0.6, IZ1 - 0.1, rgb(40, 70, 66), M.Plaster, b, nc())
+    box("Skirting", EC_X0 + 0.1, FLOOR, IZ1 - 0.16, AIX1, FLOOR + 0.6, IZ1 - 0.1, rgb(40, 70, 66), M.Plaster, b, nc())
+
+    -- the table: a diner table + two chairs in the middle of the room (cover
+    -- between the office door and the kitchenette; the drop-in stays clear)
+    local tx0, tx1, tz0, tz1 = -51.4, -48.4, 35, 38
+    local tcx, tcz = (tx0 + tx1) / 2, (tz0 + tz1) / 2
+    local TT = rgb(226, 90, 90)
+    box("TableTop", tx0, FLOOR + 2.7, tz0, tx1, FLOOR + 2.95, tz1, TT, M.Plastic, b)
+    box("TableEdge", tx0 - 0.05, FLOOR + 2.62, tz0 - 0.05, tx1 + 0.05, FLOOR + 2.72, tz1 + 0.05, STEEL_LT, M.Metal, b, nc())
+    bar("TableLeg", Vector3.new((tx0 + tx1) / 2, FLOOR, (tz0 + tz1) / 2), Vector3.new((tx0 + tx1) / 2, FLOOR + 2.62, (tz0 + tz1) / 2),
+        0.3, STEEL_LT, M.Metal, b)
+    box("TableFoot", (tx0 + tx1) / 2 - 0.8, FLOOR, (tz0 + tz1) / 2 - 0.8, (tx0 + tx1) / 2 + 0.8, FLOOR + 0.1,
+        (tz0 + tz1) / 2 + 0.8, STEEL_LT, M.Metal, b, nc())
+    for _, cz in ipairs({ tz0 - 1.1, tz1 + 1.1 }) do
+        local cx = (tx0 + tx1) / 2
+        box("ChairSeat", cx - 0.7, FLOOR + 1.6, cz - 0.6, cx + 0.7, FLOOR + 1.85, cz + 0.6, rgb(40, 110, 100), M.Fabric, b, nc())
+        local back = cz < tz0 and cz - 0.6 or cz + 0.45
+        box("ChairBack", cx - 0.7, FLOOR + 1.85, back, cx + 0.7, FLOOR + 3.6, back + 0.15, rgb(40, 110, 100), M.Fabric, b, nc())
+        bar("ChairLeg", Vector3.new(cx, FLOOR, cz), Vector3.new(cx, FLOOR + 1.6, cz), 0.14, STEEL_LT, M.Metal, b, nc())
+    end
+    -- a napkin holder + two mugs on the table
+    box("NapkinHolder", tcx - 0.3, FLOOR + 2.95, tcz - 0.2, tcx + 0.3, FLOOR + 3.4, tcz + 0.2, STEEL_LT, M.Metal, b, nc())
+    for k, m in ipairs({ { tcx - 0.8, tcz - 0.8 }, { tcx + 0.9, tcz + 0.7 } }) do
+        vcyl("Mug", Vector3.new(m[1], FLOOR + 3.15, m[2]), 0.35, 0.4, k == 1 and HOT_PINK or CYAN, M.Plastic, b, nc())
+    end
 
     -- vending machine against the south wall — glowing front, readable at a glance
     local vx0, vx1, vz0 = -53, -50.6, IZ1 - 2.2
@@ -1950,11 +2065,16 @@ function JewelryBuilder:_breakRoom(f, refs)
                 BackgroundColor3 = GEM_COLORS[((r + col) % 3) + 1] }, vg)
         end
     end
-    point(vw, rgb(200, 230, 255), 0.9, 10, false)
+    point(vw, rgb(200, 230, 255), 0.7, 9, false)
     box("VendingSlot", vx0 + 0.4, FLOOR + 0.6, vz0 - 0.05, vx1 - 0.9, FLOOR + 1.4, vz0, STEEL_DK, M.Metal, b, nc())
+    -- a water cooler beside it
+    box("WaterCooler", vx1 + 0.5, FLOOR, IZ1 - 1.2, vx1 + 1.6, FLOOR + 3.4, IZ1 - 0.1, rgb(236, 238, 240), M.Plastic, b)
+    part({ Name = "WaterBottle", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.4, 0.9, 0.9),
+        CFrame = CFrame.new(vx1 + 1.05, FLOOR + 4.1, IZ1 - 0.65) * CFrame.Angles(0, 0, math.rad(90)),
+        Color = rgb(150, 200, 240), Material = M.Glass, Transparency = 0.3, CanCollide = false }, b)
 
     -- crawl vent, break-room end: low on the south wall, east of the vending machine
-    local ventX = -48.9
+    local ventX = -46.5
     box("VentFrame", ventX - 1.4, FLOOR, IZ1 - 0.2, ventX + 1.4, FLOOR + 2.7, IZ1, STEEL_LT, M.Metal, b, nc())
     local vent = facingPart("DD_VentBreakRoom", Vector3.new(ventX, FLOOR + 1.3, IZ1 - 0.25), Vector3.new(2.4, 2.4, 0.12),
         Vector3.new(0, 0, -1), rgb(60, 62, 70), M.DiamondPlate, b)
@@ -1965,7 +2085,7 @@ function JewelryBuilder:_breakRoom(f, refs)
     end
 
     -- staff notice board + clock over the kitchenette
-    local board = box("NoticeBoard", EC_X0, FLOOR + 9.6, 29.8, EC_X0 + 0.12, FLOOR + 12, 33.2, rgb(40, 60, 70), M.Slate, b, nc())
+    local board = box("NoticeBoard", EC_X0, FLOOR + 9.6, 36, EC_X0 + 0.12, FLOOR + 12, 40, rgb(40, 60, 70), M.Slate, b, nc())
     local bg = lit(surface(board, Enum.NormalId.Right, 40, 1))
     text({ Text = "BREAK ROOM", Size = UDim2.fromScale(0.9, 0.3), Position = UDim2.fromScale(0.05, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
@@ -1973,26 +2093,36 @@ function JewelryBuilder:_breakRoom(f, refs)
     text({ Text = "Wash your mug!", Size = UDim2.fromScale(0.9, 0.22), Position = UDim2.fromScale(0.05, 0.5),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
         TextColor3 = rgb(250, 196, 220) }, bg)
+    local clock = part({ Name = "Clock", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 1.6, 1.6),
+        CFrame = CFrame.new(-50.7, FLOOR + 10, IZ1 - 0.08), Color = rgb(250, 250, 244), Material = M.Plastic,
+        CanCollide = false }, b)
+    clock.CFrame = CFrame.new(-50.7, FLOOR + 10, IZ1 - 0.08) * CFrame.Angles(0, math.rad(90), 0)
+    bar("ClockHand", Vector3.new(-50.7, FLOOR + 10, IZ1 - 0.16), Vector3.new(-50.7, FLOOR + 10.6, IZ1 - 0.16), 0.06,
+        rgb(30, 30, 30), M.Metal, b, nc())
 
-    -- the room light: warm, a little dim, on the whole time
-    local lamp = box("BreakLight", -52.2, CEIL - 0.25, 29.2, -50.8, CEIL, 30.6, STEEL_DK, M.Metal, b, nc())
-    box("BreakLightLens", -52.1, CEIL - 0.3, 29.3, -50.9, CEIL - 0.25, 30.5, WARM, M.Neon, b, nc())
-    point(lamp, WARM, 1, 12, false)
+    -- lights: a warm pendant over the table (the key light) + a dim tube by the door
+    bar("PendantCord", Vector3.new(tcx, CEIL, tcz), Vector3.new(tcx, CEIL - 4, tcz), 0.06, STEEL_DK, M.Rubber, b, nc())
+    local lamp = box("BreakLight", tcx - 0.7, CEIL - 4.6, tcz - 0.7, tcx + 0.7, CEIL - 4, tcz + 0.7, rgb(40, 110, 100), M.Metal, b, nc())
+    box("BreakLightLens", tcx - 0.5, CEIL - 4.66, tcz - 0.5, tcx + 0.5, CEIL - 4.6, tcz + 0.5, WARM, M.Neon, b, nc())
+    spot(lamp, Enum.NormalId.Bottom, WARM, 1.4, 14, 110, true)
+    tubeLight(b, -45, 36.5, false, 0.3, 11, WARM)
 
-    prop("furniture", "kitchenMicrowave", Vector3.new(EC_X0 + 1, FLOOR + 3.3, 30.4), Vector3.new(1, 0, 0), b,
+    prop("furniture", "kitchenMicrowave", Vector3.new(EC_X0 + 1, topY, 35.6), Vector3.new(1, 0, 0), b,
         { main = { rgb(232, 232, 228), M.Metal, 0.05 }, accent = { rgb(30, 32, 36), M.Glass, 0.2 } })
-    prop("furniture", "kitchenCoffeeMachine", Vector3.new(EC_X0 + 1, FLOOR + 3.3, 32.6), Vector3.new(1, 0, 0), b,
+    prop("furniture", "kitchenCoffeeMachine", Vector3.new(EC_X0 + 1, topY, 40.6), Vector3.new(1, 0, 0), b,
         { main = { rgb(26, 26, 30), M.Metal, 0.05 }, accent = { rgb(170, 174, 182), M.Metal, 0.1 } })
+    prop("furniture", "coatRackStanding", Vector3.new(AIX1 - 0.8, FLOOR, BREAK_Z0 + 0.8), Vector3.new(-1, 0, 0), b,
+        { main = { rgb(70, 50, 40), M.Wood } }, { collide = false })
 
-    -- ── the staff door in the east yard wall (open double doors) ──
-    local x = X1
+    -- ── the staff door in the annex's east wall (open double doors onto the yard) ──
+    local x = ANNEX_X1
     local STEELC = rgb(70, 74, 82)
     box("StaffDoorFrameN", x, 0, SIDE_Z0 - 0.3, x + 0.25, DOOR_H + 0.3, SIDE_Z0, STEELC, M.Metal, b)
     box("StaffDoorFrameS", x, 0, SIDE_Z1, x + 0.25, DOOR_H + 0.3, SIDE_Z1 + 0.3, STEELC, M.Metal, b)
     box("StaffDoorFrameTop", x, DOOR_H, SIDE_Z0 - 0.3, x + 0.25, DOOR_H + 0.3, SIDE_Z1 + 0.3, STEELC, M.Metal, b)
     -- both leaves propped open flat against the outside wall
-    box("StaffDoorLeaf", x + 0.25, FLOOR, SIDE_Z0 - 3.8, x + 0.45, DOOR_H - 0.1, SIDE_Z0 - 0.3, rgb(96, 100, 110), M.DiamondPlate, b, nc())
-    box("StaffDoorLeaf", x + 0.25, FLOOR, SIDE_Z1 + 0.3, x + 0.45, DOOR_H - 0.1, SIDE_Z1 + 3.8, rgb(96, 100, 110), M.DiamondPlate, b, nc())
+    box("StaffDoorLeaf", x + 0.25, FLOOR, SIDE_Z0 - 3.5, x + 0.45, DOOR_H - 0.1, SIDE_Z0 - 0.3, rgb(96, 100, 110), M.DiamondPlate, b, nc())
+    box("StaffDoorLeaf", x + 0.25, FLOOR, SIDE_Z1 + 0.3, x + 0.45, DOOR_H - 0.1, SIDE_Z1 + 3.5, rgb(96, 100, 110), M.DiamondPlate, b, nc())
     box("StaffDoorStep", x, 0, SIDE_Z0, x + 2, FLOOR, SIDE_Z1, rgb(150, 146, 140), M.Concrete, b)
     local plate = box("StaffDoorPlate", x + 0.25, DOOR_H + 0.6, SIDE_Z0 + 1.6, x + 0.35, DOOR_H + 1.8, SIDE_Z1 - 1.6,
         rgb(26, 26, 30), M.Metal, b)
@@ -2023,7 +2153,6 @@ function JewelryBuilder:_yard(f, refs)
 
     -- ── ground: asphalt yard, concrete strip behind the store, concrete driveway ──
     box("YardFloor", X1, 0, YARD_Z0, EX0, 0.1, SZ0, rgb(52, 52, 58), M.Asphalt, a)
-    box("BackStripFloor", BACK_X0 + T, 0, Z1, X1, 0.1, SZ0, rgb(120, 118, 112), M.Concrete, a)
     box("Driveway", X1, 0, -1.4, GATE_X1 + 0.8, 0.1, YARD_Z0, rgb(150, 148, 142), M.Concrete, a)
     box("GateTrack", GATE_X0, 0.1, YARD_Z0 + 0.2, GATE_X1, 0.14, YARD_Z0 + 0.4, STEEL, M.Metal, a, nc())
     -- painted parking bay round the getaway spot
@@ -2036,17 +2165,17 @@ function JewelryBuilder:_yard(f, refs)
     box("YardGatePostE", GATE_X1, 0, YARD_Z0 - 0.2, GATE_X1 + 0.8, H + 1, NZ1 + 0.2, BRICK, M.Brick, a)
     box("YardWallN", GATE_X1 + 0.8, 0, YARD_Z0, EX0, H, NZ1, BRICK, M.Brick, a)
     box("YardWallE", EX0, 0, YARD_Z0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
-    box("YardWallS", BACK_X0, 0, SZ0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
-    box("YardWallW", BACK_X0, 0, Z1, BACK_X0 + T, H, SZ0, BRICK, M.Brick, a)
+    -- (v3.1) the back strip is gone (the store fills it): the south wall runs from
+    -- the annex's east wall to the yard's east wall, flush with the store's back wall
+    box("YardWallS", ANNEX_X1, 0, SZ0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
     -- concrete coping + a dark plinth on the inside faces
     box("YardCoping", GATE_X1 + 0.8, H, YARD_Z0 - 0.1, YARD_X1 + 0.1, H + 0.35, NZ1 + 0.1, CAP, M.Concrete, a)
     box("YardCoping", EX0 - 0.1, H, NZ1, YARD_X1 + 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
-    box("YardCoping", BACK_X0 - 0.1, H, SZ0 - 0.1, EX0 - 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
-    box("YardCoping", BACK_X0 - 0.1, H, Z1, BACK_X0 + T + 0.1, H + 0.35, SZ0 - 0.1, CAP, M.Concrete, a)
+    box("YardCoping", ANNEX_X1, H, SZ0 - 0.1, EX0 - 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
     box("PostCap", GATE_X1 - 0.1, H + 1, YARD_Z0 - 0.3, GATE_X1 + 0.9, H + 1.4, NZ1 + 0.3, CAP, M.Concrete, a)
     box("Plinth", GATE_X1 + 0.8, 0.1, NZ1, EX0, 1.1, NZ1 + 0.08, PLINTH, M.Concrete, a, nc())
     box("Plinth", EX0 - 0.08, 0.1, NZ1, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
-    box("Plinth", BACK_X0 + T, 0.1, SZ0 - 0.08, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
+    box("Plinth", ANNEX_X1, 0.1, SZ0 - 0.08, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
 
     -- ── the vehicle gate: chain-link slider parked open along the north wall ──
     local gx0, gx1, gz, gy0, gy1 = GATE_X1 + 1.0, GATE_X1 + 9.4, NZ1 + 0.15, 0.5, 9.2
@@ -2085,8 +2214,8 @@ function JewelryBuilder:_yard(f, refs)
     box("YardLampLens", EX0 - 0.65, 9.52, CAR_Z - 0.6, EX0 - 0.05, 9.6, CAR_Z + 0.6, rgb(255, 196, 120), M.Neon, a,
         nc({ CastShadow = false }))
     spot(key, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.7, 26, 120, true)
-    local back = box("YardLamp", -62.7, 9.6, SZ0 - 0.7, -61.3, 10.3, SZ0, STEEL_DK, M.Metal, a, nc())
-    box("YardLampLens", -62.6, 9.52, SZ0 - 0.65, -61.4, 9.6, SZ0 - 0.05, rgb(255, 196, 120), M.Neon, a,
+    local back = box("YardLamp", -32.7, 9.6, SZ0 - 0.7, -31.3, 10.3, SZ0, STEEL_DK, M.Metal, a, nc())
+    box("YardLampLens", -32.6, 9.52, SZ0 - 0.65, -31.4, 9.6, SZ0 - 0.05, rgb(255, 196, 120), M.Neon, a,
         nc({ CastShadow = false }))
     spot(back, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.3, 18, 110, false)
 
@@ -2103,8 +2232,8 @@ function JewelryBuilder:_yard(f, refs)
             Position = Vector3.new(EX0 - 1.1 - (k % 2) * 1.2, 0.75, dz1 + 1 + k * 1.1), Color = rgb(24, 24, 28),
             Material = M.Rubber }, a)
     end
-    -- blue recycling dumpster behind the store
-    local rx0, rx1 = -70, -66.2
+    -- blue recycling dumpster against the south wall (v3.1: was behind the store)
+    local rx0, rx1 = -37.4, -33.6
     box("Dumpster", rx0, 0.4, SZ0 - 3.8, rx1, 4.2, SZ0 - 0.3, rgb(34, 84, 150), M.Metal, a)
     box("DumpsterLid", rx0 - 0.1, 4.2, SZ0 - 3.9, rx1 + 0.1, 4.45, SZ0 - 0.2, rgb(24, 60, 110), M.Metal, a)
     box("DumpsterSkid", rx0 + 0.2, 0.1, SZ0 - 3.6, rx1 - 0.2, 0.4, SZ0 - 0.5, STEEL_DK, M.Metal, a)
@@ -2113,30 +2242,24 @@ function JewelryBuilder:_yard(f, refs)
     box("Crate", cx - 1.1, 0.1, cz - 1.1, cx + 1.1, 2.3, cz + 1.1, rgb(150, 110, 70), M.WoodPlanks, a)
     box("Crate", cx - 3.5, 0.1, cz - 0.9, cx - 1.3, 2.3, cz + 1.3, rgb(140, 102, 64), M.WoodPlanks, a)
     box("Crate", cx - 0.9, 2.3, cz - 0.9, cx + 0.9, 4.1, cz + 0.9, rgb(160, 120, 78), M.WoodPlanks, a)
-    for k = 0, 1 do
-        local px = -76 + k * 2.4
-        part({ Name = "Pallet", Size = Vector3.new(2.2, 3.6, 0.4),
-            CFrame = CFrame.new(px, 1.9, SZ0 - 0.5) * CFrame.Angles(math.rad(-12), 0, 0),
-            Color = rgb(170, 130, 80), Material = M.WoodPlanks }, a)
-    end
-    -- oil drums by the back door end of the strip
-    for k, d in ipairs({ { -49.2, 39.4 }, { -47.9, 40.9 }, { -49.6, 41.8 } }) do
+    -- oil drums against the east wall (v3.1: were on the back strip)
+    for k, d in ipairs({ { -27, 33 }, { -28.4, 34.3 }, { -26.8, 35.6 } }) do
         part({ Name = "Drum", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 1.6, 1.6),
             CFrame = CFrame.new(d[1], 1.4, d[2]) * CFrame.Angles(0, 0, math.rad(90)),
             Color = (k == 2) and rgb(200, 60, 40) or rgb(40, 90, 150), Material = M.Metal }, a)
     end
-    -- AC condenser humming on the strip behind the store
-    box("Condenser", -62, 0.1, Z1 + 0.3, -58, 3.1, Z1 + 2.6, rgb(190, 192, 188), M.Metal, a)
+    -- AC condenser humming against the east wall (v3.1: was on the back strip)
+    box("Condenser", EX0 - 2.3, 0.1, 36.7, EX0, 3.1, 39.4, rgb(190, 192, 188), M.Metal, a)
     part({ Name = "CondenserFan", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.1, 1.9, 1.9),
-        CFrame = CFrame.new(-60, 3.12, Z1 + 1.45) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame = CFrame.new(EX0 - 1.15, 3.12, 38.05) * CFrame.Angles(0, 0, math.rad(90)),
         Color = STEEL_DK, Material = M.DiamondPlate, CanCollide = false }, a)
-    bar("CondenserPipe", Vector3.new(-59, 2.4, Z1 + 0.2), Vector3.new(-59, 9, Z1 + 0.2), 0.2, STEEL_LT, M.Metal, a, nc())
+    bar("CondenserPipe", Vector3.new(EX0 - 0.2, 2.4, 37), Vector3.new(EX0 - 0.2, 9, 37), 0.2, STEEL_LT, M.Metal, a, nc())
     -- flattened boxes leaning on the east wall
     part({ Name = "FlatBoxes", Size = Vector3.new(0.3, 3.4, 2.6),
         CFrame = CFrame.new(EX0 - 0.5, 1.8, 30) * CFrame.Angles(0, 0, math.rad(10)),
         Color = rgb(186, 150, 104), Material = M.Cardboard, CanCollide = false }, a)
     -- puddles: flat, reflective, catch the lamps (no collision)
-    for _, pd in ipairs({ { -40, 23.4, 3.2, 2 }, { -32.6, 10.5, 2.4, 3.8 }, { -57.5, 40.2, 4, 1.8 }, { -31, 31.5, 2, 2.6 } }) do
+    for _, pd in ipairs({ { -40, 23.4, 3.2, 2 }, { -32.6, 10.5, 2.4, 3.8 }, { -36, 36.4, 4, 1.8 }, { -31, 31.5, 2, 2.6 } }) do
         box("Puddle", pd[1] - pd[3] / 2, 0.1, pd[2] - pd[4] / 2, pd[1] + pd[3] / 2, 0.13, pd[2] + pd[4] / 2,
             rgb(40, 43, 50), M.SmoothPlastic, a, nc({ Reflectance = 0.4, Transparency = 0.35, CastShadow = false }))   -- (v3.0.1) was near-black glass = looked like a hole
     end
@@ -2144,7 +2267,7 @@ function JewelryBuilder:_yard(f, refs)
     -- painted words on the walls (they take the lamp light)
     local sign = box("WallPaint", EX0 - 0.06, 4.4, 5.5, EX0, 6.6, 12.5, rgb(122, 66, 56), M.Brick, a, nc({ Transparency = 1 }))
     lit(printOn(sign, Enum.NormalId.Left, "DELIVERIES ONLY", rgb(236, 230, 214), UITheme.F.display, 30, 1).Parent)
-    local tag1 = box("Graffiti", -45, 2.2, SZ0 - 0.06, -34, 7.2, SZ0, rgb(122, 66, 56), M.Brick, a, nc({ Transparency = 1 }))
+    local tag1 = box("Graffiti", -39.4, 5, SZ0 - 0.06, -29.4, 9.4, SZ0, rgb(122, 66, 56), M.Brick, a, nc({ Transparency = 1 }))
     local tg = lit(surface(tag1, Enum.NormalId.Front, 20, 1))
     local tl = text({ Text = "DOLLZ", Size = UDim2.fromScale(0.96, 0.9), Position = UDim2.fromScale(0.02, 0.05),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, Rotation = -4,
@@ -2154,17 +2277,17 @@ function JewelryBuilder:_yard(f, refs)
     ts.Thickness = 4
     ts.Parent = tl
 
-    -- ── roof ladder: a steel truss you can climb, on the store's east wall ──
+    -- ── roof ladder: a steel truss you can climb, on the annex's east wall ──
     -- Top at y 18; the parapet is notched (NOTCH_Z0..Z1) so you step onto the roof deck.
     local truss = Instance.new("TrussPart")
     truss.Name = "RoofLadder"
     truss.Anchored = true
     truss.Size = Vector3.new(2, 18, 2)
-    truss.CFrame = CFrame.new(X1 + 1, 9, LADDER_Z)
+    truss.CFrame = CFrame.new(ANNEX_X1 + 1, 9, LADDER_Z)
     truss.Color = STEEL_LT
     truss.Material = M.Metal
     truss.Parent = a
-    local rs = box("RoofSign", X1 + 0.02, 2.4, LADDER_Z - 3.9, X1 + 0.12, 3.6, LADDER_Z - 1.3, rgb(250, 204, 21), M.Metal, a, nc())
+    local rs = box("RoofSign", ANNEX_X1 + 0.02, 2.4, ANNEX_Z0 + 0.2, ANNEX_X1 + 0.12, 3.6, LADDER_Z - 1.2, rgb(250, 204, 21), M.Metal, a, nc())
     lit(printOn(rs, Enum.NormalId.Right, "ROOF", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
     -- the dark corner by the dumpster (sneak here from the gate)
@@ -2176,7 +2299,7 @@ function JewelryBuilder:_roof(f)
     local r = Instance.new("Folder")
     r.Name = "RoofAccess"
     r.Parent = f
-    local hx, hz = -64.8, 30.8
+    local hx, hz = -64.8, 39.6                  -- (v3.1) over the closet ladder
     box("HatchCurb", hx - 1.9, ROOF_Y, hz - 1.9, hx + 1.9, ROOF_Y + 0.6, hz + 1.9, STEEL, M.Metal, r)
     local lid = facingPart("DD_RoofHatch", Vector3.new(hx, ROOF_Y + 0.75, hz), Vector3.new(3.2, 0.3, 3.2),
         Vector3.new(1, 0, 0), rgb(250, 204, 21), M.DiamondPlate, r)
@@ -2282,7 +2405,7 @@ function JewelryBuilder:_safeRoom(f, refs, loot)
             Color = STEEL_DK, Material = M.Metal }, body)
     end
     -- Hinge on the EAST edge: with openAngle -100° the door swings north-east
-    -- and ends up standing at x ≈ -72..-71.7, z 25.8..30 — clear of the loot.
+    -- and ends up standing at x ≈ -72..-71.7, z 34.8..39 — clear of the loot.
     refs.vault = {
         door = lock,
         parts = swing,
@@ -2316,7 +2439,7 @@ function JewelryBuilder:_safeRoom(f, refs, loot)
             rgb(120, 170, 230), M.Fabric, dA, nc({ CastShadow = false }))
     end
     point(lightAnchor("SafeSparkle", Vector3.new(SAFE_X, SAFE_Y + 0.5, innerZ - 0.4), dA), rgb(230, 240, 255), 0.6, 4, false)
-    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X + 0.8, 27.8, SAFE_Z0), visual = dA, pool = "saferoom" })
+    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X + 0.8, SAFE_Z0 - 2.7, SAFE_Z0), visual = dA, pool = "saferoom" })
 
     -- 2) Diamonds, lower shelf: a stack of open ring boxes + a velvet pouch
     --    spilling stones
@@ -2342,23 +2465,42 @@ function JewelryBuilder:_safeRoom(f, refs, loot)
     for k = 0, 4 do
         stone(dB, Vector3.new(SAFE_X + 0.45 + k * 0.14, ly + 0.07, innerZ - 0.4 + (k % 2) * 0.12), 0.13, STONE.diamond)
     end
-    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X - 1.2, 27.8, SAFE_Z0), visual = dB, pool = "saferoom" })
+    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X - 1.2, SAFE_Z0 - 2.7, SAFE_Z0), visual = dB, pool = "saferoom" })
 
     -- 3) "the Duchess": a ruby + diamond collar on a bust on a tall plinth,
-    --    facing the laser doorway so you see it through the beams (grab it any time)
-    local px, pz = -78.3, 28.2
+    --    facing the laser doorway so you see it through the beams (grab it any time).
+    --    (v3.1) tucked west of the doorway line, ~9 studs from the safe
+    local px, pz = -78.8, 30
     box("DuchessPlinth", px - 0.85, FLOOR, pz - 0.85, px + 0.85, FLOOR + 2.4, pz + 0.85, rgb(236, 226, 230), M.Marble, s)
     box("DuchessCap", px - 0.95, FLOOR + 2.4, pz - 0.95, px + 0.95, FLOOR + 2.55, pz + 0.95, BRASS, M.Metal, s)
     local dplq = box("DuchessPlaque", px - 0.6, FLOOR + 1.7, pz - 0.87, px + 0.6, FLOOR + 2.1, pz - 0.85, BRASS, M.Metal, s, nc())
     lit(printOn(dplq, Enum.NormalId.Front, "THE DUCHESS", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
     local duchess = self:_necklaceBust(s, "DuchessBust", Vector3.new(px, FLOOR + 2.55, pz), Vector3.new(0, 0, -1),
         Vector3.new(0, 0, -1), 5)
-    table.insert(loot, { kind = "Necklace", cframe = stand(px, 26.1, pz), visual = duchess, interact = "unscrew",
+    table.insert(loot, { kind = "Necklace", cframe = stand(px, pz - 2.1, pz), visual = duchess, interact = "unscrew",
         pool = "saferoom", inVault = false })
     canLight(s, px, pz, rgb(255, 236, 246), 3, 36, true)
 
+    -- (v3.1) the longer room: steel evidence cabinets down the east wall (cover
+    -- on the walk to the safe), a dim caged lamp half way
+    for k = 0, 2 do
+        local cz0 = 28.2 + k * 2.6
+        local cab = box("SteelCabinet", -69.6, FLOOR, cz0, -68.05, FLOOR + 5.2, cz0 + 2.4, rgb(88, 94, 104), M.Metal, s)
+        local cg = lit(surface(cab, Enum.NormalId.Left, 30, 1))
+        for d = 0, 3 do
+            local drw = frame({ Size = UDim2.fromScale(0.9, 0.21), Position = UDim2.fromScale(0.05, 0.03 + d * 0.24),
+                BackgroundColor3 = rgb(104, 110, 120) }, cg)
+            frame({ Size = UDim2.fromScale(0.3, 0.1), Position = UDim2.fromScale(0.35, 0.4), BackgroundColor3 = BRASS }, drw)
+        end
+    end
+    local mid = box("CageLampMid", -73.4, CEIL - 0.4, 32.6, -72.6, CEIL, 33.4, STEEL_DK, M.Metal, s, nc())
+    box("CageLampBulb", -73.25, CEIL - 0.5, 32.75, -72.75, CEIL - 0.4, 33.25, COOL, M.Neon, s, nc())
+    point(mid, rgb(200, 215, 255), 0.35, 11, false)
+    box("HazardLine", SAFE_X - SAFE_HW - 0.5, FLOOR, SAFE_Z0 - 3.4, SAFE_X + SAFE_HW + 0.5, FLOOR + 0.03, SAFE_Z0 - 3.2,
+        rgb(230, 190, 40), M.Concrete, s, nc())
+
     -- light over the safe + a caged work lamp
-    canLight(s, SAFE_X, 28.6, WARM, 2.8, 55, true)
+    canLight(s, SAFE_X, SAFE_Z0 - 1.9, WARM, 2.8, 55, true)
     local cage = box("CageLamp", -75.4, CEIL - 0.4, 26.2, -74.6, CEIL, 27, STEEL_DK, M.Metal, s, nc())
     box("CageLampBulb", -75.25, CEIL - 0.5, 26.35, -74.75, CEIL - 0.4, 26.85, COOL, M.Neon, s, nc())
     point(cage, rgb(200, 215, 255), 0.45, 12, false)
@@ -2405,12 +2547,13 @@ function JewelryBuilder:build(folder)
         -- the crew drops in INSIDE the staff break room, just past the alley
         -- door. No guard route and no camera covers it; the office next door
         -- leads to the back hall.
-        sneakIn = { at = Vector3.new(-50.7, 3.5, 28.4), face = Vector3.new(-50.7, 3.5, 24),   -- (v2.1) x -50.7: row 1 clear of the fridge
+        -- (v3.1) the bigger break room: drop in by the staff door, facing the office door
+        sneakIn = { at = Vector3.new(-45, 3.5, 34.5), face = Vector3.new(-45, 3.5, 30),
             spread = Vector3.new(0.6, 0, 0) },
         entrances = {
             { kind = "front", at = Vector3.new(CX, 3, -3.5), label = "Front door" },
-            { kind = "side", at = Vector3.new(X1 + 3, 3, (SIDE_Z0 + SIDE_Z1) / 2), label = "Staff door (alley)" },
-            { kind = "roof", at = Vector3.new(X1 + 3.2, 3, LADDER_Z), label = "Roof ladder" },
+            { kind = "side", at = Vector3.new(ANNEX_X1 + 3, 3, (SIDE_Z0 + SIDE_Z1) / 2), label = "Staff door (yard)" },
+            { kind = "roof", at = Vector3.new(ANNEX_X1 + 3.2, 3, LADDER_Z), label = "Roof ladder" },
         },
         hideSpots = {},
         shadowZones = {},
@@ -2439,7 +2582,7 @@ function JewelryBuilder:build(folder)
     table.insert(refs.laserRows, cageRow)
     local breaker, shelfSpot, hatchInside = self:_closet(back, refs, loot)
     refs.breaker = breaker
-    local deskSpot = self:_office(back, loot)
+    local deskSpot = self:_office(back, loot)      -- (v3.1) on top of the office filing cabinets
     local breakVent = self:_breakRoom(back, refs)
     self:_yard(f, refs)
     local hatchRoof = self:_roof(f)
@@ -2449,13 +2592,13 @@ function JewelryBuilder:build(folder)
     -- vents: a = the end you start from, b = where it comes out (both directions work)
     -- Exit = the floor spot VentService stands you on when you come out of THIS end
     tag(breakVent, "Vent", { Pair = showroomVent.Name, Label = "Crawl through",
-        Exit = Vector3.new(-49.5, FLOOR, 31.1) })
+        Exit = Vector3.new(-46.5, FLOOR, IZ1 - 2) })
     tag(showroomVent, "Vent", { Pair = breakVent.Name, Label = "Crawl through",
         Exit = Vector3.new(-50.6, FLOOR, 13.2) })
     tag(hatchRoof, "Vent", { Pair = hatchInside.Name, Label = "Climb down",
-        Exit = Vector3.new(-61.8, ROOF_Y, 30.8) })
+        Exit = Vector3.new(-61.8, ROOF_Y, 39.6) })
     tag(hatchInside, "Vent", { Pair = hatchRoof.Name, Label = "Climb to the roof",
-        Exit = Vector3.new(-63.6, FLOOR, 30.4) })
+        Exit = Vector3.new(-63.8, FLOOR, 39.6) })
     refs.vents = {
         { a = breakVent, b = showroomVent },
         { a = hatchRoof, b = hatchInside },
@@ -2476,7 +2619,7 @@ function JewelryBuilder:build(folder)
             Vector3.new(-66, FLOOR, 9), 80, 8),
         -- safe room: north-east corner, watching the laser opening and the safe
         self:_camera(cams, "Camera_SafeRoom", Vector3.new(-68, 12.8, SR_Z0 + 0.8), Vector3.new(-1, 0, 0),
-            Vector3.new(-76, FLOOR, 30), 50, 7),
+            Vector3.new(-75, FLOOR, 35), 50, 7),
     }
 
     -- patrols: straight lines, >= 2 studs clear of every case / counter / wall.
@@ -2484,20 +2627,20 @@ function JewelryBuilder:build(folder)
     refs.guardRoutes = {
         { name = "Guard_A", spawn = Vector3.new(-76, 3.5, LANE_A_Z),
             a = Vector3.new(-76, 3.5, LANE_A_Z), b = Vector3.new(-51.5, 3.5, LANE_A_Z) },
-        { name = "Guard_B", spawn = Vector3.new(-62, 3.5, 26),
-            a = Vector3.new(-62, 3.5, 19), b = Vector3.new(-62, 3.5, 26) },
+        { name = "Guard_B", spawn = Vector3.new(-62, 3.5, 28),
+            a = Vector3.new(-62, 3.5, 19), b = Vector3.new(-62, 3.5, 29.5) },
     }
 
     refs.plan = {
-        bounds = { X0, Z0, X1, Z1 },
+        bounds = { X0, Z0, ANNEX_X1, Z1 },
         rooms = {
             { X0, Z0, X1, SHOW_Z1, "SHOWROOM" },
             { IX0, BOH_Z0, -68, LC_WALL0, "LASERS" },
             { IX0, SR_Z0, -68, IZ1, "SAFE" },
             { HALL_X0, BOH_Z0, HALL_X1, HALL_Z1, "HALL" },
             { HALL_X0, CLOSET_Z0, HALL_X1, IZ1, "CLOSET" },
-            { EC_X0, BOH_Z0, IX1, OB_Z0, "OFFICE" },
-            { EC_X0, BREAK_Z0, IX1, IZ1, "BREAK" },
+            { EC_X0, BOH_Z0, AIX1, OB_Z0, "OFFICE" },
+            { EC_X0, BREAK_Z0, AIX1, IZ1, "BREAK" },
         },
         vault = { SAFE_X, (SAFE_Z0 + SAFE_Z1) / 2 },
         entry = { CX, Z0 },

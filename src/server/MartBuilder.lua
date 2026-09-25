@@ -6,29 +6,48 @@
     fluorescent aisles, glowing drink fridges, a checkout with two registers,
     a stock room out back and an office with a floor safe.
 
-    FOOTPRINT x 50..74, z 1..25 (Constants.WORLD.MART_*). Floor top y 0.5,
-    ceiling y 14.5, roof deck y 15.5, parapet y 17.5, sign tower to ~20.
-    The storefront faces NORTH onto Ocean Drive (z 1). No keycard, no lasers,
-    no display cases: 1 guard, 1 camera, 1 breaker, 1 safe.
+    FOOTPRINT (v3.1) x 50..74, z 1..16 (sales floor) + x 48..74, z 15..33.5
+    (the back wing). Floor top y 0.5, ceiling y 14.5, roof deck y 15.5,
+    parapet y 17.5, sign tower to ~20. The storefront faces NORTH onto Ocean
+    Drive (z 1). No keycard, no lasers, no display cases: 1 guard, 1 camera,
+    1 breaker, 1 safe.
 
         z 1  ┌── glass ─── FRONT DOOR (x 58..66) ─── glass ──┐
              │ ··· guard lane (z 3.6, x 58.5..69) ··········· │
-             │ CLERK │COUNTER│  [G1]  dark  [G2]    FRIDGES   │
-             │ lotto │ $  $  │  [G1]  aisle [G2]    FRIDGES   │
-             │ area  │       │  [G1]        [G2]    FRIDGES   │
-             │  ice freezer   BIG BOX   CAM        (drinks)   │
-        z 15 ├──────────────┬─────────── STRIP CURTAIN ──────┤
-             │ OFFICE       D  STOCK ROOM  pallet   (sneakIn)═ BACK DOOR
-             │ ladder↑ desk D  breaker     shelves   closet  ═ (east alley)
-             │  [ SAFE ]    │                                │
-        z 24 └──────────────┴────────────────────────────────┘
-            x 51           59 60                             73
-        Roof: ladder on the back wall (x 70, in the yard) → roof → hatch → office.
+             │ CLERK │COUNTER│  [G1]  dark  [G2]    FRIDGES   │  yard: car (78.25, 10)
+             │ lotto │ $     │  [G1]  aisle [G2]    FRIDGES   │  nose at the gate (z 1)
+             │ area  │     $ │  [G1]        [G2]    FRIDGES   │
+             │  ice freezer   BIG BOX   CAM        ATM        │
+        z 15 ┌┴──────────────┬───────── STRIP CURTAIN ────────┤
+             │ TICKET   desk D breaker                        ═ LOADING DOOR
+             │  OFFICE       D   STOCK ROOM   (sneakIn)       ═ (roll-up, z 17..25)
+             │ ladder↑ rug   D    [pallet $]                  │ ← roof ladder (yard)
+             │ sofa  [SAFE] cab│ closet  ····racking··· lotto │
+        z 33.5└───────────────┴────────────────────────────────┘
+            x 48        59.5 60.5                             74
+        Roof: ladder on the east wall in the yard's back corner (x 74..76,
+        z 26.9..28.9) → roof → hatch → office.
+
+    v3.1 ROOMY BACK (2026-09-25, first Studio playtest: the camera jammed
+    against your head in the 8 x 8 office and the Golden Ticket / "Place drill"
+    / roof-hatch prompts crowded within ~3 studs):
+      • the back wall moved z 25 → z 33.5 (it is the old yard back-strip line;
+        the strip is gone) and the back wing is 2 wider on the west (x 48).
+        OFFICE x 49..59.5 × z 16..32.5 (10.5 × 16.5, was 8 × 8); STOCK ROOM
+        x 60.5..73 × z 16..32.5 (12.5 × 16.5, was 13 × 8). Doorways 8 wide,
+        11 tall; ceilings stay 14.
+      • E prompts >= 6 studs apart: ticket (51.6, 18.1) · drill (~54.5, 28) ·
+        deposit (66, 22.2) · breaker (60.7, 17.7, now on the office wall) ·
+        lotto (69.5, 28.3) · the counter's registers (z 3.4 / 9.4). The hatch (V)
+        and hide spots (H) sit >= 4 from every E prompt.
+      • the loading door is a rolled-up shutter; the roof ladder, dumpster,
+        propane cage and oil drum moved into the yard's back corner (south of
+        the car, clear of its run to the gate). Yard still fully walled.
 
     v2.0.2 (2026-09-25, Malachi: "shouldn't be able to walk out the heist and see
     the ugly green terrain" + "the graphics are very simple / bad"):
-      • WALLED SERVICE YARD x 74..83.7, z 1..33.5 (+ a strip behind the store,
-        x 50..74, z 25..33.5): 12-tall brick all round, a roll-up vehicle gate
+      • WALLED SERVICE YARD x 74..83.7, z 1..33.5 (v3.1: the strip behind the
+        store is now inside the store): 12-tall brick all round, a roll-up vehicle gate
         x 74..82.5 on the street line (z 1), the getaway car parked inside at
         (78.25, 0, 10) facing north. Dumpster, propane cage, crates, pallet,
         puddles, a shadowed key lamp over the car. The roof ladder moved to the
@@ -79,49 +98,64 @@ local W = Constants.WORLD
 local FLOOR = W.FLOOR                                             -- 0.5
 local CX, CZ = W.MART_CENTER.x, W.MART_CENTER.z                   -- 62, 13
 local X0, X1 = CX - W.MART_HALF_WIDTH, CX + W.MART_HALF_WIDTH     -- 50, 74
-local Z0, Z1 = CZ - W.MART_HALF_DEPTH, CZ + W.MART_HALF_DEPTH     -- 1, 25
-local IX0, IX1 = X0 + 1, X1 - 1        -- 51, 73
-local IZ0, IZ1 = Z0 + 1, Z1 - 1        -- 2, 24
+local Z0 = CZ - W.MART_HALF_DEPTH      -- 1 (Constants' z 25 back line is the OLD back wall)
+local IX0, IX1 = X0 + 1, X1 - 1        -- 51, 73 (sales floor side walls)
+local IZ0 = Z0 + 1                     -- 2
+-- (v3.1 ROOMY BACK) the back of the store grew: the back wall moved from
+-- z 24..25 to z 32.5..33.5 (it now IS the old yard back-strip wall line), and
+-- the back wing is 2 studs wider on the west (x 48..74; the sales floor keeps
+-- x 50..74). Everything stays inside MiamiBuilder.KEEP_CLEAR (x 44..82, z ≤ 34)
+-- and outside the V2 car alley (x 28..48).
+local Z1 = 33.5                        -- outer face of the back wall
+local IZ1 = Z1 - 1                     -- 32.5, inner face of the back wall
+local BX0 = 48                         -- back wing west wall x 48..49
+local BIX0 = BX0 + 1                   -- 49
 local CEIL = FLOOR + 14                -- 14.5
 local ROOF_Y = CEIL + 1                -- 15.5
 local TOP = ROOF_Y + 2                 -- 17.5
 local ZF = Z0 - 0.25                   -- 0.75, front face of the storefront
-local DOOR_H = FLOOR + 10.5            -- 11
+local DOOR_H = FLOOR + 11              -- 11.5 (v3.1: back-room doorways 11 tall, >= 8 wide)
 
 local ENT_X0, ENT_X1 = CX - 4, CX + 4           -- front door x 58..66 (8 wide)
 local ENT_TOP = FLOOR + 10.5
 local WIN_TOP = FLOOR + 10.3
 local SALES_Z1 = 15                             -- back wall z 15..16
 local BACK_Z0 = 16
-local CURTAIN_X0, CURTAIN_X1 = 63, 70           -- strip-curtain doorway into the stock room
-local OFFICE_X1 = 59                            -- office | stock wall x 59..60
-local STOCK_X0 = 60
-local SIDE_DOOR_Z0, SIDE_DOOR_Z1 = 16.5, 23.5   -- doors in the x 59..60 wall and the east wall
--- (v2.0.2) the roof ladder moved off the east wall (the getaway car parks
--- there now) onto the BACK wall, inside the walled service yard
-local LADDER_X = 70                             -- truss on the south wall, x 69..71
-local NOTCH_X0, NOTCH_X1 = 68.5, 71.5           -- parapet notch over the roof ladder
+local CURTAIN_X0, CURTAIN_X1 = 62.6, 70.6       -- strip-curtain doorway into the stock room (8 wide)
+local OFFICE_X1 = 59.5                          -- office | stock wall x 59.5..60.5
+local STOCK_X0 = 60.5
+-- office x 49..59.5 (10.5 x 16.5, was 8 x 8) · stock room x 60.5..73 (12.5 x 16.5, was 13 x 8)
+local OFFICE_DOOR_Z0, OFFICE_DOOR_Z1 = 19.5, 27.5   -- door in the x 59.5..60.5 wall
+local SIDE_DOOR_Z0, SIDE_DOOR_Z1 = 17, 25           -- roll-up loading door in the east wall
+-- (v3.1) the roof ladder is back on the east wall, south of the loading door,
+-- in the yard's back corner (the old back strip is inside the store now). The
+-- bank's side-gap wall (z 29.2..30, x 74..84) closes the yard just south of it.
+local LADDER_Z = 27.9                           -- truss x 74..76, z 26.9..28.9
+local NOTCH_Z0, NOTCH_Z1 = 26.4, 29.0           -- parapet notch over the roof ladder
 
 -- ── the walled SERVICE YARD (v2.0.2) ──
 -- East of the store (between it and the bank) + a strip behind it. The back
 -- door opens into it; the getaway car parks in it, nose at a roll-up vehicle
 -- gate onto Ocean Drive. Brick on every side: you see brick, street and sky.
 local YARD_X1 = 83.7                            -- east wall outer face (bank plinth starts at 83.8)
-local YARD_Z1 = 33.5                            -- south wall z 32.9..33.5
+local YARD_Z1 = Z1                              -- south wall z 32.9..33.5 (flush with the store's back wall)
 local YWALL_T, YWALL_H = 0.6, 12
 local GATE_X0, GATE_X1 = X1, 82.5               -- vehicle gate opening x 74..82.5 (8.5 wide), line z 1
 local CAR_X, CAR_Z = 78.25, 10                  -- getaway parking spot (faces north, at the gate)
 
 -- sales floor fixtures
-local COUNTER_X0, COUNTER_X1, COUNTER_Z0, COUNTER_Z1 = 54.5, 56.5, 3.5, 10
+-- (v3.1) counter runs up to the front window now so its two registers sit 6
+-- studs apart (z 3.4 / 9.4); the clerk gets in round the south end as before
+local COUNTER_X0, COUNTER_X1, COUNTER_Z0, COUNTER_Z1 = 54.5, 56.5, 2.6, 10
+local REGISTER_Z = { 3.4, 9.4 }
 local GONDOLAS = { { 60, 61.8 }, { 65.2, 67 } }  -- x ranges; both run z 5.6..12.4
 local GOND_Z0, GOND_Z1 = 5.6, 12.4
 local FRIDGE_X0 = 71.2                          -- fridges x 71.2..73, z 3..13
 local GUARD_Z = 3.6
 
 -- the floor safe (office, against the south wall, door facing north)
-local SAFE_X = 55.5
-local SAFE_Z0, SAFE_Z1 = 21, 23.9
+local SAFE_X = 54.5
+local SAFE_Z0, SAFE_Z1 = 29.5, IZ1 - 0.1       -- z 29.5..32.4
 local SAFE_HW = 2.5
 local SAFE_Y = FLOOR + 2.7
 local SAFE_TOP = FLOOR + 5.5
@@ -487,30 +521,37 @@ function MartBuilder:_shell(f)
     box("Apron", X0, 0, -1.4, X1, FLOOR, Z0, rgb(170, 168, 162), M.Concrete, f)
     -- floors
     box("FloorSales", X0, 0, Z0, X1, FLOOR, 15.5, rgb(200, 200, 194), M.CeramicTiles, f)
-    box("FloorOffice", X0, 0, 15.5, 59.5, FLOOR, Z1, rgb(70, 84, 104), M.Carpet, f)
-    box("FloorStock", 59.5, 0, 15.5, X1, FLOOR, Z1, rgb(140, 138, 132), M.Concrete, f)
+    box("FloorOffice", BX0, 0, 15.5, 60, FLOOR, Z1, rgb(70, 84, 104), M.Carpet, f)
+    box("FloorStock", 60, 0, 15.5, X1, FLOOR, Z1, rgb(140, 138, 132), M.Concrete, f)
 
-    -- exterior walls (the front is the facade)
-    box("WallWest", X0, FLOOR, Z0, IX0, TOP, Z1, LEMON, M.Plaster, f)
-    -- back wall: notched parapet over the roof ladder (x 68.5..71.5)
-    box("WallSouth", IX0, FLOOR, IZ1, NOTCH_X0, TOP, Z1, LEMON, M.Plaster, f)
-    box("WallSouthNotch", NOTCH_X0, FLOOR, IZ1, NOTCH_X1, ROOF_Y, Z1, LEMON, M.Plaster, f)
-    box("WallSouth", NOTCH_X1, FLOOR, IZ1, IX1, TOP, Z1, LEMON, M.Plaster, f)
+    -- exterior walls (the front is the facade). (v3.1) The back wing is wider
+    -- (west wall x 48..49 from z 15) and deeper (back wall z 32.5..33.5).
+    box("WallWest", X0, FLOOR, Z0, IX0, TOP, SALES_Z1 + 1, LEMON, M.Plaster, f)
+    box("WallWestReturn", BX0, FLOOR, SALES_Z1, X0, TOP, SALES_Z1 + 1, LEMON, M.Plaster, f)
+    box("WallWestBack", BX0, FLOOR, SALES_Z1, BIX0, TOP, Z1, LEMON, M.Plaster, f)
+    box("WallSouth", BIX0, FLOOR, IZ1, IX1, TOP, Z1, LEMON, M.Plaster, f)
     box("WallEast", IX1, FLOOR, Z0, X1, TOP, SIDE_DOOR_Z0, LEMON, M.Plaster, f)
     box("BackDoorHeader", IX1, DOOR_H, SIDE_DOOR_Z0, X1, TOP, SIDE_DOOR_Z1, LEMON, M.Plaster, f)
-    box("WallEast", IX1, FLOOR, SIDE_DOOR_Z1, X1, TOP, Z1, LEMON, M.Plaster, f)
+    box("WallEast", IX1, FLOOR, SIDE_DOOR_Z1, X1, TOP, NOTCH_Z0, LEMON, M.Plaster, f)
+    -- parapet notch over the roof ladder (x 74..76, z 26.9..28.9)
+    box("WallEastNotch", IX1, FLOOR, NOTCH_Z0, X1, ROOF_Y, NOTCH_Z1, LEMON, M.Plaster, f)
+    box("WallEast", IX1, FLOOR, NOTCH_Z1, X1, TOP, Z1, LEMON, M.Plaster, f)
     -- teal base band + coping
-    box("BaseBand", X0 - 0.1, 0, Z0, X0, 2.2, Z1 + 0.1, TEAL, M.Plaster, f, nc())
-    box("BaseBand", X0, 0, Z1, X1, 2.2, Z1 + 0.1, TEAL, M.Plaster, f, nc())
+    box("BaseBand", X0 - 0.1, 0, Z0, X0, 2.2, SALES_Z1, TEAL, M.Plaster, f, nc())
+    box("BaseBand", BX0, 0, SALES_Z1 - 0.1, X0, 2.2, SALES_Z1, TEAL, M.Plaster, f, nc())
+    box("BaseBand", BX0 - 0.1, 0, SALES_Z1 - 0.1, BX0, 2.2, Z1 + 0.1, TEAL, M.Plaster, f, nc())
+    box("BaseBand", BX0, 0, Z1, X1, 2.2, Z1 + 0.1, TEAL, M.Plaster, f, nc())
     box("BaseBand", X1, 0, Z0, X1 + 0.1, 2.2, SIDE_DOOR_Z0 - 0.3, TEAL, M.Plaster, f, nc())
-    box("BaseBand", X1, 0, SIDE_DOOR_Z1 + 0.3, X1 + 0.1, 2.2, Z1 + 0.1, TEAL, M.Plaster, f, nc())
-    box("CopingW", X0 - 0.15, TOP, Z0 - 0.4, IX0 + 0.05, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    box("CopingE", IX1 - 0.05, TOP, Z0 - 0.4, X1 + 0.15, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    box("CopingS", IX0, TOP, IZ1 - 0.05, NOTCH_X0, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
-    box("CopingS", NOTCH_X1, TOP, IZ1 - 0.05, IX1, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
+    box("BaseBand", X1, 0, SIDE_DOOR_Z1 + 0.3, X1 + 0.1, 2.2, Z1 - 0.6, TEAL, M.Plaster, f, nc())
+    box("CopingW", X0 - 0.15, TOP, Z0 - 0.4, IX0 + 0.05, TOP + 0.3, SALES_Z1 - 0.15, STUCCO, M.Plaster, f)
+    box("CopingW", BX0 - 0.15, TOP, SALES_Z1 - 0.15, X0 - 0.15, TOP + 0.3, SALES_Z1 + 1.05, STUCCO, M.Plaster, f)
+    box("CopingW", BX0 - 0.15, TOP, SALES_Z1 + 1.05, BIX0 + 0.05, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
+    box("CopingE", IX1 - 0.05, TOP, Z0 - 0.4, X1 + 0.15, TOP + 0.3, NOTCH_Z0, STUCCO, M.Plaster, f)
+    box("CopingE", IX1 - 0.05, TOP, NOTCH_Z1, X1 + 0.15, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
+    box("CopingS", BIX0 + 0.05, TOP, IZ1 - 0.05, IX1 - 0.05, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
 
     -- the west wall faces the car alley: a big painted sun mural
-    local mural = box("Mural", X0 - 0.06, 3, 5, X0, 14.5, 21, rgb(255, 214, 120), M.Plaster, f, nc())
+    local mural = box("Mural", X0 - 0.06, 3, 2, X0, 14.5, 14.5, rgb(255, 214, 120), M.Plaster, f, nc())   -- (v3.1) z 2..14.5: the back wing steps out at z 15
     local mg = surface(mural, Enum.NormalId.Left, 12, 1)
     mg.LightInfluence = 0.7
     local sky = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1) }, mg)
@@ -528,19 +569,21 @@ function MartBuilder:_shell(f)
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(200, 40, 80) }, mg)
 
-    -- ceiling + roof deck
-    box("Ceiling", IX0, CEIL, IZ0, IX1, CEIL + 0.5, IZ1, rgb(150, 150, 146), M.Plaster, f)
-    box("Roof", IX0, CEIL + 0.5, IZ0, IX1, ROOF_Y, IZ1, rgb(150, 150, 150), M.Concrete, f)
-    box("RoofLip", NOTCH_X0, ROOF_Y - 0.5, IZ1, NOTCH_X1, ROOF_Y, Z1, rgb(150, 150, 150), M.Concrete, f)
+    -- ceiling + roof deck (sales floor + the wider back wing)
+    box("Ceiling", IX0, CEIL, IZ0, IX1, CEIL + 0.5, BACK_Z0, rgb(150, 150, 146), M.Plaster, f)
+    box("Ceiling", BIX0, CEIL, BACK_Z0, IX1, CEIL + 0.5, IZ1, rgb(150, 150, 146), M.Plaster, f)
+    box("Roof", IX0, CEIL + 0.5, IZ0, IX1, ROOF_Y, BACK_Z0, rgb(150, 150, 150), M.Concrete, f)
+    box("Roof", BIX0, CEIL + 0.5, BACK_Z0, IX1, ROOF_Y, IZ1, rgb(150, 150, 150), M.Concrete, f)
+    box("RoofLip", IX1, ROOF_Y - 0.5, NOTCH_Z0, X1, ROOF_Y, NOTCH_Z1, rgb(150, 150, 150), M.Concrete, f)
     box("RoofAC", 63, ROOF_Y, 10, 67, ROOF_Y + 2.6, 13.5, STEEL_LT, M.Metal, f)
     box("RoofACFan", 63.8, ROOF_Y + 2.6, 10.7, 66.2, ROOF_Y + 2.7, 12.8, STEEL_DK, M.Metal, f, nc())
     part({ Name = "VentStack", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.6, 0.8, 0.8),
-        CFrame = CFrame.new(70, ROOF_Y + 0.8, 20) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame = CFrame.new(68, ROOF_Y + 0.8, 21) * CFrame.Angles(0, 0, math.rad(90)),
         Color = STEEL_LT, Material = M.Metal }, f)
 
     -- interior walls
     wallX("SalesBackWall", SALES_Z1, BACK_Z0, IX0, IX1, { { CURTAIN_X0, CURTAIN_X1, DOOR_H } }, WALL_IN, M.Plaster, f)
-    wallZ("OfficeWall", OFFICE_X1, STOCK_X0, BACK_Z0, IZ1, { { SIDE_DOOR_Z0, SIDE_DOOR_Z1, DOOR_H } }, WALL_IN, M.Plaster, f)
+    wallZ("OfficeWall", OFFICE_X1, STOCK_X0, BACK_Z0, IZ1, { { OFFICE_DOOR_Z0, OFFICE_DOOR_Z1, DOOR_H } }, WALL_IN, M.Plaster, f)
     -- mint wainscot round the sales floor
     box("Wainscot", IX0, FLOOR, IZ0, IX0 + 0.1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
     box("Wainscot", IX0, FLOOR, SALES_Z1 - 0.1, IX1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
@@ -789,7 +832,7 @@ function MartBuilder:_checkout(f, refs, loot)
         Enum.NormalId.Right, 11, c, true)
 
     -- two registers (Register loot = the cash drawer)
-    for k, rz in ipairs({ 5, 8.6 }) do
+    for k, rz in ipairs(REGISTER_Z) do
         local rx = (COUNTER_X0 + COUNTER_X1) / 2
         box("Register", rx - 0.7, topY, rz - 0.55, rx + 0.5, topY + 0.7, rz + 0.55, rgb(34, 34, 40), M.Metal, c)
         local screen = part({ Name = "RegisterScreen", Size = Vector3.new(0.08, 0.7, 1.1),
@@ -864,7 +907,7 @@ function MartBuilder:_checkout(f, refs, loot)
     box("DispenserTrim", IX0 + 0.25, FLOOR + 6.3, dz0, IX0 + 0.95, FLOOR + 6.45, dz1, rgb(212, 172, 92), M.Metal, c, nc())
     local lotto = box("LottoSign", IX0 + 0.9, FLOOR + 6.6, 5.8, IX0 + 1, FLOOR + 7.5, 8, SUN, M.Metal, c, nc())
     lit(printOn(lotto, Enum.NormalId.Right, "SCRATCH & WIN", rgb(120, 20, 60), UITheme.F.display, 40, 1.2).Parent)
-    local lstand = Vector3.new(IX0 + 2.4, FLOOR + 3, 6.9)
+    local lstand = Vector3.new(IX0 + 1.9, FLOOR + 3, 6.9)   -- (v3.1) 6 studs from both register prompts
     table.insert(loot, { kind = "ScratchTickets", cframe = CFrame.lookAt(lstand, Vector3.new(IX0, lstand.Y, 6.9)),
         visual = tickets, pool = "counter", inVault = false })
 
@@ -1048,7 +1091,7 @@ function MartBuilder:_salesFloor(f, refs, loot)
     box("WainscotCap", IX0, FLOOR + 3, SALES_Z1 - 0.18, CURTAIN_X0, FLOOR + 3.2, SALES_Z1, TEAL, M.Plaster, s, nc())
     box("WainscotCap", CURTAIN_X1, FLOOR + 3, SALES_Z1 - 0.18, IX1, FLOOR + 3.2, SALES_Z1, TEAL, M.Plaster, s, nc())
     -- (v3.0) the SLUSH! poster rides above the new ATM's header
-    for _, pp in ipairs({ { 52.2, 57, "HOT DOGS\n$1.99", SUN_DEEP, 5.6 }, { 70.6, 72.8, "SLUSH!", CYAN, 6.9 } }) do
+    for _, pp in ipairs({ { 52.2, 57, "HOT DOGS\n$1.99", SUN_DEEP, 5.6 }, { 70.9, 72.9, "SLUSH!", CYAN, 6.9 } }) do
         local po = box("PromoPoster", pp[1], FLOOR + pp[5], SALES_Z1 - 0.06, pp[2], FLOOR + pp[5] + 3.8, SALES_Z1, rgb(250, 248, 240), M.Fabric, s, nc())
         local pg = lit(surface(po, Enum.NormalId.Front, 30, 1))
         frame({ Size = UDim2.fromScale(1, 0.18), BackgroundColor3 = pp[4] }, pg)
@@ -1074,10 +1117,14 @@ function MartBuilder:_stockRoom(f, refs, loot)
     local s = Instance.new("Folder")
     s.Name = "StockRoom"
     s.Parent = f
+    -- (v3.1 ROOMY BACK) x 60.5..73, z 16..32.5 (12.5 x 16.5; was 13 x 8).
+    -- E prompts spread >= 6 apart: breaker (west wall, z 17.7) · night deposit
+    -- (pallet mid-room, stand z 22.2) · lotto carton (south racking, stand z 28.3).
+    -- Hide closet in the dark south-west corner. Drop-in by the loading door.
 
     -- strip curtain in the doorway to the sales floor: you walk through it,
     -- but it blocks the guard's view into the stock room
-    local n = 10
+    local n = 11
     local sw = (CURTAIN_X1 - CURTAIN_X0) / n
     for k = 0, n - 1 do
         local x = CURTAIN_X0 + (k + 0.5) * sw
@@ -1085,7 +1132,8 @@ function MartBuilder:_stockRoom(f, refs, loot)
             rgb(200, 222, 230), M.Glass, s, nc({ Transparency = 0.45, CastShadow = false }))
     end
     box("CurtainRail", CURTAIN_X0, DOOR_H - 0.2, 15.35, CURTAIN_X1, DOOR_H, 15.65, STEEL_LT, M.Metal, s, nc())
-    local emp = box("EmployeesOnly", 65, DOOR_H + 0.5, SALES_Z1 - 0.1, 68, DOOR_H + 1.5, SALES_Z1, rgb(200, 40, 60), M.Metal, s, nc())
+    local cmid = (CURTAIN_X0 + CURTAIN_X1) / 2
+    local emp = box("EmployeesOnly", cmid - 1.5, DOOR_H + 0.5, SALES_Z1 - 0.1, cmid + 1.5, DOOR_H + 1.5, SALES_Z1, rgb(200, 40, 60), M.Metal, s, nc())
     lit(printOn(emp, Enum.NormalId.Front, "EMPLOYEES ONLY", rgb(255, 255, 255), UITheme.F.bold, 50, 1.2).Parent)
 
     -- (v2.0.2) painted cinder-block walls, yellow forklift lines on the concrete
@@ -1093,15 +1141,23 @@ function MartBuilder:_stockRoom(f, refs, loot)
     box("BlockWall", STOCK_X0, FLOOR, IZ1 - 0.08, IX1, CEIL, IZ1, BLOCK, M.Brick, s, nc())
     box("BlockWall", STOCK_X0, FLOOR, BACK_Z0, CURTAIN_X0, CEIL, BACK_Z0 + 0.06, BLOCK, M.Brick, s, nc())
     box("BlockWall", CURTAIN_X1, FLOOR, BACK_Z0, IX1, CEIL, BACK_Z0 + 0.06, BLOCK, M.Brick, s, nc())
+    box("BlockWall", CURTAIN_X0, DOOR_H, BACK_Z0, CURTAIN_X1, CEIL, BACK_Z0 + 0.06, BLOCK, M.Brick, s, nc())
+    -- the office wall's stock-room face (door gap z 19.5..27.5 stays open)
+    box("BlockWall", STOCK_X0, FLOOR, BACK_Z0, STOCK_X0 + 0.06, CEIL, OFFICE_DOOR_Z0, BLOCK, M.Brick, s, nc())
+    box("BlockWall", STOCK_X0, FLOOR, OFFICE_DOOR_Z1, STOCK_X0 + 0.06, CEIL, IZ1, BLOCK, M.Brick, s, nc())
+    box("BlockWall", STOCK_X0, DOOR_H, OFFICE_DOOR_Z0, STOCK_X0 + 0.06, CEIL, OFFICE_DOOR_Z1, BLOCK, M.Brick, s, nc())
     box("BumpStripe", STOCK_X0, FLOOR + 0.9, IZ1 - 0.12, IX1, FLOOR + 1.5, IZ1 - 0.08, rgb(240, 196, 40), M.Plaster, s, nc())
     local SAFETY = rgb(236, 196, 48)
-    box("FloorLine", STOCK_X0 + 0.4, FLOOR, 17.2, IX1 - 2.2, FLOOR + 0.02, 17.45, SAFETY, M.Plaster, s, nc())
-    box("FloorLine", STOCK_X0 + 0.4, FLOOR, IZ1 - 2.45, IX1 - 2.2, FLOOR + 0.02, IZ1 - 2.2, SAFETY, M.Plaster, s, nc())
+    -- forklift lane: the loading door → the curtain, and a stop line in front of the racking
+    box("FloorLine", STOCK_X0 + 2.2, FLOOR, 17.2, IX1 - 0.4, FLOOR + 0.02, 17.45, SAFETY, M.Plaster, s, nc())
+    box("FloorLine", 63.2, FLOOR, IZ1 - 2.45, IX1 - 2.2, FLOOR + 0.02, IZ1 - 2.2, SAFETY, M.Plaster, s, nc())
+    box("FloorLine", 63.2, FLOOR, 27.2, 63.45, FLOOR + 0.02, IZ1 - 2.2, SAFETY, M.Plaster, s, nc())
 
-    -- breaker panel on the north wall (faces into the stock room)
-    local bx0, bx1 = 60.6, 62.6
-    local breaker = box("BreakerPanel", bx0, FLOOR + 2.8, BACK_Z0, bx1, FLOOR + 6.2, BACK_Z0 + 0.45, rgb(96, 102, 110), M.Metal, s)
-    local bg = lit(surface(breaker, Enum.NormalId.Back, 50, 1.1))
+    -- breaker panel on the west (office) wall, north of the office door (faces east into the stock room)
+    local bz0, bz1 = 16.9, 18.5
+    local bxf = STOCK_X0 + 0.45                     -- front face
+    local breaker = box("BreakerPanel", STOCK_X0, FLOOR + 2.8, bz0, bxf, FLOOR + 6.2, bz1, rgb(96, 102, 110), M.Metal, s)
+    local bg = lit(surface(breaker, Enum.NormalId.Right, 50, 1.1))
     text({ Text = "SECURITY", Size = UDim2.new(1, 0, 0.16, 0), Position = UDim2.fromScale(0, 0.04),
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
         TextColor3 = rgb(250, 204, 21) }, bg)
@@ -1115,13 +1171,17 @@ function MartBuilder:_stockRoom(f, refs, loot)
         end
     end
     for k, col in ipairs({ rgb(80, 255, 120), rgb(255, 180, 40) }) do
-        local lx = bx0 + 0.6 + (k - 1) * 0.6
-        box("BreakerLed", lx - 0.07, FLOOR + 5.8, BACK_Z0 + 0.45, lx + 0.07, FLOOR + 5.94, BACK_Z0 + 0.52, col, M.Neon, s, nc())
+        local lz = bz1 - 0.6 - (k - 1) * 0.6
+        box("BreakerLed", bxf, FLOOR + 5.8, lz - 0.07, bxf + 0.07, FLOOR + 5.94, lz + 0.07, col, M.Neon, s, nc())
     end
-    box("Conduit", 61.5, FLOOR + 6.2, BACK_Z0, 61.7, CEIL, BACK_Z0 + 0.2, STEEL_LT, M.Metal, s, nc())
+    box("Conduit", STOCK_X0, FLOOR + 6.2, 17.6, STOCK_X0 + 0.2, CEIL, 17.8, STEEL_LT, M.Metal, s, nc())
+    -- a caution sign over it so it reads from the curtain doorway
+    local warn = box("BreakerSign", STOCK_X0 + 0.06, FLOOR + 6.6, bz0 + 0.1, STOCK_X0 + 0.1, FLOOR + 7.4, bz1 - 0.1,
+        rgb(250, 204, 21), M.Metal, s, nc())
+    lit(printOn(warn, Enum.NormalId.Right, "HIGH VOLTAGE", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
     -- metal racking along the south wall, full of stock (cover)
-    local rx0, rx1, rz0 = 63, 70.5, IZ1 - 1.8
+    local rx0, rx1, rz0 = 63.2, 70.6, IZ1 - 1.8
     for _, y in ipairs({ FLOOR + 0.3, FLOOR + 2.8, FLOOR + 5.3 }) do
         box("RackShelf", rx0, y, rz0, rx1, y + 0.15, IZ1, rgb(60, 90, 160), M.Metal, s)
     end
@@ -1134,12 +1194,17 @@ function MartBuilder:_stockRoom(f, refs, loot)
         box("StockBox", bxa, y, rz0 + 0.2, bxa + 1.05, y + 1.3 + (k % 3) * 0.3, IZ1 - 0.1,
             rgb(176 + (k % 3) * 8, 140 + (k % 2) * 10, 96), M.Cardboard, s)
     end
+    for k = 0, 2 do                                   -- the top shelf west of the lotto carton
+        local bxa = rx0 + 0.3 + k * 1.6
+        box("StockBox", bxa, FLOOR + 5.45, rz0 + 0.3, bxa + 1.3, FLOOR + 6.5 + (k % 2) * 0.3, IZ1 - 0.2,
+            rgb(168 + k * 10, 132 + (k % 2) * 12, 90), M.Cardboard, s)
+    end
     -- (v3.0) an open carton of lotto ticket packs on the top rack (Lottery):
     -- fanfold packs standing in rows, two more lying shrink-wrapped on top
     local lot = Instance.new("Model")
     lot.Name = "LottoCarton"
     lot.Parent = s
-    local lx0, lx1, lz0, lz1 = 68.2, 70.1, rz0 + 0.2, IZ1 - 0.1
+    local lx0, lx1, lz0, lz1 = 68.5, 70.4, rz0 + 0.2, IZ1 - 0.1
     local ly0, ly1 = FLOOR + 5.45, FLOOR + 6.3
     box("CartonBase", lx0, ly0, lz0, lx1, ly0 + 0.08, lz1, rgb(196, 160, 110), M.Cardboard, lot, nc())
     local front = box("CartonFront", lx0, ly0, lz0, lx1, ly1, lz0 + 0.06, rgb(255, 214, 120), M.Cardboard, lot, nc())
@@ -1163,36 +1228,43 @@ function MartBuilder:_stockRoom(f, refs, loot)
         box("ShrinkWrap", lx0 + 0.28 + k * 0.7, ly1 + 0.07, lz0 + 0.28, lx0 + 0.92 + k * 0.7, ly1 + 0.26, lz0 + 1.02,
             rgb(230, 240, 250), M.Glass, lot, nc({ Transparency = 0.7, CastShadow = false }))
     end
-    local ls = Vector3.new(69.1, FLOOR + 3, rz0 - 2.2)
-    table.insert(loot, { kind = "Lottery", cframe = CFrame.lookAt(ls, Vector3.new(69.1, ls.Y, IZ1)), visual = lot,
+    local lmx = (lx0 + lx1) / 2
+    local ls = Vector3.new(lmx, FLOOR + 3, rz0 - 2.4)
+    table.insert(loot, { kind = "Lottery", cframe = CFrame.lookAt(ls, Vector3.new(lmx, ls.Y, IZ1)), visual = lot,
         pool = "stockroom", inVault = false })
 
-    -- pallet of shrink-wrapped soda with tonight's cash deposit bag on top (Cash loot)
-    local px0, px1, pz0, pz1 = 63.5, 66.5, 18, 20.6
+    -- pallet of shrink-wrapped soda in the middle of the room with tonight's
+    -- cash deposit bag on top (cover between the curtain and the racking)
+    local px0, px1, pz0, pz1 = 64.5, 67.5, 24, 26.6
     box("Pallet", px0, FLOOR, pz0, px1, FLOOR + 0.5, pz1, rgb(170, 130, 80), M.WoodPlanks, s)
     box("PalletLoad", px0 + 0.1, FLOOR + 0.5, pz0 + 0.1, px1 - 0.1, FLOOR + 2.8, pz1 - 0.1, rgb(220, 60, 60), M.Cardboard, s)
     box("ShrinkWrap", px0 + 0.05, FLOOR + 0.5, pz0 + 0.05, px1 - 0.05, FLOOR + 2.85, pz1 - 0.05, rgb(230, 240, 250), M.Glass, s,
         nc({ Transparency = 0.7 }))
+    local pl = box("PalletLabel", px0 + 0.6, FLOOR + 1.1, pz0 + 0.03, px1 - 0.6, FLOOR + 2.3, pz0 + 0.05, rgb(250, 250, 244), M.Fabric, s, nc())
+    lit(printOn(pl, Enum.NormalId.Front, "SUNNY SODA\n24 x 12", rgb(200, 40, 80), UITheme.F.display, 40, 1).Parent)
     -- (v3.0) tonight's takings waiting for the bank run: a zipped NIGHT
     -- DEPOSIT bag + the spare till tray, still full (Register, "stuff")
     local bag = Instance.new("Model")
     bag.Name = "NightDeposit"
     bag.Parent = s
     local ty = FLOOR + 2.85
-    box("DepositBag", 63.9, ty, 18.5, 65.3, ty + 0.5, 19.6, rgb(60, 72, 96), M.Fabric, bag, nc())
+    local bz = pz0 + 0.5
+    box("DepositBag", px0 + 0.4, ty, bz, px0 + 1.8, ty + 0.5, bz + 1.1, rgb(60, 72, 96), M.Fabric, bag, nc())
     part({ Name = "BagPuff", Shape = Enum.PartType.Ball, Size = Vector3.new(1.3, 0.35, 1.0),
-        Position = Vector3.new(64.6, ty + 0.5, 19.05), Color = rgb(60, 72, 96), Material = M.Fabric, CanCollide = false }, bag)
-    box("BagZip", 63.95, ty + 0.62, 19.0, 65.25, ty + 0.66, 19.1, rgb(220, 190, 60), M.Metal, bag, nc())
-    box("BagLock", 65.2, ty + 0.5, 18.95, 65.34, ty + 0.72, 19.15, rgb(220, 190, 60), M.Metal, bag, nc())
-    local lab = box("BagLabel", 64.1, ty + 0.1, 18.47, 65.1, ty + 0.4, 18.5, rgb(250, 250, 244), M.Fabric, bag, nc())
+        Position = Vector3.new(px0 + 1.1, ty + 0.5, bz + 0.55), Color = rgb(60, 72, 96), Material = M.Fabric, CanCollide = false }, bag)
+    box("BagZip", px0 + 0.45, ty + 0.62, bz + 0.5, px0 + 1.75, ty + 0.66, bz + 0.6, rgb(220, 190, 60), M.Metal, bag, nc())
+    box("BagLock", px0 + 1.7, ty + 0.5, bz + 0.45, px0 + 1.84, ty + 0.72, bz + 0.65, rgb(220, 190, 60), M.Metal, bag, nc())
+    local lab = box("BagLabel", px0 + 0.6, ty + 0.1, bz - 0.03, px0 + 1.6, ty + 0.4, bz, rgb(250, 250, 244), M.Fabric, bag, nc())
     lit(printOn(lab, Enum.NormalId.Front, "NIGHT DEPOSIT", rgb(30, 40, 80), UITheme.F.bold, 60, 1).Parent)
-    tillDrawer(bag, 65.4, ty, 18.4, 66.3, 19.6)
-    local bs = Vector3.new(65, FLOOR + 3, 16.9)
-    table.insert(loot, { kind = "Register", cframe = CFrame.lookAt(bs, Vector3.new(65, bs.Y, 19.3)), visual = bag,
+    tillDrawer(bag, px0 + 1.9, ty, bz - 0.1, px0 + 2.8, bz + 1.1)
+    local pmx = (px0 + px1) / 2
+    local bs = Vector3.new(pmx, FLOOR + 3, pz0 - 1.8)
+    table.insert(loot, { kind = "Register", cframe = CFrame.lookAt(bs, Vector3.new(pmx, bs.Y, pz0 + 1)), visual = bag,
         interact = "stuff", pool = "stockroom", inVault = false })
 
-    -- tall steel broom closet in the south-east corner (HideSpot)
-    local closet = box("BroomCloset", 70.8, FLOOR, IZ1 - 1.8, IX1 - 0.05, FLOOR + 7.4, IZ1, rgb(120, 150, 170), M.Metal, s)
+    -- tall steel broom closet in the dark south-west corner (HideSpot)
+    local closet = box("BroomCloset", STOCK_X0 + 0.05, FLOOR, IZ1 - 1.8, STOCK_X0 + 1.9, FLOOR + 7.4, IZ1 - 0.05,
+        rgb(120, 150, 170), M.Metal, s)
     local cg = lit(surface(closet, Enum.NormalId.Front, 30, 1))
     frame({ Size = UDim2.fromScale(0.02, 0.96), Position = UDim2.fromScale(0.49, 0.02), BackgroundColor3 = rgb(60, 80, 96) }, cg)
     for k = 0, 1 do
@@ -1204,39 +1276,57 @@ function MartBuilder:_stockRoom(f, refs, loot)
     end
     tag(closet, "HideSpot", { Label = "Closet" })
     table.insert(refs.hideSpots, closet)
+    -- mop bucket beside it
+    part({ Name = "MopBucket", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.2, 1.3, 1.3),
+        CFrame = CFrame.new(STOCK_X0 + 2.8, FLOOR + 0.6, IZ1 - 0.9) * CFrame.Angles(0, 0, math.rad(90)),
+        Color = rgb(240, 196, 40), Material = M.Plastic }, s)
+    bar("MopHandle", Vector3.new(STOCK_X0 + 2.8, FLOOR + 0.8, IZ1 - 0.9), Vector3.new(STOCK_X0 + 2.5, FLOOR + 5.2, IZ1 - 0.5),
+        0.1, rgb(150, 110, 70), M.Wood, s, nc())
 
-    -- hand truck leaning by the office door + a couple of loose boxes
-    bar("HandTruck", Vector3.new(61, FLOOR, 23.2), Vector3.new(60.6, FLOOR + 4.4, 23.6), 0.14, rgb(230, 60, 40), M.Metal, s, nc())
+    -- south-east corner: a stack of soda cases + flattened cardboard (cover)
+    for k, c in ipairs({ { 71.3, 29.4, 72.9, 32.3, 3.2 }, { 71.5, 27.2, 72.9, 29.2, 1.8 } }) do
+        box("SodaCases", c[1], FLOOR, c[2], c[3], FLOOR + c[5], c[4], k == 1 and rgb(40, 110, 200) or rgb(220, 60, 60), M.Cardboard, s)
+    end
+    part({ Name = "FlatBoxes", Size = Vector3.new(0.3, 3.2, 2.4),
+        CFrame = CFrame.new(IX1 - 0.3, FLOOR + 1.6, 26.2) * CFrame.Angles(0, 0, math.rad(-8)),
+        Color = rgb(186, 150, 104), Material = M.Cardboard, CanCollide = false }, s)
+    -- hand truck parked by the office door
+    bar("HandTruck", Vector3.new(62.6, FLOOR, 28.6), Vector3.new(62.2, FLOOR + 4.4, 29), 0.14, rgb(230, 60, 40), M.Metal, s, nc())
 
-    -- (v2.0.2) one dim tube + a caged work lamp on a cord (the key light, shadows)
-    -- (v3.1) warm + dim: these two are the only lights in the room
-    tubeLight(s, 66, 20, true, 0.22, 10, true, nil, false, rgb(255, 214, 170))
-    bar("LampCord", Vector3.new(66.5, CEIL, 18.2), Vector3.new(66.5, CEIL - 2.6, 18.2), 0.06, STEEL_DK, M.Rubber, s, nc())
-    local cage = box("CageLamp", 66.1, CEIL - 3.2, 17.8, 66.9, CEIL - 2.6, 18.6, STEEL_DK, M.Metal, s, nc())
-    box("CageLampBulb", 66.25, CEIL - 3.35, 17.95, 66.75, CEIL - 3.2, 18.45, WARM, M.Neon, s, nc({ CastShadow = false }))
-    point(cage, rgb(255, 196, 140), 0.75, 12, true)
-    table.insert(refs.shadowZones, shadowZone("ShadowStockCorner", STOCK_X0, 20.5, 63, IZ1, s))
+    -- lights: a dim warm tube over the racking + a caged work lamp on a cord
+    -- over the pallet (the key light, shadows). Pools with dark between.
+    tubeLight(s, 66.9, 28.2, true, 0.22, 10, true, nil, false, rgb(255, 214, 170))
+    bar("LampCord", Vector3.new(66, CEIL, 21), Vector3.new(66, CEIL - 2.6, 21), 0.06, STEEL_DK, M.Rubber, s, nc())
+    local cage = box("CageLamp", 65.6, CEIL - 3.2, 20.6, 66.4, CEIL - 2.6, 21.4, STEEL_DK, M.Metal, s, nc())
+    box("CageLampBulb", 65.75, CEIL - 3.35, 20.75, 66.25, CEIL - 3.2, 21.25, WARM, M.Neon, s, nc({ CastShadow = false }))
+    point(cage, rgb(255, 196, 140), 0.75, 13, true)
+    table.insert(refs.shadowZones, shadowZone("ShadowStockCorner", STOCK_X0, 27.8, 63.5, IZ1, s))
     -- (v3.1) block lining over the lemon exterior wall's inner face (it read as
-    -- a glowing yellow slab next to the work lamp); the back-door gap stays open
+    -- a glowing yellow slab next to the work lamp); the loading-door gap stays open
     box("BlockLining", IX1 - 0.06, FLOOR, BACK_Z0, IX1, CEIL, SIDE_DOOR_Z0, BLOCK, M.Brick, s, nc())
     box("BlockLining", IX1 - 0.06, FLOOR, SIDE_DOOR_Z1, IX1, CEIL, IZ1, BLOCK, M.Brick, s, nc())
     box("BlockLining", IX1 - 0.06, DOOR_H, SIDE_DOOR_Z0, IX1, CEIL, SIDE_DOOR_Z1, BLOCK, M.Brick, s, nc())
 
-    -- ── the back door: open steel double doors onto the east alley ──
+    -- ── the loading door: a steel roll-up shutter, rolled up, onto the yard ──
     local x = X1
     local STEELC = rgb(70, 74, 82)
     box("BackDoorFrameN", x, 0, SIDE_DOOR_Z0 - 0.3, x + 0.25, DOOR_H + 0.3, SIDE_DOOR_Z0, STEELC, M.Metal, s)
     box("BackDoorFrameS", x, 0, SIDE_DOOR_Z1, x + 0.25, DOOR_H + 0.3, SIDE_DOOR_Z1 + 0.3, STEELC, M.Metal, s)
     box("BackDoorFrameTop", x, DOOR_H, SIDE_DOOR_Z0 - 0.3, x + 0.25, DOOR_H + 0.3, SIDE_DOOR_Z1 + 0.3, STEELC, M.Metal, s)
-    box("BackDoorLeaf", x + 0.25, FLOOR, SIDE_DOOR_Z0 - 3.8, x + 0.45, DOOR_H - 0.1, SIDE_DOOR_Z0 - 0.3, rgb(96, 100, 110), M.DiamondPlate, s, nc())
-    box("BackDoorLeaf", x + 0.25, FLOOR, SIDE_DOOR_Z1 + 0.3, x + 0.45, DOOR_H - 0.1, SIDE_DOOR_Z1 + 3.8, rgb(96, 100, 110), M.DiamondPlate, s, nc())
+    box("ShutterHood", x + 0.25, DOOR_H + 0.3, SIDE_DOOR_Z0 - 0.2, x + 1.05, DOOR_H + 1.1, SIDE_DOOR_Z1 + 0.2,
+        rgb(96, 100, 110), M.Metal, s, nc())
+    box("ShutterSlats", x + 0.25, DOOR_H - 0.25, SIDE_DOOR_Z0 + 0.05, x + 0.4, DOOR_H + 0.3, SIDE_DOOR_Z1 - 0.05,
+        rgb(150, 156, 166), M.CorrugatedSteel, s, nc())
+    for _, gz in ipairs({ SIDE_DOOR_Z0, SIDE_DOOR_Z1 - 0.15 }) do
+        box("ShutterGuide", x + 0.25, FLOOR, gz, x + 0.4, DOOR_H, gz + 0.15, STEEL, M.Metal, s, nc())
+    end
     box("BackDoorStep", x, 0, SIDE_DOOR_Z0, x + 2, FLOOR, SIDE_DOOR_Z1, rgb(150, 146, 140), M.Concrete, s)
-    local plate = box("BackDoorPlate", x + 0.25, DOOR_H + 0.6, SIDE_DOOR_Z0 + 1.2, x + 0.35, DOOR_H + 1.9, SIDE_DOOR_Z1 - 1.2,
+    local plate = box("BackDoorPlate", x + 0.25, DOOR_H + 1.3, SIDE_DOOR_Z0 + 1.5, x + 0.35, DOOR_H + 2.4, SIDE_DOOR_Z1 - 1.5,
         rgb(26, 26, 30), M.Metal, s)
     lit(printOn(plate, Enum.NormalId.Right, "DELIVERIES", rgb(255, 200, 60), UITheme.F.bold, 60, 1.3).Parent)
     local mid = (SIDE_DOOR_Z0 + SIDE_DOOR_Z1) / 2
-    local lamp = box("AlleyLamp", x + 0.25, DOOR_H + 2.4, mid - 0.5, x + 0.9, DOOR_H + 2.8, mid + 0.5, STEEL_DK, M.Metal, s, nc())
-    box("AlleyLampLens", x + 0.3, DOOR_H + 2.3, mid - 0.4, x + 0.85, DOOR_H + 2.4, mid + 0.4, rgb(255, 214, 150), M.Neon, s, nc())
+    local lamp = box("AlleyLamp", x + 0.25, DOOR_H + 2.6, mid - 0.5, x + 0.9, DOOR_H + 3.0, mid + 0.5, STEEL_DK, M.Metal, s, nc())
+    box("AlleyLampLens", x + 0.3, DOOR_H + 2.5, mid - 0.4, x + 0.85, DOOR_H + 2.6, mid + 0.4, rgb(255, 214, 150), M.Neon, s, nc())
     spot(lamp, Enum.NormalId.Bottom, rgb(255, 200, 140), 1.3, 16, 100, true)
 
     return breaker
@@ -1249,40 +1339,60 @@ function MartBuilder:_office(f, refs, loot)
     local o = Instance.new("Folder")
     o.Name = "Office"
     o.Parent = f
+    -- (v3.1 ROOMY BACK) x 49..59.5, z 16..32.5 (10.5 x 16.5; was 8 x 8).
+    -- North end: the GOLDEN TICKET (west) + the desk (east). Middle: rug, the
+    -- ladder up to the roof hatch on the west wall. South end: the floor safe,
+    -- a sofa, filing cabinets. E prompts: ticket (z 18.1) and the drill point
+    -- (z ~28) are ~10 apart; the hatch (V) sits between them, >= 6 from each.
 
     -- (v2.0.2) walls: navy painted wainscot + white rail + striped wallpaper on
     -- the north (desk) and south (safe) walls
     local WAINSCOT = rgb(34, 46, 74)
     local RAIL = rgb(176, 168, 152)
     for _, w in ipairs({ { BACK_Z0, BACK_Z0 + 0.06, Enum.NormalId.Back }, { IZ1 - 0.06, IZ1, Enum.NormalId.Front } }) do
-        box("Wainscot", IX0, FLOOR, w[1], OFFICE_X1, FLOOR + 3.6, w[2], WAINSCOT, M.Plaster, o, nc())
+        box("Wainscot", BIX0, FLOOR, w[1], OFFICE_X1, FLOOR + 3.6, w[2], WAINSCOT, M.Plaster, o, nc())
         local rz0 = (w[3] == Enum.NormalId.Back) and w[1] or w[2] - 0.12
-        box("ChairRail", IX0, FLOOR + 3.6, rz0, OFFICE_X1, FLOOR + 3.85, rz0 + 0.12, RAIL, M.Plaster, o, nc())
-        local wp = box("Wallpaper", IX0, FLOOR + 3.85, w[1], OFFICE_X1, CEIL, w[2], rgb(186, 168, 134), M.Fabric, o, nc())
-        wallpaper(wp, w[3], rgb(182, 164, 130), rgb(170, 92, 50), 6)
+        box("ChairRail", BIX0, FLOOR + 3.6, rz0, OFFICE_X1, FLOOR + 3.85, rz0 + 0.12, RAIL, M.Plaster, o, nc())
+        local wp = box("Wallpaper", BIX0, FLOOR + 3.85, w[1], OFFICE_X1, CEIL, w[2], rgb(186, 168, 134), M.Fabric, o, nc())
+        wallpaper(wp, w[3], rgb(182, 164, 130), rgb(170, 92, 50), 8)
     end
+    -- (v3.1) the west wall's inner face was the lemon exterior plaster, the east
+    -- (stock-room) wall was bare: line both with the navy wainscot + muted paint
+    box("Wainscot", BIX0, FLOOR, BACK_Z0, BIX0 + 0.05, FLOOR + 3.6, IZ1, WAINSCOT, M.Plaster, o, nc())
+    box("WallLining", BIX0, FLOOR + 3.6, BACK_Z0, BIX0 + 0.05, CEIL, IZ1, WALL_IN, M.Plaster, o, nc())
+    local ex = OFFICE_X1 - 0.05
+    for _, zz in ipairs({ { BACK_Z0, OFFICE_DOOR_Z0 }, { OFFICE_DOOR_Z1, IZ1 } }) do
+        box("Wainscot", ex, FLOOR, zz[1], OFFICE_X1, FLOOR + 3.6, zz[2], WAINSCOT, M.Plaster, o, nc())
+        box("WallLining", ex, FLOOR + 3.6, zz[1], OFFICE_X1, CEIL, zz[2], WALL_IN, M.Plaster, o, nc())
+    end
+    box("WallLining", ex, DOOR_H, OFFICE_DOOR_Z0, OFFICE_X1, CEIL, OFFICE_DOOR_Z1, WALL_IN, M.Plaster, o, nc())
+    -- a door casing on the office side
+    for _, zz in ipairs({ { OFFICE_DOOR_Z0, OFFICE_DOOR_Z0 + 0.25 }, { OFFICE_DOOR_Z1 - 0.25, OFFICE_DOOR_Z1 } }) do
+        box("DoorCasing", ex - 0.08, FLOOR, zz[1], OFFICE_X1, DOOR_H, zz[2], RAIL, M.Wood, o, nc())
+    end
+    box("DoorCasing", ex - 0.08, DOOR_H, OFFICE_DOOR_Z0, OFFICE_X1, DOOR_H + 0.25, OFFICE_DOOR_Z1, RAIL, M.Wood, o, nc())
 
-    -- desk along the north wall (satin wood — the old WoodPlanks read as stripes)
-    local dx0, dx1, dz0, dz1 = 54.3, 58.6, BACK_Z0, BACK_Z0 + 2.2
+    -- desk along the north wall, east end (satin wood — the old WoodPlanks read as stripes)
+    local dx0, dx1, dz0, dz1 = 54.6, 59, BACK_Z0, BACK_Z0 + 2.2
     local topY = FLOOR + 2.9
     box("DeskTop", dx0, topY - 0.25, dz0, dx1, topY, dz1, WALNUT, M.Wood, o)
     box("DeskSide", dx0, FLOOR, dz0, dx0 + 0.2, topY - 0.25, dz1, WALNUT, M.Wood, o)
     box("DeskSide", dx1 - 0.2, FLOOR, dz0, dx1, topY - 0.25, dz1, WALNUT, M.Wood, o)
     box("DeskBack", dx0, FLOOR + 0.8, dz0, dx1, topY - 0.25, dz0 + 0.2, WALNUT, M.Wood, o)
-    -- desk lamp: the office's key light (shadows); the ceiling light is dim
-    local lx, lz = 54.65, dz0 + 1.5     -- west end of the desk, clear of the monitor
+    -- desk lamp: the office's key light (shadows); the ceiling lights are dim
+    local lx, lz = dx0 + 0.35, dz0 + 1.5     -- west end of the desk, clear of the monitor
     box("LampBase", lx - 0.25, topY, lz - 0.25, lx + 0.25, topY + 0.1, lz + 0.25, STEEL_DK, M.Metal, o, nc())
-    bar("LampArm", Vector3.new(lx, topY + 0.1, lz), Vector3.new(lx - 0.4, topY + 1.3, lz + 0.2), 0.07, STEEL_DK, M.Metal, o, nc())
-    local shade = box("LampShade", lx - 0.8, topY + 1.1, lz - 0.1, lx - 0.1, topY + 1.45, lz + 0.5, SUN_DEEP, M.Metal, o, nc())
+    bar("LampArm", Vector3.new(lx, topY + 0.1, lz), Vector3.new(lx + 0.4, topY + 1.3, lz + 0.2), 0.07, STEEL_DK, M.Metal, o, nc())
+    local shade = box("LampShade", lx + 0.1, topY + 1.1, lz - 0.1, lx + 0.8, topY + 1.45, lz + 0.5, SUN_DEEP, M.Metal, o, nc())
     spot(shade, Enum.NormalId.Bottom, rgb(255, 200, 140), 1.25, 11, 80, true)
     -- papers + a mug
-    box("Papers", 57, topY, dz0 + 0.6, 58, topY + 0.1, dz0 + 1.4, rgb(250, 250, 244), M.Fabric, o, nc())
+    box("Papers", 57.4, topY, dz0 + 0.6, 58.4, topY + 0.1, dz0 + 1.4, rgb(250, 250, 244), M.Fabric, o, nc())
     part({ Name = "Mug", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.45, 0.35, 0.35),
-        CFrame = CFrame.new(54.9, topY + 0.23, dz0 + 1.6) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame = CFrame.new(58.6, topY + 0.23, dz0 + 1.7) * CFrame.Angles(0, 0, math.rad(90)),
         Color = SUN, Material = M.Glass, CanCollide = false }, o)
 
     -- CCTV monitor on the wall over the desk (faces south into the office)
-    local mon = box("CctvMonitor", 55, FLOOR + 5.2, BACK_Z0, 58, FLOOR + 7.4, BACK_Z0 + 0.25, rgb(20, 20, 24), M.Metal, o)
+    local mon = box("CctvMonitor", 55.4, FLOOR + 5.2, BACK_Z0, 58.4, FLOOR + 7.4, BACK_Z0 + 0.25, rgb(20, 20, 24), M.Metal, o)
     local mg = surface(mon, Enum.NormalId.Back, 50, 1.1)
     local feeds = { "CAM 1 · REGISTER", "NO SIGNAL" }
     for k, label in ipairs(feeds) do
@@ -1291,27 +1401,29 @@ function MartBuilder:_office(f, refs, loot)
         text({ Text = label, Size = UDim2.fromScale(0.9, 0.18), Position = UDim2.fromScale(0.05, 0.05),
             TextScaled = true, FontFace = UITheme.F.mono, TextColor3 = rgb(140, 220, 200) }, cell)
     end
-    point(lightAnchor("MonitorGlow", Vector3.new(56.5, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.3, 6)
+    point(lightAnchor("MonitorGlow", Vector3.new(56.9, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.3, 6)
 
-    -- calendar + "SAFE CODE? NICE TRY" note
-    -- (v3.0) the calendar moved to the west wall; the golden ticket hangs where it was
-    local cal = box("Calendar", IX0, 5.5, 21.6, IX0 + 0.08, 7.6, 23.2, rgb(250, 250, 244), M.Fabric, o, nc())
+    -- calendar over the sofa on the west wall
+    local cal = box("Calendar", BIX0 + 0.05, 5.5, 28.6, BIX0 + 0.13, 7.6, 30.2, rgb(250, 250, 244), M.Fabric, o, nc())
     local calg = lit(surface(cal, Enum.NormalId.Right, 40, 1))
     frame({ Size = UDim2.fromScale(1, 0.3), BackgroundColor3 = SUN_DEEP }, calg)
     text({ Text = "SEPT", Size = UDim2.fromScale(0.9, 0.25), Position = UDim2.fromScale(0.05, 0.03),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(255, 255, 255) }, calg)
+    -- "SAFE CODE? NICE TRY" sticky note beside it
+    local note = box("StickyNote", BIX0 + 0.05, 6.2, 30.5, BIX0 + 0.1, 7.1, 31.4, rgb(255, 236, 120), M.Fabric, o, nc())
+    lit(printOn(note, Enum.NormalId.Right, "SAFE CODE?\nNICE TRY", rgb(60, 50, 30), UITheme.F.bold, 80, 1).Parent)
 
     -- ladder up the west wall to the roof hatch (inside end of the roof "vent")
-    local lz0, lz1 = 18.7, 20.9
+    local lz0, lz1 = 23.2, 25.4
     for _, rz in ipairs({ lz0, lz1 }) do
-        box("LadderRail", IX0, FLOOR, rz - 0.1, IX0 + 0.6, CEIL, rz + 0.1, STEEL_LT, M.Metal, o, nc())
+        box("LadderRail", BIX0, FLOOR, rz - 0.1, BIX0 + 0.6, CEIL, rz + 0.1, STEEL_LT, M.Metal, o, nc())
     end
     for y = FLOOR + 1, CEIL - 1, 1.2 do
-        box("LadderRung", IX0 + 0.35, y, lz0, IX0 + 0.5, y + 0.12, lz1, STEEL_LT, M.Metal, o, nc())
+        box("LadderRung", BIX0 + 0.35, y, lz0, BIX0 + 0.5, y + 0.12, lz1, STEEL_LT, M.Metal, o, nc())
     end
-    box("CeilingHatch", IX0 + 0.2, CEIL - 0.12, lz0 - 0.3, IX0 + 3, CEIL, lz1 + 0.3, STEEL, M.Metal, o, nc())
-    local inside = facingPart("SM_RoofHatchInside", Vector3.new(IX0 + 0.7, FLOOR + 3, (lz0 + lz1) / 2),
+    box("CeilingHatch", BIX0 + 0.2, CEIL - 0.12, lz0 - 0.3, BIX0 + 3, CEIL, lz1 + 0.3, STEEL, M.Metal, o, nc())
+    local inside = facingPart("SM_RoofHatchInside", Vector3.new(BIX0 + 0.7, FLOOR + 3, (lz0 + lz1) / 2),
         Vector3.new(2, 5, 0.15), Vector3.new(1, 0, 0), rgb(250, 204, 21), M.Metal, o,
         { Transparency = 0.2, CanCollide = false })
     local ig = lit(surface(inside, Enum.NormalId.Front, 40, 1))
@@ -1319,13 +1431,49 @@ function MartBuilder:_office(f, refs, loot)
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
         TextColor3 = rgb(30, 30, 30) }, ig)
 
-    local lamp = box("OfficeLight", 54.5, CEIL - 0.25, 19.3, 57.5, CEIL, 20.1, STEEL_LT, M.Metal, o, nc())
-    box("OfficeLightLens", 54.6, CEIL - 0.3, 19.4, 57.4, CEIL - 0.25, 20, rgb(214, 188, 150), M.Neon, o, nc())
-    point(lamp, WARM, 0.25, 9, false)
-    -- (v3.1) the west wall's inner face was the lemon exterior plaster: line it
-    -- with the same navy wainscot + muted paint as the rest of the office
-    box("Wainscot", IX0, FLOOR, BACK_Z0, IX0 + 0.05, FLOOR + 3.6, IZ1, WAINSCOT, M.Plaster, o, nc())
-    box("WallLining", IX0, FLOOR + 3.6, BACK_Z0, IX0 + 0.05, CEIL, IZ1, WALL_IN, M.Plaster, o, nc())
+    -- a rug down the middle of the room
+    box("Rug", 51.4, FLOOR, 19.8, 57.6, FLOOR + 0.04, 26.6, rgb(110, 36, 44), M.Fabric, o, nc({ CastShadow = false }))
+    box("RugBorder", 51.7, FLOOR + 0.04, 20.1, 57.3, FLOOR + 0.05, 26.3, rgb(196, 150, 80), M.Fabric, o,
+        nc({ CastShadow = false, Transparency = 0.55 }))
+
+    -- a worn leather sofa against the west wall (cover by the safe)
+    local LEATHER = rgb(82, 50, 36)
+    local sz0, sz1 = 27.2, 31.8
+    box("SofaBase", BIX0 + 0.05, FLOOR, sz0, BIX0 + 1.9, FLOOR + 1.5, sz1, LEATHER, M.Fabric, o)
+    box("SofaBack", BIX0 + 0.05, FLOOR + 1.5, sz0, BIX0 + 0.6, FLOOR + 3.1, sz1, LEATHER, M.Fabric, o)
+    for _, az in ipairs({ { sz0, sz0 + 0.5 }, { sz1 - 0.5, sz1 } }) do
+        box("SofaArm", BIX0 + 0.05, FLOOR + 1.5, az[1], BIX0 + 1.9, FLOOR + 2.3, az[2], LEATHER, M.Fabric, o)
+    end
+    for k = 0, 1 do
+        local cz = sz0 + 0.55 + k * 1.85
+        box("SofaCushion", BIX0 + 0.6, FLOOR + 1.5, cz, BIX0 + 1.85, FLOOR + 1.8, cz + 1.8, rgb(96, 60, 44), M.Fabric, o, nc())
+    end
+
+    -- filing cabinets on the east wall, south of the door
+    for k = 0, 1 do
+        local cz0 = 28.3 + k * 2.05
+        local cab = box("FilingCabinet", OFFICE_X1 - 1.4, FLOOR, cz0, OFFICE_X1 - 0.06, FLOOR + 4.6, cz0 + 1.95, rgb(96, 104, 98), M.Metal, o)
+        local cgui = lit(surface(cab, Enum.NormalId.Left, 30, 1))
+        for d = 0, 3 do
+            local drw = frame({ Size = UDim2.fromScale(0.9, 0.22), Position = UDim2.fromScale(0.05, 0.03 + d * 0.245),
+                BackgroundColor3 = rgb(110, 118, 112) }, cgui)
+            frame({ Size = UDim2.fromScale(0.3, 0.08), Position = UDim2.fromScale(0.35, 0.3), BackgroundColor3 = STEEL_LT }, drw)
+        end
+    end
+
+    -- ceiling: two dim warm panels (desk end + safe end); the desk lamp and the
+    -- ticket's picture light are the bright spots
+    for _, lzc in ipairs({ { 21.6, 0.25 }, { 27.6, 0.2 } }) do
+        local lamp = box("OfficeLight", 52.8, CEIL - 0.25, lzc[1] - 0.4, 55.8, CEIL, lzc[1] + 0.4, STEEL_LT, M.Metal, o, nc())
+        box("OfficeLightLens", 52.9, CEIL - 0.3, lzc[1] - 0.3, 55.7, CEIL - 0.25, lzc[1] + 0.3, rgb(214, 188, 150), M.Neon, o, nc())
+        point(lamp, WARM, lzc[2], 11, false)
+    end
+    table.insert(refs.shadowZones, shadowZone("ShadowOfficeSofa", BIX0, 26.8, 51.8, IZ1, o))
+    prop("furniture", "pottedPlant", Vector3.new(BIX0 + 0.9, FLOOR, 21.6), Vector3.new(1, 0, 0), o,
+        { main = { rgb(150, 110, 80), M.Plastic }, byName = { leaf = { rgb(46, 96, 52), M.Grass }, plant = { rgb(46, 96, 52), M.Grass } } },
+        { collide = false })
+    prop("furniture", "trashcan", Vector3.new(dx0 - 0.7, FLOOR, dz0 + 0.8), Vector3.new(0, 0, 1), o,
+        { main = { rgb(60, 64, 70), M.Metal } }, { collide = false })
 
     -- ── the floor safe ──
     local sx0, sx1 = SAFE_X - SAFE_HW, SAFE_X + SAFE_HW
@@ -1353,7 +1501,7 @@ function MartBuilder:_office(f, refs, loot)
     lit(printOn(plate, Enum.NormalId.Front, "SUNNY'S", rgb(60, 36, 14), UITheme.F.display, 60, 1).Parent)
 
     -- round door, hinged on the WEST edge, swings open north-west (+100°),
-    -- ending up at x ≈ 53.1..53.9, z 17.4..20.6 — clear of the ladder and desk
+    -- ending up at x ≈ 52.1..52.9, z 25.9..29.1 — clear of the ladder, sofa and rug-side SafeCash stands
     local dz = fz0 - DISC_T / 2
     local faceZ = fz0 - DISC_T
     local door = Instance.new("Model")
@@ -1408,16 +1556,16 @@ function MartBuilder:_office(f, refs, loot)
         Position = Vector3.new(SAFE_X - 0.8, FLOOR + 1.15, innerZ), Color = rgb(150, 130, 96), Material = M.Fabric,
         CanCollide = false, CastShadow = false }, c2)
     local function stand(x)
-        local p = Vector3.new(x, FLOOR + 3, 19.2)
+        local p = Vector3.new(x, FLOOR + 3, SAFE_Z0 - 1.8)
         return CFrame.lookAt(p, Vector3.new(x, p.Y, SAFE_Z0))
     end
-    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X + 0.9), visual = c1, interact = "dial", pool = "office" })
-    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X - 0.9), visual = c2, interact = "dial", pool = "office" })
+    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X + 1.2), visual = c1, interact = "dial", pool = "office" })
+    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X - 1.2), visual = c2, interact = "dial", pool = "office" })
 
     -- 🎟️ THE TARGET: Sunny's GOLDEN TICKET — the store sold a $1,000,000
     -- winner in 1987 and the owner had the ticket framed. It hangs on the north
     -- wall beside the desk, behind glass, under its own brass picture light.
-    local gx, gy = 52.7, FLOOR + 6.6                 -- frame centre
+    local gx, gy = 51.6, FLOOR + 6.6                 -- frame centre (v3.1: west end of the north wall, the desk is east)
     local fw, fh = 1.2, 0.85                         -- frame half-size
     local wz = BACK_Z0 + 0.06                        -- the wallpaper face
     local GILT = rgb(226, 178, 62)
@@ -1469,15 +1617,17 @@ function MartBuilder:_office(f, refs, loot)
     spot(pl, Enum.NormalId.Bottom, rgb(255, 216, 160), 0.9, 6, 70, false)
     local plq = box("TicketPlaque", gx - 0.6, gy - fh - 0.52, wz, gx + 0.6, gy - fh - 0.28, wz + 0.04, GILT, M.Metal, o, nc())
     lit(printOn(plq, Enum.NormalId.Back, "OUR FIRST MILLIONAIRE", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
-    local ts = Vector3.new(gx, FLOOR + 3, 17.1)   -- (v3.0.1) was z 18.4: its E prompt sat 2.7 studs from the safe's "Place drill" and lost to it
+    -- (v3.0.1) its E prompt once sat 2.7 studs from the safe's "Place drill" and lost to it;
+    -- (v3.1) the safe is now ~10 studs south, the roof hatch (V) ~6.5 away
+    local ts = Vector3.new(gx, FLOOR + 3, 18.1)
     table.insert(loot, { kind = "GoldenTicket", target = "GoldenTicket", cframe = CFrame.lookAt(ts, Vector3.new(gx, ts.Y, BACK_Z0)),
         visual = tv, pool = "office", inVault = false })
 
     -- (v2.0 fix) chair nudged east, off the safe line: at x 56.4 it sat right where the drill goes and blocked the "Place drill" prompt's line of sight
     -- (v2.0.2) both repainted after they load — they import as plain white blocks
-    prop("furniture", "chairDesk", Vector3.new(57.6, FLOOR, dz1 + 0.6), Vector3.new(0, 0, -1), o,
+    prop("furniture", "chairDesk", Vector3.new(57.2, FLOOR, dz1 + 0.7), Vector3.new(0, 0, -1), o,
         { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } }, { collide = false })
-    prop("furniture", "computerScreen", Vector3.new(56.4, topY, dz0 + 0.7), Vector3.new(0, 0, 1), o,
+    prop("furniture", "computerScreen", Vector3.new(56.6, topY, dz0 + 0.7), Vector3.new(0, 0, 1), o,
         { main = { rgb(36, 38, 44), M.Metal, 0.05 }, byName = { screen = { rgb(40, 90, 140), M.Glass, 0.2 } } })
 
     return inside
@@ -1501,11 +1651,12 @@ function MartBuilder:_yard(f, refs)
     local H, T = YWALL_H, YWALL_T
     local EX0 = YARD_X1 - T               -- inner face of the east wall (83.1)
     local SZ0 = YARD_Z1 - T               -- inner face of the south wall (32.9)
-    local WX1 = X0 + T                    -- inner face of the back strip's west wall (50.6)
+    -- (v3.1) no more back strip: the store's back wing now fills x 48..74 up to
+    -- z 33.5, so the yard is the east strip only. Its south end is closed by the
+    -- bank's side-gap wall (z 29.2..30) and, behind that, by this south wall.
 
     -- ── ground ──
     box("YardFloor", X1, 0, Z0, EX0, 0.1, SZ0, rgb(52, 52, 58), M.Asphalt, a)
-    box("BackStripFloor", WX1, 0, Z1, X1, 0.1, SZ0, rgb(120, 118, 112), M.Concrete, a)
     box("Driveway", X1, 0, -1.4, EX0, 0.1, Z0, rgb(150, 148, 142), M.Concrete, a)
     local LINE = rgb(236, 196, 48)
     box("BayLine", CAR_X - 3.4, 0.1, CAR_Z - 6.2, CAR_X - 3.2, 0.12, CAR_Z + 6.6, LINE, M.Plaster, a, nc())
@@ -1522,14 +1673,12 @@ function MartBuilder:_yard(f, refs)
     -- ── brick walls (CanCollide, meet the store walls exactly) ──
     box("YardGatePost", GATE_X1, 0, Z0 - 0.3, EX0, H + 1, Z0 + 0.7, BRICK, M.Brick, a)
     box("YardWallE", EX0, 0, Z0 - 0.3, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
-    box("YardWallS", X0, 0, SZ0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
-    box("YardWallW", X0, 0, Z1, WX1, H, SZ0, BRICK, M.Brick, a)
+    box("YardWallS", X1, 0, SZ0, YARD_X1, H, YARD_Z1, BRICK, M.Brick, a)
     box("YardCoping", EX0 - 0.1, H, Z0 - 0.4, YARD_X1 + 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
-    box("YardCoping", X0 - 0.1, H, SZ0 - 0.1, EX0 - 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
-    box("YardCoping", X0 - 0.1, H, Z1, WX1 + 0.1, H + 0.35, SZ0 - 0.1, CAP, M.Concrete, a)
+    box("YardCoping", X1, H, SZ0 - 0.1, EX0 - 0.1, H + 0.35, YARD_Z1 + 0.1, CAP, M.Concrete, a)
     box("PostCap", GATE_X1 - 0.1, H + 1, Z0 - 0.4, EX0, H + 1.4, Z0 + 0.8, CAP, M.Concrete, a)
     box("Plinth", EX0 - 0.08, 0.1, Z0 + 0.7, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
-    box("Plinth", WX1, 0.1, SZ0 - 0.08, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
+    box("Plinth", X1, 0.1, SZ0 - 0.08, EX0, 1.1, SZ0, PLINTH, M.Concrete, a, nc())
 
     -- ── the vehicle gate: roll-up shutter, rolled up (clear height 10.6) ──
     local SHUT = rgb(150, 156, 166)
@@ -1552,36 +1701,36 @@ function MartBuilder:_yard(f, refs)
     box("YardLampLens", EX0 - 0.65, 9.52, CAR_Z - 0.6, EX0 - 0.05, 9.6, CAR_Z + 0.6, rgb(255, 196, 120), M.Neon, a,
         nc({ CastShadow = false }))
     spot(key, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.7, 26, 120, true)
-    local back = box("YardLamp", 57.3, 9.6, SZ0 - 0.7, 58.7, 10.3, SZ0, STEEL_DK, M.Metal, a, nc())
-    box("YardLampLens", 57.4, 9.52, SZ0 - 0.65, 58.6, 9.6, SZ0 - 0.05, rgb(255, 196, 120), M.Neon, a, nc({ CastShadow = false }))
-    spot(back, Enum.NormalId.Bottom, rgb(255, 180, 110), 1.3, 18, 110, false)
-
     -- ── props (hard against the walls, clear of the car and its run to the gate) ──
-    -- blue dumpster behind the store
-    local dx0, dx1 = 53.4, 57.2
-    box("Dumpster", dx0, 0.4, SZ0 - 3.8, dx1, 4.2, SZ0 - 0.3, rgb(30, 90, 150), M.Metal, a)
-    box("DumpsterLid", dx0 - 0.1, 4.2, SZ0 - 3.9, dx1 + 0.1, 4.45, SZ0 - 0.2, rgb(22, 66, 110), M.Metal, a)
-    box("DumpsterSkid", dx0 + 0.2, 0.1, SZ0 - 3.6, dx1 - 0.2, 0.4, SZ0 - 0.5, STEEL_DK, M.Metal, a)
+    -- (v3.1) the back-strip props moved into the yard's back corner, along the
+    -- east wall south of the car (the car's run north to the gate stays clear;
+    -- the loading-door apron x 74..78 stays clear)
+    -- blue dumpster against the east wall
+    local dz0, dz1 = 21.2, 25
+    box("Dumpster", EX0 - 3.6, 0.4, dz0, EX0 - 0.2, 4.2, dz1, rgb(30, 90, 150), M.Metal, a)
+    box("DumpsterLid", EX0 - 3.7, 4.2, dz0 - 0.1, EX0 - 0.1, 4.45, dz1 + 0.1, rgb(22, 66, 110), M.Metal, a)
+    box("DumpsterSkid", EX0 - 3.4, 0.1, dz0 + 0.2, EX0 - 0.4, 0.4, dz1 - 0.2, STEEL_DK, M.Metal, a)
     for k = 0, 1 do
         part({ Name = "BinBag", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.3, 1.5),
-            Position = Vector3.new(dx1 + 1 + k * 1.3, 0.75, SZ0 - 1 - k * 0.6), Color = rgb(24, 24, 28), Material = M.Rubber }, a)
+            Position = Vector3.new(EX0 - 4.3 + k * 0.4, 0.75, dz1 - 0.6 + k * 1.4), Color = rgb(24, 24, 28), Material = M.Rubber }, a)
     end
     -- used-oil drum
     part({ Name = "OilDrum", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.6, 1.6, 1.6),
-        CFrame = CFrame.new(51.8, 1.4, SZ0 - 1.1) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame = CFrame.new(EX0 - 0.95, 1.4, 16.9) * CFrame.Angles(0, 0, math.rad(90)),
         Color = rgb(200, 60, 40), Material = M.Metal }, a)
-    -- propane exchange cage against the back of the store
-    local px0, px1 = 60.4, 64.2
-    box("PropaneCage", px0, 0.1, Z1 + 0.1, px1, 4.2, Z1 + 1.9, rgb(200, 206, 214), M.DiamondPlate, a,
+    -- propane exchange cage against the east wall
+    local pz0, pz1 = 17.9, 20.9
+    local px0 = EX0 - 1.8
+    box("PropaneCage", px0, 0.1, pz0, EX0 - 0.05, 4.2, pz1, rgb(200, 206, 214), M.DiamondPlate, a,
         { Transparency = 0.35 })
-    box("PropaneCageTop", px0 - 0.05, 4.2, Z1 + 0.05, px1 + 0.05, 4.35, Z1 + 1.95, rgb(40, 90, 170), M.Metal, a)
+    box("PropaneCageTop", px0 - 0.05, 4.2, pz0 - 0.05, EX0, 4.35, pz1 + 0.05, rgb(40, 90, 170), M.Metal, a)
     for k = 0, 2 do
-        part({ Name = "PropaneTank", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.7, 1.1, 1.1),
-            CFrame = CFrame.new(px0 + 0.8 + k * 1.1, 1.0, Z1 + 1) * CFrame.Angles(0, 0, math.rad(90)),
+        part({ Name = "PropaneTank", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.7, 1.0, 1.0),
+            CFrame = CFrame.new(px0 + 0.9, 1.0, pz0 + 0.55 + k * 0.95) * CFrame.Angles(0, 0, math.rad(90)),
             Color = rgb(236, 236, 230), Material = M.Metal, CanCollide = false }, a)
     end
-    local ps = box("PropaneSign", px0 + 0.6, 2.8, Z1 + 1.92, px1 - 0.6, 3.8, Z1 + 1.96, rgb(40, 90, 170), M.Metal, a, nc())
-    lit(printOn(ps, Enum.NormalId.Back, "PROPANE", rgb(255, 255, 255), UITheme.F.display, 40, 1).Parent)
+    local ps = box("PropaneSign", px0 - 0.04, 2.8, pz0 + 0.5, px0, 3.8, pz1 - 0.5, rgb(40, 90, 170), M.Metal, a, nc())
+    lit(printOn(ps, Enum.NormalId.Left, "PROPANE", rgb(255, 255, 255), UITheme.F.display, 40, 1).Parent)
     -- milk crates by the east wall (north of the bank's z 29.2..30 gap wall, which
     -- stands inside this yard) + a shrink-wrapped soda pallet in the nook behind it
     box("MilkCrate", EX0 - 1.8, 0.1, 26.9, EX0 - 0.2, 1.5, 28.5, rgb(220, 60, 60), M.Rubber, a)
@@ -1594,7 +1743,7 @@ function MartBuilder:_yard(f, refs)
         nc({ Transparency = 0.7 }))
     -- flattened boxes leaning on the east wall
     part({ Name = "FlatBoxes", Size = Vector3.new(0.3, 3.4, 2.6),
-        CFrame = CFrame.new(EX0 - 0.5, 1.8, 21.5) * CFrame.Angles(0, 0, math.rad(10)),
+        CFrame = CFrame.new(EX0 - 0.5, 1.8, 13.6) * CFrame.Angles(0, 0, math.rad(10)),
         Color = rgb(186, 150, 104), Material = M.Cardboard, CanCollide = false }, a)
     -- puddles: flat, reflective, catch the lamps (no collision). (v3.1) were
     -- near-black glass slabs that read as holes: now flattened ovals a shade
@@ -1603,7 +1752,7 @@ function MartBuilder:_yard(f, refs)
     for _, pd in ipairs({
         { 80.6, 20.5, 3.8, 2.0, 1.3, rgb(40, 41, 48) },       -- yard asphalt (52, 52, 58)
         { 76.2, 2.8, 2.8, 1.4, 0.2, rgb(40, 41, 48) },
-        { 66, 30, 4.2, 1.7, -0.15, rgb(92, 91, 88) },         -- back strip concrete (120, 118, 112)
+        { 77.4, 22.8, 3.4, 1.5, -0.15, rgb(40, 41, 48) },      -- by the loading door
     }) do
         local pud = part({ Name = "Puddle", Size = Vector3.new(pd[3], 0.04, pd[4]),
             CFrame = CFrame.new(pd[1], 0.1, pd[2]) * CFrame.Angles(0, pd[5], 0), Color = pd[6],
@@ -1613,26 +1762,27 @@ function MartBuilder:_yard(f, refs)
         mesh.MeshType = Enum.MeshType.Sphere
         mesh.Parent = pud
     end
-    -- painted sun on the back wall of the yard (it takes the lamp light)
-    local mural = box("YardMural", 60, 2, SZ0 - 0.06, 68, 9, SZ0, BRICK, M.Brick, a, nc({ Transparency = 1 }))
-    local mg = lit(surface(mural, Enum.NormalId.Front, 16, 1))
+    -- painted sun on the yard's east wall beside the car (it takes the key lamp's light)
+    local mural = box("YardMural", EX0 - 0.06, 2, 2.6, EX0, 8.8, 8.6, BRICK, M.Brick, a, nc({ Transparency = 1 }))
+    local mg = lit(surface(mural, Enum.NormalId.Left, 16, 1))
     local sun = frame({ Size = UDim2.fromScale(0.34, 0.5), Position = UDim2.fromScale(0.33, 0.08), BackgroundColor3 = SUN }, mg)
     UITheme.corner(sun, 999)
     text({ Text = "SUNNY SIDE UP", Size = UDim2.fromScale(0.96, 0.26), Position = UDim2.fromScale(0.02, 0.66),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
         TextColor3 = rgb(255, 120, 150) }, mg)
 
-    -- ── roof ladder: a climbable steel truss on the store's back wall ──
+    -- ── roof ladder: a climbable steel truss on the store's east wall, in the
+    -- yard's back corner (v3.1: the back wall is no longer in the yard) ──
     local truss = Instance.new("TrussPart")
     truss.Name = "RoofLadder"
     truss.Anchored = true
     truss.Size = Vector3.new(2, 18, 2)
-    truss.CFrame = CFrame.new(LADDER_X, 9, Z1 + 1.15)
+    truss.CFrame = CFrame.new(X1 + 1, 9, LADDER_Z)
     truss.Color = STEEL_LT
     truss.Material = M.Metal
     truss.Parent = a
-    local sign = box("RoofSign", LADDER_X + 1.4, 2.4, Z1 + 0.1, LADDER_X + 2.8, 3.6, Z1 + 0.2, rgb(250, 204, 21), M.Metal, a, nc())
-    lit(printOn(sign, Enum.NormalId.Back, "ROOF", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
+    local sign = box("RoofSign", X1, 2.4, SIDE_DOOR_Z1 + 0.45, X1 + 0.1, 3.6, LADDER_Z - 1.1, rgb(250, 204, 21), M.Metal, a, nc())
+    lit(printOn(sign, Enum.NormalId.Right, "ROOF", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
 
     -- a dark corner past the back door (sneak here from the gate)
     table.insert(refs.shadowZones, shadowZone("ShadowYard", EX0 - 4.5, 17.5, EX0, 26, a))
@@ -1642,7 +1792,7 @@ function MartBuilder:_roof(f)
     local r = Instance.new("Folder")
     r.Name = "RoofAccess"
     r.Parent = f
-    local hx, hz = 53.6, 19.8
+    local hx, hz = 52.2, 24.3                      -- (v3.1) over the office ladder
     box("HatchPaint", hx - 2.4, ROOF_Y, hz - 2.4, hx + 2.4, ROOF_Y + 0.03, hz + 2.4, rgb(230, 190, 40), M.Concrete, r, nc())
     box("HatchCurb", hx - 1.7, ROOF_Y, hz - 1.7, hx + 1.7, ROOF_Y + 0.6, hz + 1.7, STEEL, M.Metal, r)
     local lid = facingPart("SM_RoofHatch", Vector3.new(hx, ROOF_Y + 0.75, hz), Vector3.new(2.9, 0.3, 2.9),
@@ -1691,12 +1841,12 @@ function MartBuilder:build(folder)
         entryPoint = Vector3.new(CX, 3, -2),
         -- the crew drops in INSIDE the stock room, just past the alley door.
         -- No guard route and no camera covers it (the strip curtain blocks the view).
-        sneakIn = { at = Vector3.new(69, 3.5, 19.8), face = Vector3.new(62, 3.5, 19.8),
+        sneakIn = { at = Vector3.new(69, 3.5, 20.8), face = Vector3.new(62, 3.5, 20.8),
             spread = Vector3.new(0, 0, 0.45) },
         entrances = {
             { kind = "front", at = Vector3.new(CX, 3, -2.5), label = "Front door" },
             { kind = "side", at = Vector3.new(X1 + 3, 3, (SIDE_DOOR_Z0 + SIDE_DOOR_Z1) / 2), label = "Back door (yard)" },
-            { kind = "roof", at = Vector3.new(LADDER_X, 3, Z1 + 3.4), label = "Roof ladder" },
+            { kind = "roof", at = Vector3.new(X1 + 3.2, 3, LADDER_Z), label = "Roof ladder" },
         },
         hideSpots = {},
         shadowZones = {},
@@ -1727,9 +1877,9 @@ function MartBuilder:build(folder)
 
     -- Exit = the floor spot VentService stands you on when you come out of THIS end
     tag(hatchRoof, "Vent", { Pair = hatchInside.Name, Label = "Climb down",
-        Exit = Vector3.new(56.6, ROOF_Y, 19.8) })
+        Exit = Vector3.new(55.4, ROOF_Y, 24.3) })
     tag(hatchInside, "Vent", { Pair = hatchRoof.Name, Label = "Climb to the roof",
-        Exit = Vector3.new(55.6, FLOOR, 19.6) })
+        Exit = Vector3.new(51.9, FLOOR, 24.3) })
     refs.vents = { { a = hatchRoof, b = hatchInside } }
 
     local cams = Instance.new("Folder")
@@ -1740,7 +1890,7 @@ function MartBuilder:build(folder)
     local cam = self:_camera(cams, "Camera_Register", Vector3.new(61.5, 12, SALES_Z1), Vector3.new(0, 0, -1),
         Vector3.new(57, FLOOR, 6), 70, 8)
     refs.cameras = { cam }
-    local sticker = box("CameraSticker", 60.3, 9.6, SALES_Z1 - 0.06, 62.7, 10.6, SALES_Z1, rgb(250, 204, 21), M.Metal, cams, nc())
+    local sticker = box("CameraSticker", 60.2, 9.6, SALES_Z1 - 0.06, 62.4, 10.6, SALES_Z1, rgb(250, 204, 21), M.Metal, cams, nc())
     printOn(sticker, Enum.NormalId.Front, "SMILE! YOU'RE ON CAMERA", rgb(30, 30, 30), UITheme.F.bold, 50, 1)
 
     -- one security guard walking the front of the store (>= 2 studs clear of the
@@ -1751,10 +1901,10 @@ function MartBuilder:build(folder)
     }
 
     refs.plan = {
-        bounds = { X0, Z0, X1, Z1 },
+        bounds = { BX0, Z0, X1, Z1 },
         rooms = {
             { X0, Z0, X1, SALES_Z1, "STORE" },
-            { IX0, BACK_Z0, OFFICE_X1, IZ1, "OFFICE" },
+            { BIX0, BACK_Z0, OFFICE_X1, IZ1, "OFFICE" },
             { STOCK_X0, BACK_Z0, IX1, IZ1, "STOCK" },
         },
         vault = { SAFE_X, (SAFE_Z0 + SAFE_Z1) / 2 },

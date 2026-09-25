@@ -150,14 +150,9 @@ function HeistBuilder:_setupAmbientMusic()
             child:Destroy()
         end
     end
-
-    local music = Instance.new("Sound")
-    music.Name = "AmbientMusic"
-    music.SoundId = Constants.SOUNDS.LOBBY_AMBIENT
-    music.Volume = 0.3
-    music.Looped = true
-    music.Parent = Workspace
-    music:Play()
+    -- v3.1: the always-on server loop is GONE — client/MusicController.lua now
+    -- plays lobby / stealth / tension / alarm / getaway music per player with
+    -- crossfades (and a mute button). A server loop here would double up.
 end
 
 -- ──────────────────────────────────────────────

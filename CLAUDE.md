@@ -558,6 +558,21 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - ⚠️ **Invisicam was tried and REVERTED:** ProximityPrompt line-of-sight is checked from the CAMERA, so a camera
     behind a wall hides every prompt in small rooms. Don't re-add it.
 
+- **2026-09-25** — **v3.1 "FAIR & FUN"** (Malachi: build the top-3 suggestions + make cramped rooms bigger).
+  - **GuardCones** (client): floor wedge per guard (real range/FOV, stops at walls, teal → yellow "Huh?" → red)
+    + per camera (hidden when cut). Hooks: guards carry `Sus_<UserId>`/`Stunned`/`Chasing`, cameras `Live`.
+  - **MusicController** (client): lobby 1846431634 · stealth 9047763385 · tension 1836289781 (susp > 0.35) ·
+    alarm 1847683499 · getaway 134157706807016 — all APM/DistroKid, verified loading in Studio; 1.5 s crossfades,
+    🎵 mute button (session-only). Old Workspace AmbientMusic loop removed (HeistBuilder).
+  - **Tutorial** (TutorialService + TutorialHud, save field `tutorialDone`, old saves → heistsCompleted > 0):
+    offer card for new players → gold Beam arrow + step cards through Sunny's Mart (door → breaker → register →
+    trunk → optional Golden Ticket → F into car + GO!) → $1,000 once. Solo/all-new crews get 2× slower guards +
+    cameras (attribute `Tutorial`). TipHud, CrewHud lobby steps and DailyRewardUI stay quiet during it.
+  - **Bigger back rooms:** mart back wall z 25 → 33.5 (office 10.5×16.5, stock room 12.5×16.5, sneakIn now
+    (69,3.5,20.8)); Diamond Dolls back wall z 35 → 44 + annex x −46..−40 z 22..44 (break room 15×13 = sneakIn
+    (−45,3.5,34.5)). All E prompts ≥ 6 apart. ⚠️ Constants.WORLD MART_/JEWELRY_ HALF_DEPTH comments are stale.
+  - Mock: drv_rr_v3int 208/208 · drv_tut 68/68 · drv_cones 30/30 · drv_getaway 1401/1401.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

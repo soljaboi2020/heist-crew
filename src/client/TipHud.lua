@@ -17,6 +17,9 @@
     standing in a heist door · first run starting · first time being spotted ·
     first bag · near the car with a bag · first alarm · first time in the car ·
     reaching the vault · lasers ahead · first time in jail.
+
+    v3.1: quiet while the player attribute `Tutorial` is set (TutorialService /
+    TutorialHud run the first-time walkthrough and own the coaching then).
 --]]
 
 local Players = game:GetService("Players")
@@ -151,6 +154,9 @@ end
 function TipHud:show(key)
     if self._seen[key] then return end
     if not localPlayer:GetAttribute("Rookie") then return end
+    -- (tutorial hook, v3.1) the first-time tutorial (TutorialHud) owns the coaching while
+    -- it runs: no tips, and the tip isn't marked seen, so it can still show afterwards
+    if localPlayer:GetAttribute("Tutorial") then return end
     if not TIPS[key] then return end
     self._seen[key] = true
     if not self._showing then
@@ -169,6 +175,13 @@ function TipHud:start()
     self._seen = {}
     self._queue = {}
     self:_build()
+    -- (tutorial hook, v3.1) the tutorial starting clears any tip on screen + the queue
+    localPlayer:GetAttributeChangedSignal("Tutorial"):Connect(function()
+        if localPlayer:GetAttribute("Tutorial") then
+            self._queue = {}
+            if self._showing then self:_hide() end
+        end
+    end)
 
     -- v2.0: wait for the first-join fly-over (IntroCam) to finish first
     task.delay(6, function()

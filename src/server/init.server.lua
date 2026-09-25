@@ -263,6 +263,12 @@ if RobuxService then safe("RobuxService", function() RobuxService:init({ data = 
 if JailService then safe("JailService", function() JailService:init({ jail = world.jail, notify = notify, jobService = JobService }) end) end
 if BotService then safe("BotService", function() BotService:init({ jobService = JobService, loot = LootService }) end) end
 if PortalService then safe("PortalService", function() PortalService:init({ hub = hub, jobService = JobService, notify = notify }) end) end
+local TutorialService = optional("TutorialService", nil)
+if TutorialService then safe("TutorialService", function() TutorialService:init({
+    data = PlayerDataService, jobService = JobService, loot = LootService, security = SecurityService,
+    economy = EconomyService, hub = hub, portal = PortalService, notify = notify,
+    getaway = (function() local ok, g = pcall(require, script.GetawayService) return ok and g or nil end)(),
+}) end) end
 
 -- First-join fly-over (client IntroCam plays it once per join)
 do
