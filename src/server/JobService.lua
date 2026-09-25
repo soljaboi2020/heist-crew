@@ -493,6 +493,36 @@ triggerAlarm = function(reason, player)
     pushInfo()
 end
 
+-- (v1.2.5) Malachi: "one guard sees you and they all come running, it's confusing".
+-- New rule, simple enough for a 7-year-old: a GUARD catching or spotting you just
+-- sends you back to the sneaky door (you drop your bag + keycard). No alarm, the
+-- other guards keep patrolling, and you're still in the run. Only COPS take you out.
+local kickedAt = {}
+local function kickBack(player, guard)
+    if os.clock() < resettingUntil then sendToSafehouse(player) return end
+    if (kickedAt[player] or 0) > os.clock() - 2 then return end   -- one kick at a time
+    kickedAt[player] = os.clock()
+    if not run then startRun(player, "caught") end
+    if not run then return end
+    addToCrew(player)
+    local e = run.crew[player]
+    if e and (e.out or e.escaped) then return end
+    S.loot:drop(player)
+    S.security:dropKeycard(player)
+    if guard then S.guards:stun(guard, 3) end   -- he doesn't grab you again on the way out
+    local s = job() and job().refs.sneakIn
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if s and hrp then
+        unseat(player)
+        local pos = s.at + s.spread * math.random(-2, 2)
+        hrp.CFrame = CFrame.lookAt(pos, Vector3.new(s.face.X, pos.Y, s.face.Z))
+    end
+    player:SetAttribute("GuardSuspicion", 0)
+    notify(player, "A guard caught you! You're back at the door. Sneak back in!", "red", 4)
+    notifyAll(player.DisplayName .. " got sent back to the door", "white", 2)
+    pushInfo()
+end
+
 local function catchPlayer(player, by)
     if os.clock() < resettingUntil then
         sendToSafehouse(player)
@@ -923,16 +953,19 @@ function JobService:init(deps)
     }, S.shop)
 
     S.guards:spawnPatrols({
-        onPlayerSpotted = function(player) triggerAlarm("guard", player) end,
-        onPlayerCaught = function(player) catchPlayer(player, "guard") end,
+        onPlayerSpotted = function(player, guard) kickBack(player, guard) end,
+        onPlayerCaught = function(player, guard)
+            -- during the loud escape a guard grab still counts as caught
+            if run and run.alarm then catchPlayer(player, "guard") else kickBack(player, guard) end
+        end,
         onTakedown = function(player)
             startRun(player, "takedown")
             addToCrew(player)
             notifyAll(player.DisplayName .. " knocked out a guard", "gold", 3)
         end,
         onTakedownFailed = function(player)
-            notify(player, "He saw you coming — get behind him", "red", 2)
-            triggerAlarm("guard", player)
+            notify(player, "He saw you coming! Get behind him next time.", "red", 2)
+            kickBack(player)
         end,
     }, {})
 

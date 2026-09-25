@@ -167,7 +167,8 @@ Constants.JOBS = {
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
         briefing = {
             "This job is Villa Rosa. It's a rich guy's beach house. He's on vacation, but his vault is full of money!",
-            "There are 3 guards with flashlights and 3 cameras. Don't let them see you!",
+            "There are 3 guards with flashlights. If a guard sees you, you get sent back to the door. Just sneak back in!",
+            "There are also 3 cameras. If a camera sees you, the alarm goes off and the police come!",
             "Tip: find the breaker box in the security room. Use it to turn the cameras off.",
             "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
             "Red lasers blink on and off. Walk through when they turn off.",
@@ -184,7 +185,7 @@ Constants.JOBS = {
         briefing = {
             "This job is Diamond Dolls. It's a jewelry store with 8 glass cases full of shiny stuff!",
             "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
-            "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
+            "If a guard sees you, you go back to the door. Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
             "Put the bags in the car and drive to the boats (the marina) before the timer runs out!",
         },
     },
