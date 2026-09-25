@@ -434,6 +434,11 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   lights, spots and the EQ locally (only while you're in the club). Extras (training course,
   leaderboard wall, arcade) deferred by Malachi — "later when I feel happy".
 
+- **2026-09-25** — **v1.2.1** first spawn put you on the street outside the auto shop: the
+  character loads while `HeistBuilder:build()` is still yielding, before the spawn pad moves into
+  The Vault. `init.server` now pivots every already-loaded character to `SPAWN_POSITION` (facing
+  the holo table) right after the build. Respawns were already fine.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot
