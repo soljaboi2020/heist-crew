@@ -89,6 +89,7 @@ end
 
 function UITheme.label(props)
     local l = Instance.new("TextLabel")
+    l.Text = ""   -- (fix v1.1.1) Roblox's default is the word "Label" — it showed on screen
     l.BackgroundTransparency = 1
     l.TextColor3 = UITheme.C.text
     l.FontFace = UITheme.F.bold

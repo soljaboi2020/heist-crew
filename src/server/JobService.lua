@@ -182,7 +182,6 @@ local function buildTargets(j, c)
             add(door.panel.Position, "KEYPAD", "door")
         else
             for _, spot in ipairs(refs.keycardSpots or {}) do add(spot.Position + Vector3.new(0, 1.5, 0), "SEARCH", "search") end
-            if door then add(door.panel.Position, "KEYPAD", "optional") end
         end
     elseif not run.vaultOpen and refs.vault then
         local label = "DRILL"

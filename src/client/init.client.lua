@@ -35,6 +35,22 @@ pcall(function()
     game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
 end)
 
+-- (fix v1.1.1) On some PCs / graphics settings a CanvasGroup at GroupTransparency 1
+-- still draws its contents — Malachi saw "SPOTTING…" and the drop-in title on
+-- screen when they should have been invisible. So every CanvasGroup in our UI
+-- is hidden outright whenever it's (nearly) fully transparent.
+do
+    local pg = localPlayer:WaitForChild("PlayerGui")
+    local function watch(cg)
+        if not cg:IsA("CanvasGroup") then return end
+        local function sync() cg.Visible = cg.GroupTransparency < 0.98 end
+        sync()
+        cg:GetPropertyChangedSignal("GroupTransparency"):Connect(sync)
+    end
+    for _, d in ipairs(pg:GetDescendants()) do watch(d) end
+    pg.DescendantAdded:Connect(watch)
+end
+
 local ORDER = {
     "CashHud", "Notifications", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",

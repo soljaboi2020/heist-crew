@@ -260,6 +260,17 @@ function HeistBuilder:build()
         spawn = Instance.new("SpawnLocation")
         spawn.Name = "SpawnLocation"
     end
+    -- (fix v1.1.1) any OTHER spawn left in the place (the default one from a new
+    -- baseplate, one inside an old import…) makes Roblox pick at random — players
+    -- were appearing outside. Disable them (not deleted: they're Malachi's).
+    for _, d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("SpawnLocation") and d ~= spawn then
+            d.Enabled = false
+            print("[HeistBuilder] disabled extra spawn:", d:GetFullName())
+        end
+    end
+    spawn.Enabled = true
+    spawn.Neutral = true
     spawn.Anchored = true
     spawn.Size = Vector3.new(6, 0.2, 6)
     spawn.CFrame = CFrame.new(v3(W.SPAWN_POSITION))

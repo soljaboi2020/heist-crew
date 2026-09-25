@@ -105,6 +105,18 @@ function WaypointHud:start()
         end
         local vp = cam.ViewportSize
         local list = targets
+        -- (v1.1.1) at most the 2 NEAREST "SEARCH" markers — five at once was noise
+        do
+            local searches, others = {}, {}
+            for _, t in ipairs(targets) do
+                if t.kind == "search" and typeof(t.pos) == "Vector3" then table.insert(searches, t) else table.insert(others, t) end
+            end
+            table.sort(searches, function(a, b)
+                return (a.pos - root.Position).Magnitude < (b.pos - root.Position).Magnitude
+            end)
+            list = others
+            for i = 1, math.min(2, #searches) do table.insert(list, searches[i]) end
+        end
         if localPlayer:GetAttribute("CarryingLoot") then
             list = {}
             for _, t in ipairs(targets) do
