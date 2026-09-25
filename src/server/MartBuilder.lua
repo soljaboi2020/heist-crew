@@ -177,6 +177,11 @@ local CREAM     = rgb(238, 232, 218)
 -- old off-white walls + close lamps blew out to pure white in playtest
 local WALL_IN   = rgb(184, 178, 166)     -- light warm grey / beige
 local TUBE_LENS = rgb(196, 210, 228)     -- fluorescent diffuser (was near-white neon)
+-- (v3.2 LIGHTING) sales floor: the lens is a dimmer grey-blue so 9 fixtures
+-- read as "lit tubes" without blooming white; interior paint a notch darker
+local SALES_LENS = rgb(128, 138, 152)
+local MINT_IN    = rgb(104, 160, 140)    -- sales-floor wainscot (was the pastel exterior mint)
+local SALES_WALL = rgb(166, 158, 142)    -- sales-floor side-wall lining (the shell is pastel lemon)
 local STEEL     = rgb(58, 62, 70)
 local STEEL_DK  = rgb(30, 32, 38)
 local STEEL_LT  = rgb(170, 176, 186)
@@ -186,7 +191,7 @@ local WARM      = rgb(255, 222, 186)
 local CASH_GREEN = rgb(96, 170, 96)
 local PRODUCT = {
     rgb(230, 57, 70), rgb(255, 183, 3), rgb(33, 158, 188), rgb(106, 176, 76), rgb(244, 114, 182),
-    rgb(251, 133, 0), rgb(142, 202, 230), rgb(155, 93, 229), rgb(241, 250, 238), rgb(2, 48, 71),
+    rgb(251, 133, 0), rgb(122, 176, 204), rgb(155, 93, 229), rgb(196, 200, 188), rgb(2, 48, 71),
 }
 
 -- ── helpers (same style as JewelryBuilder) ──────────────────────────────
@@ -317,13 +322,14 @@ end
 
 -- fluorescent ceiling fixture. on = false → a dead tube (dark, no light).
 -- len = fixture length (default 4.4); shadows = this tube is a key light
-local function tubeLight(parent, x, z, alongX, brightness, range, on, len, shadows, color)
+local function tubeLight(parent, x, z, alongX, brightness, range, on, len, shadows, color, lens)
     local half = (len or 4.4) / 2
     local hx, hz = alongX and half or 0.4, alongX and 0.4 or half
     local fx = box("TubeFixture", x - hx, CEIL - 0.25, z - hz, x + hx, CEIL, z + hz, STEEL_LT, M.Metal, parent, nc())
     box("TubeLens", x - hx + 0.15, CEIL - 0.3, z - hz + 0.1, x + hx - 0.15, CEIL - 0.25, z + hz - 0.1,
-        on == false and rgb(120, 124, 130) or TUBE_LENS, on == false and M.Glass or M.Neon, parent, nc({ CastShadow = false }))
-    if on ~= false then point(fx, color or COOL, brightness or 1, range or 16, shadows == true) end
+        on == false and rgb(120, 124, 130) or (lens or TUBE_LENS), on == false and M.Glass or M.Neon, parent, nc({ CastShadow = false }))
+    -- (v3.2) brightness 0 = a lit-looking fixture that casts no light (fill budget)
+    if on ~= false and (brightness or 1) > 0 then point(fx, color or COOL, brightness or 1, range or 16, shadows == true) end
     return fx
 end
 
@@ -427,9 +433,10 @@ end
 -- and it reads as a full shelf from any distance)
 local function productRow(name, x0, y0, z0, x1, y1, z1, face, seed, parent, wide)
     local p = box(name, x0, y0, z0, x1, y1, z1, rgb(60, 60, 64), M.Cardboard, parent, nc())
-    local g = surface(p, face, 24, 1)
-    g.LightInfluence = 0.45     -- (v2.0.2) shaded by the room, still punchy
-    g.Brightness = 1.5
+    -- (v3.2 LIGHTING) fully lit by the room. The old LightInfluence 0.45 /
+    -- Brightness 1.5 made ~40 shelf rows self-glow and blew the aisles out
+    -- to white under Future lighting.
+    local g = lit(surface(p, face, 24, 1))
     local n = wide and 7 or 10
     for k = 0, n - 1 do
         local col = PRODUCT[((seed * 7 + k * 3) % #PRODUCT) + 1]
@@ -437,7 +444,7 @@ local function productRow(name, x0, y0, z0, x1, y1, z1, face, seed, parent, wide
         local item = frame({ Size = UDim2.fromScale(0.86 / n, h), Position = UDim2.fromScale(0.02 + k / n, 1 - h),
             BackgroundColor3 = col }, g)
         frame({ Size = UDim2.fromScale(0.8, 0.14), Position = UDim2.fromScale(0.1, 0.3),
-            BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.25 }, item)
+            BackgroundColor3 = rgb(226, 222, 212), BackgroundTransparency = 0.35 }, item)
     end
     return p
 end
@@ -520,7 +527,7 @@ function MartBuilder:_shell(f)
     -- sidewalk apron in front (the south sidewalk ends at z -1.4)
     box("Apron", X0, 0, -1.4, X1, FLOOR, Z0, rgb(170, 168, 162), M.Concrete, f)
     -- floors
-    box("FloorSales", X0, 0, Z0, X1, FLOOR, 15.5, rgb(200, 200, 194), M.CeramicTiles, f)
+    box("FloorSales", X0, 0, Z0, X1, FLOOR, 15.5, rgb(132, 130, 124), M.CeramicTiles, f)   -- (v3.2) mid-tone, was 200 (cones vanished on it)
     box("FloorOffice", BX0, 0, 15.5, 60, FLOOR, Z1, rgb(70, 84, 104), M.Carpet, f)
     box("FloorStock", 60, 0, 15.5, X1, FLOOR, Z1, rgb(140, 138, 132), M.Concrete, f)
 
@@ -585,8 +592,8 @@ function MartBuilder:_shell(f)
     wallX("SalesBackWall", SALES_Z1, BACK_Z0, IX0, IX1, { { CURTAIN_X0, CURTAIN_X1, DOOR_H } }, WALL_IN, M.Plaster, f)
     wallZ("OfficeWall", OFFICE_X1, STOCK_X0, BACK_Z0, IZ1, { { OFFICE_DOOR_Z0, OFFICE_DOOR_Z1, DOOR_H } }, WALL_IN, M.Plaster, f)
     -- mint wainscot round the sales floor
-    box("Wainscot", IX0, FLOOR, IZ0, IX0 + 0.1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
-    box("Wainscot", IX0, FLOOR, SALES_Z1 - 0.1, IX1, FLOOR + 3, SALES_Z1, MINT, M.Plaster, f, nc())
+    box("Wainscot", IX0, FLOOR, IZ0, IX0 + 0.1, FLOOR + 3, SALES_Z1, MINT_IN, M.Plaster, f, nc())
+    box("Wainscot", IX0, FLOOR, SALES_Z1 - 0.1, IX1, FLOOR + 3, SALES_Z1, MINT_IN, M.Plaster, f, nc())
 end
 
 -- ──────────────────────────────────────────────
@@ -758,14 +765,14 @@ function MartBuilder:_gondola(f, x0, x1, idx, label)
     local mid = (x0 + x1) / 2
     local H = FLOOR + 6.2
     box("Kick", x0, FLOOR, z0, x1, FLOOR + 0.5, z1, rgb(60, 64, 72), M.Metal, g)
-    box("Spine", mid - 0.12, FLOOR + 0.5, z0, mid + 0.12, H, z1, rgb(196, 200, 204), M.DiamondPlate, g)
+    box("Spine", mid - 0.12, FLOOR + 0.5, z0, mid + 0.12, H, z1, rgb(128, 132, 138), M.DiamondPlate, g)
     local levels = { FLOOR + 0.5, FLOOR + 2, FLOOR + 3.5, FLOOR + 5 }
     for li, y in ipairs(levels) do
-        box("Shelf", x0, y - 0.1, z0, x1, y, z1, rgb(236, 236, 230), M.Metal, g)
+        box("Shelf", x0, y - 0.1, z0, x1, y, z1, rgb(164, 166, 164), M.Metal, g)
         productRow("ProductsW", x0 + 0.05, y, z0 + 0.1, mid - 0.12, y + 1.2, z1 - 0.1, Enum.NormalId.Left, idx * 4 + li, g)
         productRow("ProductsE", mid + 0.12, y, z0 + 0.1, x1 - 0.05, y + 1.2, z1 - 0.1, Enum.NormalId.Right, idx * 4 + li + 2, g)
-        box("PriceStrip", x0 - 0.02, y - 0.3, z0, x0, y - 0.1, z1, rgb(255, 236, 120), M.Metal, g, nc())
-        box("PriceStrip", x1, y - 0.3, z0, x1 + 0.02, y - 0.1, z1, rgb(255, 236, 120), M.Metal, g, nc())
+        box("PriceStrip", x0 - 0.02, y - 0.3, z0, x0, y - 0.1, z1, rgb(214, 190, 84), M.Metal, g, nc())
+        box("PriceStrip", x1, y - 0.3, z0, x1 + 0.02, y - 0.1, z1, rgb(214, 190, 84), M.Metal, g, nc())
     end
     -- end cap sign facing the front of the store
     local cap = box("EndCap", x0, H - 0.8, z0 - 0.1, x1, H + 0.6, z0, SUN_DEEP, M.Metal, g, nc())
@@ -773,8 +780,8 @@ function MartBuilder:_gondola(f, x0, x1, idx, label)
     -- hanging aisle sign
     local sign = box("AisleSign", mid - 1.6, CEIL - 3.2, (z0 + z1) / 2 - 0.05, mid + 1.6, CEIL - 2, (z0 + z1) / 2 + 0.05,
         TEAL, M.Metal, g, nc())
-    printOn(sign, Enum.NormalId.Front, "AISLE " .. idx, rgb(255, 255, 255), UITheme.F.display, 40, 1.2)
-    printOn(sign, Enum.NormalId.Back, label, rgb(255, 255, 255), UITheme.F.display, 40, 1.2)
+    printOn(sign, Enum.NormalId.Front, "AISLE " .. idx, rgb(236, 236, 230), UITheme.F.display, 40, 0.9)
+    printOn(sign, Enum.NormalId.Back, label, rgb(236, 236, 230), UITheme.F.display, 40, 0.9)
     bar("SignWire", Vector3.new(mid - 1.4, CEIL - 2, (z0 + z1) / 2), Vector3.new(mid - 1.4, CEIL, (z0 + z1) / 2), 0.05,
         STEEL_DK, M.Metal, g, nc())
     bar("SignWire", Vector3.new(mid + 1.4, CEIL - 2, (z0 + z1) / 2), Vector3.new(mid + 1.4, CEIL, (z0 + z1) / 2), 0.05,
@@ -791,7 +798,7 @@ function MartBuilder:_fridges(f)
     box("FridgeBody", x0 + 0.3, FLOOR, z0, x1, H, z1, rgb(40, 44, 52), M.Metal, fr)
     box("FridgeHeader", x0, H, z0, x1, H + 1.3, z1, rgb(20, 120, 200), M.Metal, fr)
     local hdr = box("FridgeHeaderFace", x0 - 0.02, H, z0, x0, H + 1.3, z1, rgb(20, 120, 200), M.Metal, fr, nc())
-    printOn(hdr, Enum.NormalId.Left, "COLD DRINKS", rgb(255, 255, 255), UITheme.F.display, 30, 1.4)
+    printOn(hdr, Enum.NormalId.Left, "COLD DRINKS", rgb(236, 240, 245), UITheme.F.display, 30, 0.9)
     local doors = 5
     local dw = (z1 - z0) / doors
     for d = 0, doors - 1 do
@@ -800,7 +807,7 @@ function MartBuilder:_fridges(f)
         for s = 0, 4 do
             local y = FLOOR + 0.6 + s * 1.3
             productRow("Drinks", x0 + 0.35, y, dz0 + 0.15, x0 + 1.2, y + 1.05, dz1 - 0.15, Enum.NormalId.Left, d * 5 + s, fr, true)
-            box("FridgeShelf", x0 + 0.35, y - 0.06, dz0 + 0.1, x1 - 0.2, y, dz1 - 0.1, rgb(200, 206, 214), M.Metal, fr, nc())
+            box("FridgeShelf", x0 + 0.35, y - 0.06, dz0 + 0.1, x1 - 0.2, y, dz1 - 0.1, rgb(140, 146, 154), M.Metal, fr, nc())
         end
         box("FridgeGlass", x0, FLOOR + 0.3, dz0 + 0.08, x0 + 0.1, H - 0.1, dz1 - 0.08, rgb(200, 230, 245), M.Glass, fr,
             { Transparency = 0.6, Reflectance = 0.15 })
@@ -808,10 +815,10 @@ function MartBuilder:_fridges(f)
         bar("FridgeHandle", Vector3.new(x0 - 0.15, FLOOR + 2.6, dz1 - 0.4), Vector3.new(x0 - 0.15, FLOOR + 5.2, dz1 - 0.4),
             0.1, STEEL_LT, M.Metal, fr, nc())
         -- LED strip down each door (thin neon) + the cold glow
-        box("FridgeLed", x0 + 0.12, FLOOR + 0.4, dz0 + 0.12, x0 + 0.2, H - 0.2, dz0 + 0.2, COOL, M.Neon, fr, nc({ CastShadow = false }))
+        box("FridgeLed", x0 + 0.12, FLOOR + 0.4, dz0 + 0.12, x0 + 0.2, H - 0.2, dz0 + 0.2, rgb(110, 150, 190), M.Neon, fr, nc({ CastShadow = false }))
     end
-    point(lightAnchor("FridgeGlowN", Vector3.new(x0 - 0.5, FLOOR + 4, 5.5), fr), rgb(190, 225, 255), 0.6, 9)
-    point(lightAnchor("FridgeGlowS", Vector3.new(x0 - 0.5, FLOOR + 4, 10.5), fr), rgb(190, 225, 255), 0.6, 9)
+    -- (v3.2) one soft cold glow for the whole bank (was 2 x 0.6 / range 9)
+    point(lightAnchor("FridgeGlow", Vector3.new(x0 - 0.5, FLOOR + 4, 8), fr), rgb(170, 210, 250), 0.3, 7)
 end
 
 function MartBuilder:_checkout(f, refs, loot)
@@ -822,7 +829,7 @@ function MartBuilder:_checkout(f, refs, loot)
     -- counter (customer side faces east)
     box("CounterBody", COUNTER_X0, FLOOR, COUNTER_Z0, COUNTER_X1, topY - 0.2, COUNTER_Z1, TEAL, M.Plaster, c)
     box("CounterTop", COUNTER_X0 - 0.1, topY - 0.2, COUNTER_Z0 - 0.1, COUNTER_X1 + 0.15, topY, COUNTER_Z1 + 0.1,
-        rgb(236, 232, 226), M.Marble, c)
+        rgb(188, 182, 172), M.Marble, c)
     local front = box("CounterFront", COUNTER_X1, FLOOR + 0.6, COUNTER_Z0 + 0.3, COUNTER_X1 + 0.05, topY - 0.5, COUNTER_Z1 - 0.3,
         SUN, M.Plaster, c, nc())
     lit(printOn(front, Enum.NormalId.Right, "THANK YOU!", rgb(200, 40, 80), UITheme.F.display, 30, 1).Parent)
@@ -838,7 +845,7 @@ function MartBuilder:_checkout(f, refs, loot)
         local screen = part({ Name = "RegisterScreen", Size = Vector3.new(0.08, 0.7, 1.1),
             CFrame = CFrame.new(rx - 0.4, topY + 1.25, rz) * CFrame.Angles(0, 0, math.rad(-15)),
             Color = rgb(20, 22, 26), Material = M.Metal, CanCollide = false }, c)
-        local sg = surface(screen, Enum.NormalId.Left, 80, 1.4)
+        local sg = surface(screen, Enum.NormalId.Left, 80, 1)
         frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = rgb(10, 24, 18) }, sg)
         text({ Text = "$0.00", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
             TextXAlignment = Enum.TextXAlignment.Right, TextScaled = true, FontFace = UITheme.F.mono,
@@ -922,7 +929,7 @@ function MartBuilder:_checkout(f, refs, loot)
     -- run in 20 the SECRET STASH: a box of "frozen peas" that is really cash.
     local fx0, fx1, fz0, fz1 = IX0 + 0.1, 56, 13.4, SALES_Z1
     local fTop = FLOOR + 3
-    local FRZ = rgb(236, 244, 250)
+    local FRZ = rgb(186, 194, 200)      -- (v3.2) was 236,244,250 (white-hot)
     box("IceCreamFreezer", fx0, FLOOR, fz0, fx1, FLOOR + 1.9, fz1, FRZ, M.Metal, c)           -- body below the tubs
     box("FreezerWall", fx0, FLOOR + 1.9, fz0, fx1, fTop, fz0 + 0.2, FRZ, M.Metal, c)
     box("FreezerWall", fx0, FLOOR + 1.9, fz1 - 0.2, fx1, fTop, fz1, FRZ, M.Metal, c)
@@ -932,7 +939,7 @@ function MartBuilder:_checkout(f, refs, loot)
     box("FrostRim", fx0 + 0.2, fTop - 0.12, fz1 - 0.28, fx1 - 0.2, fTop - 0.05, fz1 - 0.2, rgb(244, 250, 255), M.Ice, c, nc())
     box("FreezerLid", IX0 + 0.2, fTop, 13.5, 55.9, fTop + 0.1, SALES_Z1 - 0.1, rgb(200, 230, 245), M.Glass, c,
         { Transparency = 0.6, Reflectance = 0.2 })
-    point(lightAnchor("FreezerGlow", Vector3.new(53.5, FLOOR + 2.6, 14.2), c), rgb(200, 230, 255), 0.5, 5, false)
+    point(lightAnchor("FreezerGlow", Vector3.new(53.5, FLOOR + 2.6, 14.2), c), rgb(200, 230, 255), 0.25, 4, false)
     local tubCols = { rgb(250, 190, 210), rgb(120, 70, 40), rgb(250, 240, 200), rgb(140, 220, 160), rgb(250, 150, 90) }
     for k = 0, 7 do
         local tx = fx0 + 0.55 + (k % 4) * 0.72
@@ -982,7 +989,7 @@ function MartBuilder:_atm(f, loot)
     box("AtmFascia", fx, FLOOR + 1.4, z0 + 0.1, x0, FLOOR + 5.3, z1 - 0.1, BRUSHED, M.Metal, a, { Reflectance = 0.12 })
     -- backlit header
     local hdr = box("AtmHeader", fx - 0.05, FLOOR + 5.5, z0, x1, FLOOR + 6.3, z1, rgb(18, 84, 186), M.Metal, a)
-    local hg = surface(hdr, Enum.NormalId.Left, 40, 1.6)
+    local hg = surface(hdr, Enum.NormalId.Left, 40, 1)
     text({ Text = "ATM", Size = UDim2.fromScale(0.5, 0.8), Position = UDim2.fromScale(0.05, 0.1), TextScaled = true,
         FontFace = UITheme.F.display, TextColor3 = rgb(255, 255, 255) }, hg)
     text({ Text = "CASH 24/7", Size = UDim2.fromScale(0.4, 0.4), Position = UDim2.fromScale(0.56, 0.3), TextScaled = true,
@@ -990,7 +997,7 @@ function MartBuilder:_atm(f, loot)
     -- the screen, recessed under a little privacy hood
     local zc = (z0 + z1) / 2
     local scr = box("AtmScreen", fx - 0.02, FLOOR + 3.7, zc - 0.55, fx, FLOOR + 4.7, zc + 0.35, rgb(10, 20, 40), M.Glass, a, nc())
-    local sg = surface(scr, Enum.NormalId.Left, 60, 1.3)
+    local sg = surface(scr, Enum.NormalId.Left, 60, 0.9)
     local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1) }, sg)
     local grad = Instance.new("UIGradient")
     grad.Rotation = 90
@@ -1000,7 +1007,7 @@ function MartBuilder:_atm(f, loot)
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextColor3 = rgb(255, 214, 120) }, sg)
     text({ Text = "PLEASE TAKE YOUR CASH", Size = UDim2.fromScale(0.9, 0.18), Position = UDim2.fromScale(0.05, 0.56), TextScaled = true,
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextColor3 = rgb(255, 255, 255) }, sg)
-    point(scr, rgb(120, 170, 255), 0.6, 8, false)
+    point(scr, rgb(120, 170, 255), 0.3, 5, false)
     box("HoodTop", fx - 0.4, FLOOR + 4.7, zc - 0.62, fx, FLOOR + 4.78, zc + 0.42, GRAPHITE, M.Metal, a, nc())
     box("HoodSide", fx - 0.4, FLOOR + 3.7, zc - 0.62, fx, FLOOR + 4.78, zc - 0.56, GRAPHITE, M.Metal, a, nc())
     box("HoodSide", fx - 0.4, FLOOR + 3.7, zc + 0.36, fx, FLOOR + 4.78, zc + 0.42, GRAPHITE, M.Metal, a, nc())
@@ -1067,23 +1074,36 @@ function MartBuilder:_salesFloor(f, refs, loot)
     table.insert(refs.hideSpots, bigBox)
 
     -- ceiling tubes: three long rows of troffers down the aisles (v2.0.2: they
-    -- no longer overlap; v3.1 dimmer + tighter for Future lighting). Bright over the aisles, dimmer at the back, aisle 2's
-    -- dead tube = the dark aisle. Two tubes are key lights (shadows).
+    -- no longer overlap; v3.1 dimmer + tighter for Future lighting). Aisle 2's
+    -- dead tube = the dark aisle.
+    -- (v3.2 LIGHTING) Studio showed the floor still blown out, so the budget is
+    -- now 2 KEY lights (middle row, shadows) + 2 dim front fills + 1 faint back
+    -- fill. The other 3 fixtures glow (dim lens) but cast nothing, so there are
+    -- pools with darker floor between them and the guard cones read.
+    local LIGHT = {
+        ["57.5,8.6"] = { 0.42, 12, true }, ["69,8.6"] = { 0.42, 12, true },     -- keys
+        ["57.5,4.2"] = { 0.18, 9 },        ["69,4.2"] = { 0.18, 9 },            -- front fills
+        ["63.5,13"] = { 0.12, 8 },                                              -- back fill
+    }
     for _, tx in ipairs({ 57.5, 63.5, 69 }) do
         for _, tz in ipairs({ 4.2, 8.6, 13.0 }) do
             local dead = (tx == 63.5 and tz == 8.6)
-            local key = (tz == 8.6 and tx ~= 63.5)
-            tubeLight(s, tx, tz, false, (tz == 13.0) and 0.35 or 0.55, 11, not dead, 4.0, key)
+            local l = LIGHT[tostring(tx) .. "," .. tostring(tz)] or { 0 }
+            tubeLight(s, tx, tz, false, l[1], l[2] or 8, not dead, 4.0, l[3] == true, nil, SALES_LENS)
         end
     end
+    -- (v3.2) the lemon shell showed through on the inside of both side walls:
+    -- line them above the wainscot in a darker warm grey
+    box("WallLining", IX0, FLOOR + 3, IZ0, IX0 + 0.05, CEIL, SALES_Z1, SALES_WALL, M.Plaster, s, nc())
+    box("WallLining", IX1 - 0.05, FLOOR + 3, IZ0, IX1, CEIL, SALES_Z1, SALES_WALL, M.Plaster, s, nc())
 
     -- (v2.0.2) floor: darker tile runners down the aisles + a teal band at the fridges
-    local RUNNER = rgb(170, 172, 176)
+    local RUNNER = rgb(112, 114, 118)
     box("AisleRunner", COUNTER_X1 + 0.6, FLOOR, GOND_Z0, GONDOLAS[1][1] - 0.4, FLOOR + 0.02, GOND_Z1, RUNNER, M.CeramicTiles, s, nc())
-    box("AisleRunner", GONDOLAS[1][2] + 0.4, FLOOR, GOND_Z0, GONDOLAS[2][1] - 0.4, FLOOR + 0.02, GOND_Z1, rgb(120, 122, 128),
+    box("AisleRunner", GONDOLAS[1][2] + 0.4, FLOOR, GOND_Z0, GONDOLAS[2][1] - 0.4, FLOOR + 0.02, GOND_Z1, rgb(84, 86, 92),
         M.CeramicTiles, s, nc())
     box("AisleRunner", GONDOLAS[2][2] + 0.4, FLOOR, GOND_Z0, FRIDGE_X0 - 2.2, FLOOR + 0.02, GOND_Z1, RUNNER, M.CeramicTiles, s, nc())
-    box("FridgeBand", FRIDGE_X0 - 2, FLOOR, 3, FRIDGE_X0, FLOOR + 0.02, 13, TEAL, M.CeramicTiles, s, nc())
+    box("FridgeBand", FRIDGE_X0 - 2, FLOOR, 3, FRIDGE_X0, FLOOR + 0.02, 13, rgb(16, 104, 104), M.CeramicTiles, s, nc())
 
     -- (v2.0.2) back wall: black cove base on the mint wainscot + two promo posters
     box("CoveBase", IX0, FLOOR, SALES_Z1 - 0.16, CURTAIN_X0, FLOOR + 0.5, SALES_Z1 - 0.1, rgb(26, 26, 30), M.Rubber, s, nc())
@@ -1092,7 +1112,7 @@ function MartBuilder:_salesFloor(f, refs, loot)
     box("WainscotCap", CURTAIN_X1, FLOOR + 3, SALES_Z1 - 0.18, IX1, FLOOR + 3.2, SALES_Z1, TEAL, M.Plaster, s, nc())
     -- (v3.0) the SLUSH! poster rides above the new ATM's header
     for _, pp in ipairs({ { 52.2, 57, "HOT DOGS\n$1.99", SUN_DEEP, 5.6 }, { 70.9, 72.9, "SLUSH!", CYAN, 6.9 } }) do
-        local po = box("PromoPoster", pp[1], FLOOR + pp[5], SALES_Z1 - 0.06, pp[2], FLOOR + pp[5] + 3.8, SALES_Z1, rgb(250, 248, 240), M.Fabric, s, nc())
+        local po = box("PromoPoster", pp[1], FLOOR + pp[5], SALES_Z1 - 0.06, pp[2], FLOOR + pp[5] + 3.8, SALES_Z1, rgb(214, 210, 198), M.Fabric, s, nc())
         local pg = lit(surface(po, Enum.NormalId.Front, 30, 1))
         frame({ Size = UDim2.fromScale(1, 0.18), BackgroundColor3 = pp[4] }, pg)
         text({ Text = pp[3], Size = UDim2.fromScale(0.9, 0.7), Position = UDim2.fromScale(0.05, 0.24),

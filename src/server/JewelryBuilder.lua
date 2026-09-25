@@ -203,6 +203,10 @@ local BOH_DARK  = rgb(96, 90, 102)
 local VELVET    = rgb(112, 18, 70)
 local VELVET_2  = rgb(38, 22, 70)
 local MIRROR    = rgb(206, 210, 224)
+-- (v3.2 LIGHTING) showroom: Studio showed a pink/white bloom. Mirrors are
+-- smoked (less light bounced back), can lenses dimmer, pale stone a notch down.
+local SMOKED_MIRROR = rgb(120, 116, 134)
+local CAN_LENS  = rgb(196, 160, 124)
 local BRASS     = rgb(212, 172, 92)
 local GOLD      = rgb(240, 192, 64)
 local STEEL     = rgb(58, 62, 70)
@@ -430,11 +434,13 @@ local function lightAnchor(name, pos, parent)
 end
 
 -- ceiling can light: small black can + warm lens + a tight spotlight straight down
-local function canLight(parent, x, z, color, brightness, angle, shadows)
+-- (v3.2) optional range + lens colour; the showroom passes a dimmer lens so a
+-- dozen cans don't bloom. Defaults are unchanged (the safe room uses them).
+local function canLight(parent, x, z, color, brightness, angle, shadows, range, lens)
     local can = box("CanLight", x - 0.45, CEIL - 0.3, z - 0.45, x + 0.45, CEIL, z + 0.45, STEEL_DK, M.Metal, parent, nc())
-    box("CanLens", x - 0.3, CEIL - 0.34, z - 0.3, x + 0.3, CEIL - 0.3, z + 0.3, color or WARM, M.Neon, parent,
+    box("CanLens", x - 0.3, CEIL - 0.34, z - 0.3, x + 0.3, CEIL - 0.3, z + 0.3, lens or color or WARM, M.Neon, parent,
         nc({ CastShadow = false }))
-    spot(can, Enum.NormalId.Bottom, color or WARM, brightness or 3, 19, angle or 44, shadows)
+    spot(can, Enum.NormalId.Bottom, color or WARM, brightness or 3, range or 19, angle or 44, shadows)
     return can
 end
 
@@ -553,7 +559,7 @@ end
 -- ──────────────────────────────────────────────
 function JewelryBuilder:_shell(f)
     -- floors (one finish per room)
-    box("FloorShowroom", X0, 0, Z0, X1, FLOOR, 16.5, rgb(34, 26, 40), M.Marble, f, { Reflectance = 0.08 })
+    box("FloorShowroom", X0, 0, Z0, X1, FLOOR, 16.5, rgb(92, 76, 96), M.Marble, f, { Reflectance = 0.03 })   -- (v3.2) mid-tone plum
     box("FloorSecure", X0, 0, 16.5, -67.5, FLOOR, Z1, rgb(76, 79, 86), M.DiamondPlate, f)
     box("FloorHall", -67.5, 0, 16.5, -56.5, FLOOR, Z1, rgb(132, 128, 124), M.Slate, f)
     box("FloorOffice", -56.5, 0, 16.5, X1, FLOOR, OB_Z0 + 0.5, rgb(78, 44, 66), M.Carpet, f)
@@ -667,10 +673,10 @@ function JewelryBuilder:_facade(f)
         -- busts + glass hoods on top are loot, built in _windowNecklaces.
         for k = 1, 2 do
             local px = b0 + (b1 - b0) * (k == 1 and 0.28 or 0.72)
-            box("WindowPlinth", px - 0.9, FLOOR, 0.3, px + 0.9, FLOOR + 2.4, 1.5, rgb(236, 226, 230), M.Marble, fa)
+            box("WindowPlinth", px - 0.9, FLOOR, 0.3, px + 0.9, FLOOR + 2.4, 1.5, rgb(176, 164, 170), M.Marble, fa)
             box("PlinthCap", px - 1.0, FLOOR + 2.4, 0.2, px + 1.0, FLOOR + 2.55, 1.6, BRASS, M.Metal, fa)
             spot(lightAnchor("PlinthLight", Vector3.new(px, WIN_TOP - 0.5, 0.9), fa), Enum.NormalId.Bottom,
-                WARM, 1.6, 14, 30)
+                WARM, 1.0, 10, 30)      -- (v3.2) was 1.6 / 14
         end
     end
 
@@ -838,7 +844,7 @@ function JewelryBuilder:_walls(f)
             if k % 2 == 1 then
                 box("VelvetPanel", xa, FLOOR + 0.7, z, xb, FLOOR + 11, z + wd, VELVET, M.Fabric, f)
             else
-                box("MirrorPanel", xa, FLOOR + 0.7, z, xb, FLOOR + 11, z + wd, MIRROR, M.Glass, f, { Reflectance = 0.6 })
+                box("MirrorPanel", xa, FLOOR + 0.7, z, xb, FLOOR + 11, z + wd, SMOKED_MIRROR, M.Glass, f, { Reflectance = 0.22 })
             end
             z = z + wd
             box("PanelFrame", xa, FLOOR + 0.7, z, xw - side * 0.22, FLOOR + 11, z + 0.2, BRASS, M.Metal, f)
@@ -847,7 +853,7 @@ function JewelryBuilder:_walls(f)
         box("PanelRailTop", xa, FLOOR + 11, 0.4, xw - side * 0.22, FLOOR + 11.2, z, BRASS, M.Metal, f)
         box("PanelRailLow", xa, FLOOR + 0.5, 0.4, xw - side * 0.22, FLOOR + 0.7, z, BRASS, M.Metal, f)
         -- thin pink kick-strip (glow only — no light, so the floor stays dark between pools)
-        box("BaseNeon", xw - side * 0.17, FLOOR, 0.3, xw - side * 0.29, FLOOR + 0.12, 15.7, HOT_PINK,
+        box("BaseNeon", xw - side * 0.17, FLOOR, 0.3, xw - side * 0.29, FLOOR + 0.12, 15.7, rgb(196, 44, 136),
             M.Neon, f, nc({ CastShadow = false }))
 
         -- (v2.0.2) brass wall sconces between the wall cases: small warm pools up the walls
@@ -856,18 +862,18 @@ function JewelryBuilder:_walls(f)
             local plate = box("SconcePlate", sx, FLOOR + 7.6, sz - 0.35, sx - side * 0.12, FLOOR + 9.4, sz + 0.35,
                 BRASS, M.Metal, f, nc())
             box("SconceShade", sx - side * 0.12, FLOOR + 8.1, sz - 0.3, sx - side * 0.62, FLOOR + 8.9, sz + 0.3,
-                rgb(255, 226, 190), M.Glass, f, nc({ Transparency = 0.2, CastShadow = false }))
+                rgb(214, 180, 146), M.Glass, f, nc({ Transparency = 0.2, CastShadow = false }))
             point(plate, rgb(255, 196, 150), 0.8, 9, false)
         end
     end
 
     -- (v2.0.2) light marble border + brass inlay round the showroom floor
-    local BORDER = rgb(214, 200, 212)
+    local BORDER = rgb(150, 136, 148)     -- (v3.2) was 214,200,212
     local fz1 = SHOW_Z1 - 0.1
-    box("FloorBorder", IX0, FLOOR, IZ0, IX1, FLOOR + 0.02, IZ0 + 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
-    box("FloorBorder", IX0, FLOOR, fz1 - 1.2, IX1, FLOOR + 0.02, fz1, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
-    box("FloorBorder", IX0, FLOOR, IZ0 + 1.2, IX0 + 1.2, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
-    box("FloorBorder", IX1 - 1.2, FLOOR, IZ0 + 1.2, IX1, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.1 }))
+    box("FloorBorder", IX0, FLOOR, IZ0, IX1, FLOOR + 0.02, IZ0 + 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.04 }))
+    box("FloorBorder", IX0, FLOOR, fz1 - 1.2, IX1, FLOOR + 0.02, fz1, BORDER, M.Marble, f, nc({ Reflectance = 0.04 }))
+    box("FloorBorder", IX0, FLOOR, IZ0 + 1.2, IX0 + 1.2, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.04 }))
+    box("FloorBorder", IX1 - 1.2, FLOOR, IZ0 + 1.2, IX1, FLOOR + 0.02, fz1 - 1.2, BORDER, M.Marble, f, nc({ Reflectance = 0.04 }))
     box("FloorInlay", IX0 + 1.2, FLOOR, IZ0 + 1.2, IX1 - 1.2, FLOOR + 0.03, IZ0 + 1.35, BRASS, M.Metal, f, nc())
     box("FloorInlay", IX0 + 1.2, FLOOR, fz1 - 1.35, IX1 - 1.2, FLOOR + 0.03, fz1 - 1.2, BRASS, M.Metal, f, nc())
     box("FloorInlay", IX0 + 1.2, FLOOR, IZ0 + 1.35, IX0 + 1.35, FLOOR + 0.03, fz1 - 1.35, BRASS, M.Metal, f, nc())
@@ -895,7 +901,7 @@ function JewelryBuilder:_walls(f)
     box("Cornice", IX1 - 0.2, CEIL - 0.3, IZ0, IX1, CEIL, SHOW_Z1, BRASS, M.Metal, f, nc())
     part({ Name = "CeilingMedallion", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.1, 5.4, 5.4),
         CFrame = CFrame.new(CX, CEIL - 0.05, CAGE_Z) * CFrame.Angles(0, 0, math.rad(90)),
-        Color = STUCCO, Material = M.Plaster, CanCollide = false }, f)
+        Color = rgb(150, 126, 142), Material = M.Plaster, CanCollide = false }, f)
 
     -- archway to the back hall: brass frame + STAFF ONLY plaque
     box("ArchTrimW", ARCH_X0 - 0.3, FLOOR, SHOW_Z1 - 0.2, ARCH_X0, ARCH_TOP + 0.3, SHOW_Z1, BRASS, M.Metal, f)
@@ -947,7 +953,7 @@ function JewelryBuilder:_chandelier(f, x, z)
         local a = (i + 0.5) * math.pi / 4
         part({ Name = "Bulb", Shape = Enum.PartType.Ball, Size = Vector3.new(0.3, 0.3, 0.3),
             Position = Vector3.new(x + 2.4 * math.cos(a), y0 + 0.22, z + 2.4 * math.sin(a)),
-            Color = WARM, Material = M.Neon, CanCollide = false, CastShadow = false }, c)
+            Color = rgb(214, 158, 104), Material = M.Neon, CanCollide = false, CastShadow = false }, c)
     end
     local pendant = part({ Name = "Pendant", Size = Vector3.new(0.6, 0.6, 0.6),
         CFrame = CFrame.new(x, y0 - 1.4, z) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
@@ -955,14 +961,15 @@ function JewelryBuilder:_chandelier(f, x, z)
         CanCollide = false, CastShadow = false }, c)
     -- (v2.0.2) the one big key light in the showroom: shadows on, a bit dimmer
     -- so the case spots read as bright pools
-    point(pendant, rgb(255, 214, 170), 1.0, 22, true)
+    -- (v3.2) the room's KEY light: 0.6 / range 16 (was 1.0 / 22), shadows on
+    point(pendant, rgb(255, 206, 160), 1.0, 22, true)
 end
 
 function JewelryBuilder:_counter(f)
     -- sales counter along the back-west wall, facing the showroom
     local x0, x1, z0, z1 = -80, -70, 13.6, 15.3
     local topY = FLOOR + 3.2
-    box("CounterBody", x0, FLOOR, z0, x1, topY, z1, rgb(236, 214, 226), M.Marble, f)
+    box("CounterBody", x0, FLOOR, z0, x1, topY, z1, rgb(168, 146, 160), M.Marble, f)
     box("CounterKick", x0 + 0.1, FLOOR, z0 - 0.08, x1 - 0.1, FLOOR + 0.3, z0, BRASS, M.Metal, f)
     for k = 0, 6 do
         local fx = x0 + 0.7 + k * ((x1 - x0 - 1.4) / 6)
@@ -976,7 +983,7 @@ function JewelryBuilder:_counter(f)
     local screen = part({ Name = "RegisterScreen", Size = Vector3.new(1.2, 0.65, 0.08),
         CFrame = CFrame.new(-71.6, ty + 1.05, 14.7) * CFrame.Angles(math.rad(18), 0, 0),
         Color = rgb(20, 22, 26), Material = M.Metal, CanCollide = false }, f)
-    local sg = surface(screen, Enum.NormalId.Front, 80, 1.4)
+    local sg = surface(screen, Enum.NormalId.Front, 80, 1)
     frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = rgb(10, 24, 18) }, sg)
     text({ Text = "$0.00", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
         TextXAlignment = Enum.TextXAlignment.Right, TextScaled = true, FontFace = UITheme.F.mono,
@@ -991,8 +998,8 @@ function JewelryBuilder:_counter(f)
 
     -- mirror wall behind the counter
     local mx0, mx1, my0, my1 = -80, -70, 4.8, 12
-    local mirror = box("CounterMirror", mx0, my0, SHOW_Z1 - 0.12, mx1, my1, SHOW_Z1, MIRROR, M.Glass, f,
-        { Reflectance = 0.6 })
+    local mirror = box("CounterMirror", mx0, my0, SHOW_Z1 - 0.12, mx1, my1, SHOW_Z1, SMOKED_MIRROR, M.Glass, f,
+        { Reflectance = 0.25 })
     box("MirrorFrame", mx0 - 0.15, my1, SHOW_Z1 - 0.18, mx1 + 0.15, my1 + 0.15, SHOW_Z1, BRASS, M.Metal, f, nc())
     box("MirrorFrame", mx0 - 0.15, my0 - 0.15, SHOW_Z1 - 0.18, mx1 + 0.15, my0, SHOW_Z1, BRASS, M.Metal, f, nc())
     box("MirrorFrame", mx0 - 0.15, my0, SHOW_Z1 - 0.18, mx0, my1, SHOW_Z1, BRASS, M.Metal, f, nc())
@@ -1002,8 +1009,8 @@ function JewelryBuilder:_counter(f)
         TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, TextTransparency = 0.15,
         FontFace = Font.new("rbxasset://fonts/families/Kalam.json", Enum.FontWeight.Bold),
         TextColor3 = rgb(222, 180, 96) }, mg)
-    canLight(f, -77.5, 14.5, WARM, 2.4, 40)
-    canLight(f, -72.5, 14.5, WARM, 2.4, 40)
+    canLight(f, -77.5, 14.5, WARM, 2.4, 40, false, 19, CAN_LENS)
+    canLight(f, -72.5, 14.5, WARM, 2.4, 40, false, 19, CAN_LENS)
 
     -- keycard spot: west end of the counter top
     return CFrame.new(-78.4, ty, 14.45)
@@ -1024,7 +1031,7 @@ function JewelryBuilder:_lounge(f, refs)
     local px, pz = -48.2, 13.9
     local pot = part({ Name = "BigPlant", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.2, 2, 2),
         CFrame = CFrame.new(px, FLOOR + 1.1, pz) * CFrame.Angles(0, 0, math.rad(90)),
-        Color = rgb(236, 226, 230), Material = M.Marble }, f)
+        Color = rgb(176, 164, 170), Material = M.Marble }, f)
     box("PotBand", px - 1.05, FLOOR + 1.7, pz - 1.05, px + 1.05, FLOOR + 1.9, pz + 1.05, BRASS, M.Metal, f, nc())
     bar("PalmTrunk", Vector3.new(px, FLOOR + 2, pz), Vector3.new(px - 0.2, FLOOR + 5.6, pz + 0.1), 0.35,
         rgb(110, 84, 58), M.Wood, f, nc())
@@ -1206,8 +1213,10 @@ function JewelryBuilder:_case(f, i, centre, faceDir)
 
     -- (v2.0.2) glam spotlighting: a tight, bright pool on every case (the four
     -- island faces cast shadows) + a cool glow inside the glass so the stones sparkle
-    canLight(f, centre.X, centre.Z, rgb(255, 238, 220), 4.5, 26, i == 3 or i == 4)
-    point(glass, rgb(226, 236, 255), 0.9, 4.5, false)
+    -- (v3.2 LIGHTING) 2.0 / range 13 (was 4.5 / 19) + a much fainter inner glow:
+    -- still the brightest pools in the room, but they no longer bloom
+    canLight(f, centre.X, centre.Z, rgb(255, 232, 206), 4.0, 26, i == 3 or i == 4, 19, CAN_LENS)
+    point(glass, rgb(226, 236, 255), 0.7, 4.5, false)
 
     local stand = lp(0, 3, -(HZ + 1.9))
     return {
@@ -1292,7 +1301,7 @@ function JewelryBuilder:_necklaceBust(f, name, p0, face, toPlayer, style)
         end
     end
     -- a glint inside the hood (goes dark with the necklace)
-    point(lightAnchor("NecklaceGlint", lp(0, 1.2, -0.6), nk), rgb(255, 240, 250), 0.6, 4, false)
+    point(lightAnchor("NecklaceGlint", lp(0, 1.2, -0.6), nk), rgb(255, 240, 250), 0.3, 3.5, false)
 
     -- the glass hood with a brass frame; 4 screws on the thief's side
     local hx, hz, top = 0.8, 0.6, 2.5
@@ -1395,7 +1404,7 @@ function JewelryBuilder:_pinkDiamond(f, loot)
     local heart = part({ Name = "Heart", Shape = Enum.PartType.Ball, Size = Vector3.new(0.34, 0.34, 0.34),
         Position = Vector3.new(x, gy - 0.1, z), Color = HOT_PINK, Material = M.Neon, CastShadow = false }, dm)
     weldTo(turn, heart)
-    point(heart, rgb(255, 120, 200), 1.3, 9, false)
+    point(heart, rgb(255, 120, 200), 0.6, 6, false)      -- (v3.2) was 1.3 / 9 (the pink bloom)
     -- four gold prongs from the cushion up to the girdle
     for k = 0, 3 do
         local a = k * math.pi / 2 + math.pi / 4
@@ -1404,7 +1413,7 @@ function JewelryBuilder:_pinkDiamond(f, loot)
         weldTo(turn, bar("Prong", p0, p1, 0.06, GOLD, M.Metal, dm, { Reflectance = 0.4, CastShadow = false }))
     end
     -- a tight pink-white spot from the ceiling (the chandelier hangs just above)
-    canLight(g, x, z, rgb(255, 236, 246), 4, 22, true)
+    canLight(g, x, z, rgb(255, 236, 246), 3.6, 22, true, 19, CAN_LENS)      -- (v3.2) was 4 / range 19
 
     -- stand at the column's north face (inside the cage: you have to go in)
     local stand = Vector3.new(x, FLOOR + 3, z - 1.95)
