@@ -1,0 +1,706 @@
+{
+  "factory/arrow": {
+    "assetId": 136468770290383,
+    "moderation": "Approved"
+  },
+  "factory/arrow-basic": {
+    "assetId": 86894680127742,
+    "moderation": "Approved"
+  },
+  "factory/arrow-basic-rounded": {
+    "assetId": 115661874596199,
+    "moderation": "Approved"
+  },
+  "factory/arrow-rounded": {
+    "assetId": 90061598679621,
+    "moderation": "Approved"
+  },
+  "factory/box-large": {
+    "assetId": 118503033202875,
+    "moderation": "Approved"
+  },
+  "factory/box-long": {
+    "assetId": 95971733706548,
+    "moderation": "Approved"
+  },
+  "factory/box-small": {
+    "assetId": 122215157127517,
+    "moderation": "Approved"
+  },
+  "factory/box-wide": {
+    "assetId": 104090568781366,
+    "moderation": "Approved"
+  },
+  "factory/button-floor-round": {
+    "assetId": 83327364213373,
+    "moderation": "Approved"
+  },
+  "factory/button-floor-round-small": {
+    "assetId": 119098113390337,
+    "moderation": "Approved"
+  },
+  "factory/button-floor-square": {
+    "assetId": 101020155335463,
+    "moderation": "Approved"
+  },
+  "factory/button-floor-square-small": {
+    "assetId": 111380557693645,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-corner": {
+    "assetId": 80400810046304,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-cross": {
+    "assetId": 88340427403292,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-junction": {
+    "assetId": 87879169120454,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-stairs": {
+    "assetId": 82839421700546,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-stairs-loop": {
+    "assetId": 111704439934461,
+    "moderation": "Approved"
+  },
+  "factory/catwalk-straight": {
+    "assetId": 81975858766061,
+    "moderation": "Approved"
+  },
+  "factory/cog-a": {
+    "assetId": 86276894073318,
+    "moderation": "Approved"
+  },
+  "factory/cog-b": {
+    "assetId": 122034650353900,
+    "moderation": "Approved"
+  },
+  "factory/cog-c": {
+    "assetId": 97479132316206,
+    "moderation": "Approved"
+  },
+  "factory/cog-d": {
+    "assetId": 89801268206881,
+    "moderation": "Approved"
+  },
+  "factory/cog-e": {
+    "assetId": 106681298529492,
+    "moderation": "Approved"
+  },
+  "factory/cone": {
+    "assetId": 125116735505234,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars": {
+    "assetId": 73631986752021,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-fence": {
+    "assetId": 122247947257960,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-fence-slope": {
+    "assetId": 94817417528887,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-high": {
+    "assetId": 109684672475121,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-high-slope": {
+    "assetId": 89021049084521,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-sides": {
+    "assetId": 94813644106365,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe": {
+    "assetId": 75312654835658,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe-fence": {
+    "assetId": 102470231522816,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe-fence-slope": {
+    "assetId": 123831815275579,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe-high": {
+    "assetId": 96663707552912,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe-high-slope": {
+    "assetId": 79593858635469,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-bars-stripe-side": {
+    "assetId": 80739081378107,
+    "moderation": "Approved"
+  },
+  "furniture/bathroomCabinet": {
+    "assetId": 132463685358398,
+    "moderation": "Approved"
+  },
+  "furniture/bathroomCabinetDrawer": {
+    "assetId": 91236107966137,
+    "moderation": "Approved"
+  },
+  "furniture/bathroomMirror": {
+    "assetId": 101521291201479,
+    "moderation": "Approved"
+  },
+  "furniture/bathroomSink": {
+    "assetId": 110944488561646,
+    "moderation": "Approved"
+  },
+  "furniture/bathroomSinkSquare": {
+    "assetId": 102957063220619,
+    "moderation": "Approved"
+  },
+  "furniture/bathtub": {
+    "assetId": 102198616580583,
+    "moderation": "Approved"
+  },
+  "furniture/bear": {
+    "assetId": 78382567602128,
+    "moderation": "Approved"
+  },
+  "furniture/bedBunk": {
+    "assetId": 102061618440805,
+    "moderation": "Approved"
+  },
+  "furniture/bedDouble": {
+    "assetId": 116885666169663,
+    "moderation": "Approved"
+  },
+  "furniture/bedSingle": {
+    "assetId": 127271465145794,
+    "moderation": "Approved"
+  },
+  "furniture/bench": {
+    "assetId": 81836639811732,
+    "moderation": "Approved"
+  },
+  "furniture/benchCushion": {
+    "assetId": 92237176701433,
+    "moderation": "Approved"
+  },
+  "furniture/benchCushionLow": {
+    "assetId": 93041053810645,
+    "moderation": "Approved"
+  },
+  "furniture/bookcaseClosed": {
+    "assetId": 73706290046299,
+    "moderation": "Approved"
+  },
+  "furniture/bookcaseClosedDoors": {
+    "assetId": 87815184308156,
+    "moderation": "Approved"
+  },
+  "furniture/bookcaseClosedWide": {
+    "assetId": 104201001340096,
+    "moderation": "Approved"
+  },
+  "furniture/bookcaseOpen": {
+    "assetId": 120959362950300,
+    "moderation": "Approved"
+  },
+  "furniture/bookcaseOpenLow": {
+    "assetId": 132131359406337,
+    "moderation": "Approved"
+  },
+  "furniture/books": {
+    "assetId": 120761971505154,
+    "moderation": "Approved"
+  },
+  "furniture/cabinetBed": {
+    "assetId": 75137079212782,
+    "moderation": "Approved"
+  },
+  "furniture/cabinetBedDrawer": {
+    "assetId": 137956013799088,
+    "moderation": "Approved"
+  },
+  "furniture/cabinetBedDrawerTable": {
+    "assetId": 106657388946173,
+    "moderation": "Approved"
+  },
+  "furniture/cabinetTelevision": {
+    "assetId": 129907724904432,
+    "moderation": "Approved"
+  },
+  "furniture/cabinetTelevisionDoors": {
+    "assetId": 137390440065394,
+    "moderation": "Approved"
+  },
+  "furniture/cardboardBoxClosed": {
+    "assetId": 139732906192802,
+    "moderation": "Approved"
+  },
+  "furniture/cardboardBoxOpen": {
+    "assetId": 82063472783709,
+    "moderation": "Approved"
+  },
+  "furniture/ceilingFan": {
+    "assetId": 71777691188771,
+    "moderation": "Approved"
+  },
+  "furniture/chair": {
+    "assetId": 100878419730482,
+    "moderation": "Approved"
+  },
+  "furniture/chairCushion": {
+    "assetId": 89675031137585,
+    "moderation": "Approved"
+  },
+  "furniture/chairDesk": {
+    "assetId": 92508959301714,
+    "moderation": "Approved"
+  },
+  "furniture/chairModernCushion": {
+    "assetId": 132310652275771,
+    "moderation": "Approved"
+  },
+  "furniture/chairModernFrameCushion": {
+    "assetId": 84477425968015,
+    "moderation": "Approved"
+  },
+  "furniture/chairRounded": {
+    "assetId": 79046985035782,
+    "moderation": "Approved"
+  },
+  "furniture/coatRack": {
+    "assetId": 109670467069381,
+    "moderation": "Approved"
+  },
+  "furniture/coatRackStanding": {
+    "assetId": 95975898167845,
+    "moderation": "Approved"
+  },
+  "furniture/computerKeyboard": {
+    "assetId": 81099946426442,
+    "moderation": "Approved"
+  },
+  "furniture/computerMouse": {
+    "assetId": 131476311046037,
+    "moderation": "Approved"
+  },
+  "furniture/computerScreen": {
+    "assetId": 108174962205982,
+    "moderation": "Approved"
+  },
+  "furniture/desk": {
+    "assetId": 108470551669951,
+    "moderation": "Approved"
+  },
+  "furniture/deskCorner": {
+    "assetId": 95463734350913,
+    "moderation": "Approved"
+  },
+  "furniture/doorway": {
+    "assetId": 138494058264889,
+    "moderation": "Approved"
+  },
+  "furniture/doorwayFront": {
+    "assetId": 95604707062685,
+    "moderation": "Approved"
+  },
+  "furniture/doorwayOpen": {
+    "assetId": 82387297129259,
+    "moderation": "Approved"
+  },
+  "furniture/dryer": {
+    "assetId": 134270414036069,
+    "moderation": "Approved"
+  },
+  "furniture/floorCorner": {
+    "assetId": 116919544933073,
+    "moderation": "Approved"
+  },
+  "furniture/floorCornerRound": {
+    "assetId": 102658437032260,
+    "moderation": "Approved"
+  },
+  "furniture/floorFull": {
+    "assetId": 134024188597431,
+    "moderation": "Approved"
+  },
+  "furniture/floorHalf": {
+    "assetId": 85313081909148,
+    "moderation": "Approved"
+  },
+  "furniture/hoodLarge": {
+    "assetId": 119787734344168,
+    "moderation": "Approved"
+  },
+  "furniture/hoodModern": {
+    "assetId": 122586638132624,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenBar": {
+    "assetId": 81519705730193,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenBarEnd": {
+    "assetId": 115406966776466,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenBlender": {
+    "assetId": 76972278648015,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinet": {
+    "assetId": 87456334263843,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetCornerInner": {
+    "assetId": 109227804004438,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetCornerRound": {
+    "assetId": 111280085677907,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetDrawer": {
+    "assetId": 98043233457691,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetUpper": {
+    "assetId": 115955696058356,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetUpperCorner": {
+    "assetId": 140133750520210,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetUpperDouble": {
+    "assetId": 86991024391068,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCabinetUpperLow": {
+    "assetId": 125685470177574,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenCoffeeMachine": {
+    "assetId": 112018827975833,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenFridge": {
+    "assetId": 122614216872453,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenFridgeBuiltIn": {
+    "assetId": 72911669021881,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenFridgeLarge": {
+    "assetId": 110877855156755,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenFridgeSmall": {
+    "assetId": 77109021707587,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenMicrowave": {
+    "assetId": 134514377546953,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenSink": {
+    "assetId": 96220831350450,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenStove": {
+    "assetId": 137778410665020,
+    "moderation": "Approved"
+  },
+  "furniture/kitchenStoveElectric": {
+    "assetId": 126543030494462,
+    "moderation": "Approved"
+  },
+  "furniture/lampRoundFloor": {
+    "assetId": 100164160507117,
+    "moderation": "Approved"
+  },
+  "furniture/lampRoundTable": {
+    "assetId": 122329668223366,
+    "moderation": "Approved"
+  },
+  "furniture/lampSquareCeiling": {
+    "assetId": 136478614066183,
+    "moderation": "Approved"
+  },
+  "furniture/lampSquareFloor": {
+    "assetId": 117680620854522,
+    "moderation": "Approved"
+  },
+  "furniture/lampSquareTable": {
+    "assetId": 72154329117891,
+    "moderation": "Approved"
+  },
+  "furniture/lampWall": {
+    "assetId": 101052772350784,
+    "moderation": "Approved"
+  },
+  "furniture/laptop": {
+    "assetId": 85777097782140,
+    "moderation": "Approved"
+  },
+  "furniture/loungeChair": {
+    "assetId": 101007672350048,
+    "moderation": "Approved"
+  },
+  "furniture/loungeChairRelax": {
+    "assetId": 82084024610406,
+    "moderation": "Approved"
+  },
+  "furniture/loungeDesignChair": {
+    "assetId": 82571606166585,
+    "moderation": "Approved"
+  },
+  "furniture/loungeDesignSofa": {
+    "assetId": 85812075315389,
+    "moderation": "Approved"
+  },
+  "furniture/loungeDesignSofaCorner": {
+    "assetId": 74562214892183,
+    "moderation": "Approved"
+  },
+  "furniture/loungeSofa": {
+    "assetId": 110359722081476,
+    "moderation": "Approved"
+  },
+  "furniture/loungeSofaCorner": {
+    "assetId": 131789881160473,
+    "moderation": "Approved"
+  },
+  "furniture/loungeSofaLong": {
+    "assetId": 74999758310111,
+    "moderation": "Approved"
+  },
+  "furniture/loungeSofaOttoman": {
+    "assetId": 73289715252895,
+    "moderation": "Approved"
+  },
+  "furniture/paneling": {
+    "assetId": 102460581007763,
+    "moderation": "Approved"
+  },
+  "furniture/pillow": {
+    "assetId": 123881772034005,
+    "moderation": "Approved"
+  },
+  "furniture/pillowBlue": {
+    "assetId": 100103437047944,
+    "moderation": "Approved"
+  },
+  "furniture/pillowBlueLong": {
+    "assetId": 135766657196464,
+    "moderation": "Approved"
+  },
+  "furniture/pillowLong": {
+    "assetId": 95262837002112,
+    "moderation": "Approved"
+  },
+  "furniture/plantSmall1": {
+    "assetId": 94632463929975,
+    "moderation": "Approved"
+  },
+  "furniture/plantSmall2": {
+    "assetId": 79876530333177,
+    "moderation": "Approved"
+  },
+  "furniture/plantSmall3": {
+    "assetId": 73789243312026,
+    "moderation": "Approved"
+  },
+  "furniture/pottedPlant": {
+    "assetId": 114636481392993,
+    "moderation": "Approved"
+  },
+  "furniture/radio": {
+    "assetId": 112127301564404,
+    "moderation": "Approved"
+  },
+  "furniture/rugDoormat": {
+    "assetId": 125739165910156,
+    "moderation": "Approved"
+  },
+  "furniture/rugRectangle": {
+    "assetId": 94280059008483,
+    "moderation": "Approved"
+  },
+  "furniture/rugRound": {
+    "assetId": 131442876725955,
+    "moderation": "Approved"
+  },
+  "furniture/rugRounded": {
+    "assetId": 115603206742745,
+    "moderation": "Approved"
+  },
+  "furniture/rugSquare": {
+    "assetId": 127552856390461,
+    "moderation": "Approved"
+  },
+  "furniture/shower": {
+    "assetId": 73649016736489,
+    "moderation": "Approved"
+  },
+  "furniture/showerRound": {
+    "assetId": 76035066750932,
+    "moderation": "Approved"
+  },
+  "furniture/sideTable": {
+    "assetId": 96942506470364,
+    "moderation": "Approved"
+  },
+  "furniture/sideTableDrawers": {
+    "assetId": 71849027588464,
+    "moderation": "Approved"
+  },
+  "furniture/speaker": {
+    "assetId": 126770495790804,
+    "moderation": "Approved"
+  },
+  "furniture/speakerSmall": {
+    "assetId": 98826114279200,
+    "moderation": "Approved"
+  },
+  "furniture/stairs": {
+    "assetId": 86277934682800,
+    "moderation": "Approved"
+  },
+  "furniture/stairsCorner": {
+    "assetId": 106192456611173,
+    "moderation": "Approved"
+  },
+  "furniture/stairsOpen": {
+    "assetId": 137277297860758,
+    "moderation": "Approved"
+  },
+  "furniture/stairsOpenSingle": {
+    "assetId": 87978082461826,
+    "moderation": "Approved"
+  },
+  "furniture/stoolBar": {
+    "assetId": 87225239236720,
+    "moderation": "Approved"
+  },
+  "furniture/stoolBarSquare": {
+    "assetId": 128822251759051,
+    "moderation": "Approved"
+  },
+  "furniture/table": {
+    "assetId": 78768433308611,
+    "moderation": "Approved"
+  },
+  "furniture/tableCloth": {
+    "assetId": 71112641617461,
+    "moderation": "Approved"
+  },
+  "furniture/tableCoffee": {
+    "assetId": 107422137621396,
+    "moderation": "Approved"
+  },
+  "furniture/tableCoffeeGlass": {
+    "assetId": 101994672532659,
+    "moderation": "Approved"
+  },
+  "furniture/tableCoffeeGlassSquare": {
+    "assetId": 126220618731116,
+    "moderation": "Approved"
+  },
+  "furniture/tableCoffeeSquare": {
+    "assetId": 90817529373113,
+    "moderation": "Approved"
+  },
+  "furniture/tableCross": {
+    "assetId": 93411592422638,
+    "moderation": "Approved"
+  },
+  "furniture/tableCrossCloth": {
+    "assetId": 121022708661385,
+    "moderation": "Approved"
+  },
+  "furniture/tableGlass": {
+    "assetId": 118105218285942,
+    "moderation": "Approved"
+  },
+  "furniture/tableRound": {
+    "assetId": 123381196820681,
+    "moderation": "Approved"
+  },
+  "furniture/televisionAntenna": {
+    "assetId": 111495549217012,
+    "moderation": "Approved"
+  },
+  "furniture/televisionModern": {
+    "assetId": 91983606438002,
+    "moderation": "Approved"
+  },
+  "furniture/televisionVintage": {
+    "assetId": 89715301924087,
+    "moderation": "Approved"
+  },
+  "furniture/toaster": {
+    "assetId": 80627132966933,
+    "moderation": "Approved"
+  },
+  "furniture/toilet": {
+    "assetId": 120326021929087,
+    "moderation": "Approved"
+  },
+  "furniture/toiletSquare": {
+    "assetId": 114884352033008,
+    "moderation": "Approved"
+  },
+  "furniture/trashcan": {
+    "assetId": 77288665611519,
+    "moderation": "Approved"
+  },
+  "furniture/wall": {
+    "assetId": 84527304438421,
+    "moderation": "Approved"
+  },
+  "furniture/wallCorner": {
+    "assetId": 129095200602687,
+    "moderation": "Approved"
+  },
+  "furniture/wallCornerRond": {
+    "assetId": 118821156049691,
+    "moderation": "Approved"
+  },
+  "furniture/wallDoorway": {
+    "assetId": 120901524222140,
+    "moderation": "Approved"
+  },
+  "furniture/wallDoorwayWide": {
+    "assetId": 130442593412844,
+    "moderation": "Approved"
+  },
+  "furniture/wallHalf": {
+    "assetId": 77143313701528,
+    "moderation": "Approved"
+  },
+  "furniture/wallWindow": {
+    "assetId": 72608996582073,
+    "moderation": "Approved"
+  },
+  "furniture/wallWindowSlide": {
+    "assetId": 121329908637754,
+    "moderation": "Approved"
+  },
+  "furniture/washer": {
+    "assetId": 105701435262312,
+    "moderation": "Approved"
+  },
+  "furniture/washerDryerStacked": {
+    "assetId": 136408839588690,
+    "moderation": "Approved"
+  }
+}

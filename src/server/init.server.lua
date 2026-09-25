@@ -29,10 +29,11 @@ local TestPad           = require(script.TestPad)
 local HeistBuilder      = require(script.HeistBuilder)
 local GuardService      = require(script.GuardService)
 local HeistService      = require(script.HeistService)
+local CrewService       = require(script.CrewService)
 
 print("══════════════════════════════════════════")
 print("[HEIST CREW] Server online ✅")
-print(string.format("[HEIST CREW] Version %s — Co-op Crew + Art Pass 1", Constants.VERSION))
+print(string.format("[HEIST CREW] Version %s — The Safehouse", Constants.VERSION))
 print("══════════════════════════════════════════")
 
 -- 1. Build the world (mansion, vault, getaway car, spawn ring)
@@ -50,6 +51,7 @@ GuardService:spawnPatrols({
 
 -- 3. Initialize the heist state machine (it'll wire up the vault prompt + getaway touch)
 HeistService:init(refs, GuardService, EconomyService)
+CrewService:init(refs.safehouse, PlayerDataService)
 
 -- 4. Spawn the test cash pad (still useful for quick economy testing)
 TestPad:spawn()
@@ -58,6 +60,7 @@ TestPad:spawn()
 Players.PlayerAdded:Connect(function(player)
     print(string.format("[HEIST CREW] %s joined the crew 💼", player.Name))
     PlayerDataService:loadPlayer(player)
+    EconomyService:fireCashUpdate(player)   -- sets the Cash attribute + leaderstats right away
 
     local function syncCash()
         task.wait(0.5)

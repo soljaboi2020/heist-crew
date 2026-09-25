@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "0.6.0"
+Constants.VERSION      = "0.7.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Crew settings ─────
@@ -54,24 +54,30 @@ Constants.HEIST_PAYOUT_STEALTH_BONUS = 500  -- bonus if no guard ever spotted th
 Constants.HEIST_PAYOUT_CRACKER_BONUS = 750  -- to the player who cracked the vault
 
 -- ───── World layout (Vector3-friendly tables — convert with Vector3.new) ─────
--- v0.3.0: completely re-laid-out. Mansion is now CLOSE to spawn (~30 studs),
--- lobby is a proper plaza with NPC + tutorial board + lamp posts, path
--- guides players directly to the mansion entrance.
+-- v0.7.0 (2026-09-25): the open marble plaza is gone. Players spawn INSIDE the
+-- crew safehouse (a warehouse south of the street), walk out through a roll-up
+-- garage door, cross a real street, and hit the mansion on the far side.
+--   +Z = south (safehouse side)     -Z = north (mansion side)
 Constants.WORLD = {
-    -- Spawn / lobby plaza
-    SPAWN_POSITION         = {x = 0,  y = 5,    z = 0},
-    LOBBY_CENTER           = {x = 0,  y = 0,    z = 0},
-    LOBBY_RADIUS           = 28,
+    -- Spawn — inside the safehouse, facing north toward the planning table
+    SPAWN_POSITION         = {x = 0,  y = 0.6,  z = 27},
 
-    -- Tutorial board + boss NPC (just south of spawn, between spawn and mansion)
-    TUTORIAL_BOARD_POS     = {x = -14, y = 0,   z = -8},
-    BOSS_NPC_POS           = {x = 12, y = 0,    z = -8},
+    -- The safehouse (warehouse). Garage door is in the NORTH wall.
+    SAFEHOUSE_CENTER       = {x = 0,  y = 0,    z = 22},
+    SAFEHOUSE_HALF_WIDTH   = 24,
+    SAFEHOUSE_HALF_DEPTH   = 18,
+    SAFEHOUSE_HEIGHT       = 16,
+    GARAGE_WIDTH           = 18,
+    GARAGE_HEIGHT          = 12,
 
-    -- Path from lobby → mansion (straight south corridor)
-    PATH_START             = {x = 0,  y = 0,    z = -15},
-    PATH_END               = {x = 0,  y = 0,    z = -35},
+    -- Boss stands at the planning table
+    BOSS_NPC_POS           = {x = 8,  y = 0,    z = 19},
 
-    -- Mansion (closer, fancier, smaller footprint)
+    -- Street between the safehouse and the mansion (runs east-west)
+    STREET_Z               = -14,
+    STREET_HALF_WIDTH      = 8,
+
+    -- Mansion
     MANSION_DOOR           = {x = 0,  y = 0,    z = -35},
     MANSION_CENTER         = {x = 0,  y = 0,    z = -55},
     MANSION_VAULT          = {x = 0,  y = 5,    z = -73},
@@ -80,11 +86,22 @@ Constants.WORLD = {
     MANSION_WALL_HEIGHT    = 18,
     MANSION_DOOR_WIDTH     = 10,
 
-    -- Getaway car (east of plaza so escape is sideways, not back through guards)
-    GETAWAY_POSITION       = {x = 38, y = 2,    z = 4},
+    -- Getaway car (parked in the alley east of the safehouse)
+    GETAWAY_POSITION       = {x = 38, y = 2.5,  z = 8},
 
     -- Test pad (still around for quick economy testing)
     TEST_PAD_POSITION      = {x = -38, y = 0.5, z = 4},
+}
+
+-- ───── Crew roles (v0.7.0) ─────
+-- Picked by standing on a pad in the safehouse. One player per role.
+-- ⚠️ Roles are COSMETIC for now (badge + roster). Abilities come later and get
+-- approved first (Rule #12).
+Constants.ROLES = {
+    { id = "Hacker",  color = {56, 189, 248},  blurb = "Cameras, keypads, alarms" },
+    { id = "Muscle",  color = {248, 113, 113}, blurb = "Heavy loot, doors, crowds" },
+    { id = "Driver",  color = {251, 191, 36},  blurb = "Getaway car, cop chases" },
+    { id = "Lookout", color = {74, 222, 128},  blurb = "Spots guards through walls" },
 }
 
 -- ───── Theme colors (RGB tables — convert with Color3.fromRGB) ─────

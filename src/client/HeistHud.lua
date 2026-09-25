@@ -1,14 +1,19 @@
 --[[
-    HEIST CREW — HeistHud (vault progress + alarm border)
+    HEIST CREW — HeistHud
     ────────────────────────────────────────────────
-    Two UI elements:
-      1. Vault progress bar (bottom-center) — fills as you hold E on the vault
-      2. Alarm border (full-screen red flashing border) — when alarm is active
+    v0.7.0 redesign (UITheme). Three things:
 
-    Listens to:
-      - VaultProgress remote: 0..1 fills the bar; 0 hides it
-      - AlarmTriggered remote: true → red border flashes; false → hides
-      - HeistState remote: top banner shows current state
+      1. ALARM — a red glow that breathes in from the screen edges (a soft
+         vignette, not the old four solid red bars).
+      2. VAULT CRACK — bottom-centre card: "CRACKING VAULT" + live percent,
+         thin gold bar that fills smoothly.
+      3. RESULT — centre card when a run ends: HEIST COMPLETE / BUSTED and how
+         many of the crew got out. Pops in, holds, fades.
+
+    The escape countdown moved to the objective pill (CrewHud) — one place
+    for "what do I do now", instead of a second banner on top of it.
+
+    Listens to: VaultProgress, AlarmTriggered, HeistState remotes.
 
     PUBLIC API:
         HeistHud:start()
@@ -20,14 +25,32 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local UITheme = require(ReplicatedStorage.Shared.UITheme)
+local T = UITheme.C
 
 local HeistHud = {}
-
 local localPlayer = Players.LocalPlayer
+
+local function edgeGlow(parent, rotation, size, position, anchor)
+    local f = Instance.new("Frame")
+    f.BackgroundColor3 = T.dangerDeep
+    f.BorderSizePixel = 0
+    f.Size = size
+    f.Position = position
+    f.AnchorPoint = anchor
+    f.Parent = parent
+    local g = Instance.new("UIGradient")
+    g.Rotation = rotation
+    g.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.15),
+        NumberSequenceKeypoint.new(0.5, 0.75),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    g.Parent = f
+end
 
 function HeistHud:_buildUi()
     local playerGui = localPlayer:WaitForChild("PlayerGui")
-
     local existing = playerGui:FindFirstChild("HeistHud")
     if existing then existing:Destroy() end
 
@@ -38,230 +61,170 @@ function HeistHud:_buildUi()
     screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screen.Parent = playerGui
 
-    -- ── Alarm border (full-screen red overlay, hidden by default) ──
-    local alarmBorder = Instance.new("Frame")
-    alarmBorder.Name = "AlarmBorder"
-    alarmBorder.Size = UDim2.new(1, 0, 1, 0)
-    alarmBorder.BackgroundTransparency = 1
-    alarmBorder.BorderSizePixel = 0
-    alarmBorder.Visible = false
-    alarmBorder.ZIndex = 1
-    alarmBorder.Parent = screen
+    -- 1. alarm vignette
+    local vignette = Instance.new("CanvasGroup")
+    vignette.Name = "AlarmVignette"
+    vignette.Size = UDim2.fromScale(1, 1)
+    vignette.BackgroundTransparency = 1
+    vignette.GroupTransparency = 1
+    vignette.Visible = false
+    vignette.Parent = screen
+    edgeGlow(vignette, 90, UDim2.fromScale(1, 0.22), UDim2.fromScale(0, 0), Vector2.new(0, 0))     -- top
+    edgeGlow(vignette, -90, UDim2.fromScale(1, 0.22), UDim2.fromScale(0, 1), Vector2.new(0, 1))    -- bottom
+    edgeGlow(vignette, 0, UDim2.fromScale(0.16, 1), UDim2.fromScale(0, 0), Vector2.new(0, 0))      -- left
+    edgeGlow(vignette, 180, UDim2.fromScale(0.16, 1), UDim2.fromScale(1, 0), Vector2.new(1, 0))    -- right
 
-    -- 4 colored bars (top, bottom, left, right) for the border effect
-    local function makeBar(side)
-        local bar = Instance.new("Frame")
-        bar.Name = side
-        bar.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
-        bar.BorderSizePixel = 0
-        bar.BackgroundTransparency = 0.3
-        bar.Parent = alarmBorder
-        return bar
-    end
-    local topBar = makeBar("Top")
-    topBar.Size = UDim2.new(1, 0, 0, 12)
-    topBar.Position = UDim2.new(0, 0, 0, 0)
-    local bottomBar = makeBar("Bottom")
-    bottomBar.Size = UDim2.new(1, 0, 0, 12)
-    bottomBar.Position = UDim2.new(0, 0, 1, -12)
-    local leftBar = makeBar("Left")
-    leftBar.Size = UDim2.new(0, 12, 1, 0)
-    leftBar.Position = UDim2.new(0, 0, 0, 0)
-    local rightBar = makeBar("Right")
-    rightBar.Size = UDim2.new(0, 12, 1, 0)
-    rightBar.Position = UDim2.new(1, -12, 0, 0)
+    -- 2. vault crack card
+    local crack = UITheme.panel({
+        Name = "VaultCrack",
+        AnchorPoint = Vector2.new(0.5, 1),
+        Position = UDim2.new(0.5, 0, 1, -96),
+        Size = UDim2.fromOffset(380, 64),
+        Visible = false,
+        radius = 14,
+    })
+    crack.Parent = screen
+    UITheme.caption("Cracking vault", { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -36, 0, 14),
+        TextColor3 = T.gold }).Parent = crack
+    local pct = UITheme.label({ Text = "0%", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 8),
+        Size = UDim2.fromOffset(80, 22), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.mono, TextSize = 18 })
+    pct.Parent = crack
+    local track = Instance.new("Frame")
+    track.Position = UDim2.new(0, 18, 0, 40)
+    track.Size = UDim2.new(1, -36, 0, 8)
+    track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    track.BackgroundTransparency = 0.88
+    track.BorderSizePixel = 0
+    track.Parent = crack
+    UITheme.corner(track, 4)
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.fromScale(0, 1)
+    fill.BackgroundColor3 = T.gold
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    UITheme.corner(fill, 4)
+    local fg = Instance.new("UIGradient")
+    fg.Color = ColorSequence.new(Color3.fromRGB(245, 158, 11), Color3.fromRGB(253, 224, 71))
+    fg.Parent = fill
 
-    -- Center "ALARM" text
-    local alarmText = Instance.new("TextLabel")
-    alarmText.Name = "AlarmText"
-    alarmText.Size = UDim2.new(0, 600, 0, 80)
-    alarmText.Position = UDim2.new(0.5, -300, 0, 60)
-    alarmText.BackgroundTransparency = 1
-    alarmText.Text = "🚨 ALARM TRIGGERED — RUN TO THE GETAWAY 🚨"
-    alarmText.TextColor3 = Color3.fromRGB(239, 68, 68)
-    alarmText.Font = Enum.Font.GothamBlack
-    alarmText.TextScaled = true
-    alarmText.TextStrokeTransparency = 0
-    alarmText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    alarmText.Parent = alarmBorder
+    -- 3. result card
+    local result = Instance.new("CanvasGroup")
+    result.Name = "Result"
+    result.AnchorPoint = Vector2.new(0.5, 0.5)
+    result.Position = UDim2.fromScale(0.5, 0.42)
+    result.Size = UDim2.fromOffset(460, 170)
+    result.BackgroundColor3 = T.bg
+    result.BackgroundTransparency = 0.1
+    result.GroupTransparency = 1
+    result.Visible = false
+    result.Parent = screen
+    UITheme.corner(result, 18)
+    UITheme.stroke(result)
+    local rScale = Instance.new("UIScale")
+    rScale.Parent = result
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(1, 0, 0, 4)
+    accent.BorderSizePixel = 0
+    accent.Parent = result
+    local rCaption = UITheme.caption("Job 01 · The Mansion", { Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 14),
+        TextXAlignment = Enum.TextXAlignment.Center })
+    rCaption.Parent = result
+    local rTitle = UITheme.label({ Position = UDim2.fromOffset(0, 46), Size = UDim2.new(1, 0, 0, 56),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 50 })
+    rTitle.Parent = result
+    local rSub = UITheme.label({ Position = UDim2.fromOffset(0, 108), Size = UDim2.new(1, 0, 0, 24),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.medium, TextSize = 19, TextColor3 = T.muted })
+    rSub.Parent = result
 
-    -- ── Vault progress bar (bottom-center, hidden by default) ──
-    local progressFrame = Instance.new("Frame")
-    progressFrame.Name = "VaultProgress"
-    progressFrame.Size = UDim2.new(0, 360, 0, 36)
-    progressFrame.Position = UDim2.new(0.5, -180, 1, -120)
-    progressFrame.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
-    progressFrame.BackgroundTransparency = 0.15
-    progressFrame.BorderSizePixel = 0
-    progressFrame.Visible = false
-    progressFrame.ZIndex = 2
-    progressFrame.Parent = screen
-
-    Instance.new("UICorner", progressFrame).CornerRadius = UDim.new(0, 8)
-    local stroke = Instance.new("UIStroke", progressFrame)
-    stroke.Color = Color3.fromRGB(234, 179, 8)
-    stroke.Thickness = 2
-
-    local progressFill = Instance.new("Frame")
-    progressFill.Name = "Fill"
-    progressFill.Size = UDim2.new(0, 0, 1, -6)
-    progressFill.Position = UDim2.new(0, 3, 0, 3)
-    progressFill.BackgroundColor3 = Color3.fromRGB(234, 179, 8)
-    progressFill.BorderSizePixel = 0
-    progressFill.Parent = progressFrame
-    Instance.new("UICorner", progressFill).CornerRadius = UDim.new(0, 6)
-
-    local progressLabel = Instance.new("TextLabel")
-    progressLabel.Size = UDim2.new(1, 0, 1, 0)
-    progressLabel.BackgroundTransparency = 1
-    progressLabel.Text = "🔧 CRACKING VAULT..."
-    progressLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    progressLabel.Font = Enum.Font.GothamBlack
-    progressLabel.TextSize = 18
-    progressLabel.ZIndex = 3
-    progressLabel.Parent = progressFrame
-
-    -- ── Heist state banner (top-center, only shows during ESCAPING/COMPLETE/FAILED) ──
-    local stateBanner = Instance.new("Frame")
-    stateBanner.Name = "StateBanner"
-    stateBanner.Size = UDim2.new(0, 480, 0, 56)
-    stateBanner.Position = UDim2.new(0.5, -240, 0, 28)
-    stateBanner.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
-    stateBanner.BackgroundTransparency = 0.1
-    stateBanner.BorderSizePixel = 0
-    stateBanner.Visible = false
-    stateBanner.ZIndex = 4
-    stateBanner.Parent = screen
-
-    Instance.new("UICorner", stateBanner).CornerRadius = UDim.new(0, 12)
-    local bannerStroke = Instance.new("UIStroke", stateBanner)
-    bannerStroke.Color = Color3.fromRGB(239, 68, 68)
-    bannerStroke.Thickness = 2
-
-    local stateLabel = Instance.new("TextLabel")
-    stateLabel.Size = UDim2.new(1, -16, 1, 0)
-    stateLabel.Position = UDim2.new(0, 8, 0, 0)
-    stateLabel.BackgroundTransparency = 1
-    stateLabel.Text = ""
-    stateLabel.TextColor3 = Color3.fromRGB(239, 68, 68)
-    stateLabel.Font = Enum.Font.GothamBlack
-    stateLabel.TextSize = 22
-    stateLabel.Parent = stateBanner
-
-    self._screen = screen
-    self._alarmBorder = alarmBorder
-    self._alarmText = alarmText
-    self._progressFrame = progressFrame
-    self._progressFill = progressFill
-    self._progressLabel = progressLabel
-    self._stateBanner = stateBanner
-    self._stateLabel = stateLabel
-    self._bannerStroke = bannerStroke
-end
-
--- Pulse the alarm border (red on/off cycle)
-function HeistHud:_startAlarmPulse()
-    if self._alarmHeartbeat then self._alarmHeartbeat:Disconnect() end
-    local startTime = os.clock()
-    self._alarmHeartbeat = RunService.Heartbeat:Connect(function()
-        if not self._alarmBorder.Visible then return end
-        local elapsed = os.clock() - startTime
-        local pulse = (math.sin(elapsed * 6) + 1) / 2  -- 0..1 sine wave at ~1Hz
-        local trans = 0.2 + pulse * 0.5
-        for _, child in ipairs(self._alarmBorder:GetChildren()) do
-            if child:IsA("Frame") then
-                child.BackgroundTransparency = trans
-            end
-        end
-    end)
+    self._vignette = vignette
+    self._crack, self._fill, self._pct = crack, fill, pct
+    self._result, self._rScale, self._rAccent, self._rTitle, self._rSub = result, rScale, accent, rTitle, rSub
 end
 
 function HeistHud:setAlarm(active)
-    self._alarmBorder.Visible = active
-    if active then
-        self:_startAlarmPulse()
-    else
-        if self._alarmHeartbeat then
-            self._alarmHeartbeat:Disconnect()
-            self._alarmHeartbeat = nil
-        end
+    if self._pulse then self._pulse:Disconnect() self._pulse = nil end
+    local v = self._vignette
+    if not active then
+        TweenService:Create(v, TweenInfo.new(0.6), { GroupTransparency = 1 }):Play()
+        task.delay(0.6, function() if v.GroupTransparency > 0.95 then v.Visible = false end end)
+        return
     end
+    v.Visible = true
+    local t0 = os.clock()
+    self._pulse = RunService.RenderStepped:Connect(function()
+        local wave = (math.sin((os.clock() - t0) * 4.2) + 1) / 2   -- slow breathe, ~0.7 Hz
+        v.GroupTransparency = 0.15 + wave * 0.45
+    end)
 end
 
 function HeistHud:setVaultProgress(progress)
+    local card = self._crack
     if progress <= 0 then
-        self._progressFrame.Visible = false
-        self._progressFill.Size = UDim2.new(0, 0, 1, -6)
+        card.Visible = false
+        self._fill.Size = UDim2.fromScale(0, 1)
         return
     end
-    self._progressFrame.Visible = true
-    local targetWidth = math.floor(354 * progress)
-    self._progressFill.Size = UDim2.new(0, targetWidth, 1, -6)
+    card.Visible = true
+    TweenService:Create(self._fill, TweenInfo.new(0.2, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(math.clamp(progress, 0, 1), 1) }):Play()
+    self._pct.Text = string.format("%d%%", math.floor(progress * 100 + 0.5))
     if progress >= 1 then
-        self._progressLabel.Text = "✅ VAULT CRACKED!"
-        task.delay(0.8, function()
-            if self._progressFrame then self._progressFrame.Visible = false end
+        self._pct.Text = "OPEN"
+        self._pct.TextColor3 = T.money
+        task.delay(0.9, function()
+            card.Visible = false
+            self._pct.TextColor3 = T.text
         end)
-    else
-        self._progressLabel.Text = string.format("🔧 CRACKING... %d%%", math.floor(progress * 100))
     end
 end
 
-function HeistHud:setHeistState(stateName, payload)
-    if stateName == "ESCAPING" then
-        self._stateBanner.Visible = true
-        self._stateLabel.Text = string.format("🏃 ESCAPE: %ds left!", payload.escapeSeconds or 0)
-        self._bannerStroke.Color = Color3.fromRGB(239, 68, 68)
-        self._stateLabel.TextColor3 = Color3.fromRGB(239, 68, 68)
+function HeistHud:showResult(win, payload)
+    local r = self._result
+    self._rTitle.Text = win and "HEIST COMPLETE" or "BUSTED"
+    self._rTitle.TextColor3 = win and T.money or T.danger
+    self._rAccent.BackgroundColor3 = win and T.money or T.danger
+    local total = payload.crewSize or 0
+    local escaped = payload.escaped
+    local n = type(escaped) == "table" and #escaped or tonumber(escaped) or 0
+    if total > 0 then
+        self._rSub.Text = string.format("%d of %d crew made it out", n, total)
+    else
+        self._rSub.Text = win and "Clean getaway." or "Nobody made it to the car."
+    end
 
-        -- Live countdown
-        if self._stateCountdown then task.cancel(self._stateCountdown) end
-        self._stateCountdown = task.spawn(function()
-            local startTime = os.clock()
-            local total = payload.escapeSeconds or 60
-            while self._stateBanner.Visible do
-                local remaining = math.max(0, total - (os.clock() - startTime))
-                self._stateLabel.Text = string.format("🏃 ESCAPE: %ds left!", math.ceil(remaining))
-                if remaining <= 0 then break end
-                task.wait(0.5)
-            end
-        end)
-    elseif stateName == "COMPLETE" then
-        self._stateBanner.Visible = true
-        self._stateLabel.Text = "🎉 HEIST COMPLETE!"
-        self._bannerStroke.Color = Color3.fromRGB(34, 197, 94)
-        self._stateLabel.TextColor3 = Color3.fromRGB(34, 197, 94)
-        task.delay(4, function()
-            if self._stateBanner then self._stateBanner.Visible = false end
-        end)
+    r.Visible = true
+    r.GroupTransparency = 1
+    self._rScale.Scale = 0.86
+    TweenService:Create(r, TweenInfo.new(0.25), { GroupTransparency = 0 }):Play()
+    TweenService:Create(self._rScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+    local token = {}
+    self._resultToken = token
+    task.delay(4, function()
+        if self._resultToken ~= token then return end
+        local out = TweenService:Create(r, TweenInfo.new(0.5), { GroupTransparency = 1 })
+        out:Play()
+        out.Completed:Wait()
+        if self._resultToken == token then r.Visible = false end
+    end)
+end
+
+function HeistHud:setHeistState(stateName, payload)
+    if stateName == "COMPLETE" then
+        self:showResult(true, payload)
     elseif stateName == "FAILED" then
-        self._stateBanner.Visible = true
-        self._stateLabel.Text = "❌ HEIST FAILED"
-        self._bannerStroke.Color = Color3.fromRGB(239, 68, 68)
-        self._stateLabel.TextColor3 = Color3.fromRGB(239, 68, 68)
-        task.delay(3, function()
-            if self._stateBanner then self._stateBanner.Visible = false end
-        end)
-    elseif stateName == "IDLE" then
-        self._stateBanner.Visible = false
+        self:showResult(false, payload)
     end
 end
 
 function HeistHud:start()
     self:_buildUi()
 
-    local progressRemote = Remotes.getRemote(Remotes.NAMES.VaultProgress, "RemoteEvent")
-    progressRemote.OnClientEvent:Connect(function(progress)
+    Remotes.getRemote(Remotes.NAMES.VaultProgress, "RemoteEvent").OnClientEvent:Connect(function(progress)
         self:setVaultProgress(progress)
     end)
-
-    local alarmRemote = Remotes.getRemote(Remotes.NAMES.AlarmTriggered, "RemoteEvent")
-    alarmRemote.OnClientEvent:Connect(function(active)
+    Remotes.getRemote(Remotes.NAMES.AlarmTriggered, "RemoteEvent").OnClientEvent:Connect(function(active)
         self:setAlarm(active)
     end)
-
-    local stateRemote = Remotes.getRemote(Remotes.NAMES.HeistState, "RemoteEvent")
-    stateRemote.OnClientEvent:Connect(function(stateName, payload)
+    Remotes.getRemote(Remotes.NAMES.HeistState, "RemoteEvent").OnClientEvent:Connect(function(stateName, payload)
         self:setHeistState(stateName, payload or {})
     end)
 

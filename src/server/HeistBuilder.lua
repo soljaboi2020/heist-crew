@@ -53,6 +53,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local NpcFactory = require(script.Parent.NpcFactory)
+local SafehouseBuilder = require(script.Parent.SafehouseBuilder)
 
 local HeistBuilder = {}
 
@@ -201,7 +202,7 @@ function HeistBuilder:_setupGround(folder)
     local baseplate = Workspace:FindFirstChild("Baseplate")
     if baseplate then baseplate:Destroy() end
 
-    -- Big grass ground plane
+    -- Big grass ground plane (v0.7.0: the marble plaza + brass ring are gone)
     local grass = makePart({
         Name = "Grass",
         Size = Vector3.new(400, 2, 400),
@@ -210,216 +211,16 @@ function HeistBuilder:_setupGround(folder)
         Material = Enum.Material.Grass,
     })
     grass.Parent = folder
-
-    -- Lobby plaza floor (circle approximated by a wide cylinder)
-    local plaza = makePart({
-        Name = "LobbyPlaza",
-        Size = Vector3.new(0.5, W.LOBBY_RADIUS * 2, W.LOBBY_RADIUS * 2),
-        Color = rgb(C.MARBLE_WHITE),
-        Material = Enum.Material.Marble,
-        Shape = Enum.PartType.Cylinder,
-    })
-    plaza.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.25, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
-    plaza.Parent = folder
-
-    -- ── Gold trim ring ──────────────────────────────────────────────
-    -- v0.5.0 REWRITE. This used to be a 56-stud-wide SOLID Neon cylinder with the
-    -- marble inner disc sitting at the SAME top height (0.85). Two problems:
-    -- the discs z-fought, and a neon surface that size is fully emissive, so it
-    -- lit the whole scene yellow and flattened everything. (Visible in Malachi's
-    -- 2026-09-22 screenshot — the entire plaza read as one glowing blob.)
-    --
-    -- Now it's an actual ring: 64 small Metal segments laid around the edge.
-    -- Metal, not Neon — it catches the lamp light and reads as inlaid brass
-    -- instead of emitting its own. No overlap, so nothing z-fights.
-    local SEGMENTS = 64
-    local trimRadius = W.LOBBY_RADIUS - 1.2
-    local segLength = (2 * math.pi * trimRadius) / SEGMENTS + 0.15  -- slight overlap closes the seams
-    for i = 1, SEGMENTS do
-        local angle = (i / SEGMENTS) * math.pi * 2
-        local seg = makePart({
-            Name = "PlazaTrim_" .. i,
-            -- 2026-09-24 FIX: was (segLength, 0.22, 1.1). After the Y-rotation local X
-            -- points outward from the centre, so the long side was sticking out like
-            -- spokes (orange "planks" in Malachi's screenshot). Long side goes on Z.
-            Size = Vector3.new(1.1, 0.22, segLength),
-            Color = Color3.fromRGB(150, 116, 52),   -- aged brass, less orange
-            Material = Enum.Material.Metal,
-        })
-        seg.CFrame = CFrame.new(
-            W.LOBBY_CENTER.x + math.cos(angle) * trimRadius,
-            0.58,
-            W.LOBBY_CENTER.z + math.sin(angle) * trimRadius
-        ) * CFrame.Angles(0, -angle, 0)
-        seg.Parent = folder
-    end
-
-    -- Darker inlay disc in the middle of the plaza. Sits BELOW the trim height so
-    -- the two never share a plane.
-    local inner = makePart({
-        Name = "PlazaInner",
-        Size = Vector3.new(0.3, (W.LOBBY_RADIUS - 3) * 2, (W.LOBBY_RADIUS - 3) * 2),
-        Color = Color3.fromRGB(196, 190, 178),
-        Material = Enum.Material.Marble,
-        Shape = Enum.PartType.Cylinder,
-    })
-    inner.CFrame = CFrame.new(W.LOBBY_CENTER.x, 0.52, W.LOBBY_CENTER.z) * CFrame.Angles(0, 0, math.rad(90))
-    inner.Parent = folder
 end
 
 -- ──────────────────────────────────────────────
 -- 🏙 LOBBY: pedestal sign + lamp posts + tutorial + boss
 -- ──────────────────────────────────────────────
 function HeistBuilder:_buildLobby(folder)
-    -- Center pedestal with the giant "HEIST CREW" sign
-    local pedestal = makePart({
-        Name = "LobbyPedestal",
-        Size = Vector3.new(6, 6, 6),
-        Position = Vector3.new(W.LOBBY_CENTER.x, 3, W.LOBBY_CENTER.z),
-        Color = rgb(C.MARBLE_DARK),
-        Material = Enum.Material.Marble,
-    })
-    pedestal.Parent = folder
-
-    -- Brass cap. Was Neon — one more emissive surface feeding the yellow wash.
-    local pedestalCap = makePart({
-        Name = "PedestalCap",
-        Size = Vector3.new(7, 0.5, 7),
-        Position = Vector3.new(W.LOBBY_CENTER.x, 6.5, W.LOBBY_CENTER.z),
-        Color = rgb(C.GOLD_DEEP),
-        Material = Enum.Material.Metal,
-    })
-    pedestalCap.Parent = folder
-
-    -- ── Signage ─────────────────────────────────────────────────────
-    -- v0.5.0: the two floating BillboardGuis that used to live here ("💰 HEIST
-    -- CREW 💰" at 600px and the subtitle) are GONE. Between them, the mansion
-    -- sign, the vault sign and the boss bubble, Malachi's screenshot had five
-    -- pieces of text hovering in midair at once, overlapping each other.
-    -- Jailbreak / Flood Escape 2 / Steal a Brainrot all put text on SURFACES and
-    -- keep the rest on the screen HUD, so that's what this does now: the title
-    -- is printed on the pedestal itself, on all four faces so it reads from any
-    -- approach angle.
-    for _, face in ipairs({Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right}) do
-        local sg = Instance.new("SurfaceGui", pedestal)
-        sg.Face = face
-        sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-        sg.PixelsPerStud = 50
-        sg.LightInfluence = 0.25
-
-        local title = Instance.new("TextLabel", sg)
-        title.Size = UDim2.new(1, 0, 0.42, 0)
-        title.Position = UDim2.new(0, 0, 0.16, 0)
-        title.BackgroundTransparency = 1
-        title.Text = "HEIST CREW"
-        title.TextColor3 = rgb(C.GOLD)
-        title.Font = Enum.Font.GothamBlack
-        title.TextScaled = true
-
-        local sub = Instance.new("TextLabel", sg)
-        sub.Size = UDim2.new(0.86, 0, 0.16, 0)
-        sub.Position = UDim2.new(0.07, 0, 0.58, 0)
-        sub.BackgroundTransparency = 1
-        sub.Text = "CRACK IT. RUN. GET PAID."
-        sub.TextColor3 = Color3.fromRGB(225, 220, 210)
-        sub.Font = Enum.Font.GothamMedium
-        sub.TextScaled = true
-    end
-
-    -- 4 lamp posts at compass points around plaza
-    local lampOffsets = {
-        Vector3.new( W.LOBBY_RADIUS - 2, 0,  0),
-        Vector3.new(-W.LOBBY_RADIUS + 2, 0,  0),
-        Vector3.new( 0, 0,  W.LOBBY_RADIUS - 2),
-        Vector3.new( 0, 0, -W.LOBBY_RADIUS + 2),
-    }
-    for i, offset in ipairs(lampOffsets) do
-        local pos = Vector3.new(W.LOBBY_CENTER.x, 0, W.LOBBY_CENTER.z) + offset
-        local pole = makePart({
-            Name = "LampPole_" .. i,
-            Size = Vector3.new(0.6, 10, 0.6),
-            Position = pos + Vector3.new(0, 5, 0),
-            Color = rgb(C.MARBLE_DARK),
-            Material = Enum.Material.Metal,
-        })
-        pole.Parent = folder
-        local bulb = makePart({
-            Name = "LampBulb_" .. i,
-            Size = Vector3.new(0.9, 0.9, 0.9),
-            Position = pos + Vector3.new(0, 10.1, 0),
-            Color = Color3.fromRGB(255, 226, 170),   -- warm white, not flat yellow
-            Material = Enum.Material.Neon,
-            Shape = Enum.PartType.Ball,
-        })
-        bulb.Parent = folder
-        local shade = makePart({
-            Name = "LampShade_" .. i,
-            Size = Vector3.new(0.7, 2.2, 2.2),
-            Color = rgb(C.MARBLE_DARK),
-            Material = Enum.Material.Metal,
-            Shape = Enum.PartType.Cylinder,
-            CanCollide = false,
-        })
-        shade.CFrame = CFrame.new(pos + Vector3.new(0, 10.8, 0)) * CFrame.Angles(0, 0, math.rad(90))
-        shade.Parent = folder
-        -- v0.5.0: was Brightness 3 / Range 25 on four lamps at once, which flooded
-        -- the plaza and killed every shadow. Dimmer and tighter gives pools of
-        -- light with dark between them — the thing that makes Cheese Escape and
-        -- Jailbreak's night side read as lit rather than washed out.
-        local light = Instance.new("PointLight", bulb)
-        light.Brightness = 1.4
-        light.Range = 17
-        light.Color = Color3.fromRGB(255, 214, 160)
-        light.Shadows = true
-    end
-
-    -- Tutorial billboard ("How to Play")
-    local board = makePart({
-        Name = "TutorialBoard",
-        Size = Vector3.new(0.5, 7, 8),
-        Position = v3(W.TUTORIAL_BOARD_POS) + Vector3.new(0, 4, 0),
-        Color = rgb(C.MARBLE_DARK),
-        Material = Enum.Material.Wood,
-        Orientation = Vector3.new(0, 30, 0),
-    })
-    board.Parent = folder
-
-    local boardSurface = Instance.new("SurfaceGui", board)
-    boardSurface.Face = Enum.NormalId.Right
-    boardSurface.LightInfluence = 0
-    boardSurface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-    boardSurface.PixelsPerStud = 60
-
-    local boardBg = Instance.new("Frame", boardSurface)
-    boardBg.Size = UDim2.new(1, 0, 1, 0)
-    boardBg.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    boardBg.BackgroundTransparency = 0.1
-    boardBg.BorderSizePixel = 0
-
-    local boardTitle = Instance.new("TextLabel", boardBg)
-    boardTitle.Size = UDim2.new(1, 0, 0.2, 0)
-    boardTitle.Position = UDim2.new(0, 0, 0.05, 0)
-    boardTitle.BackgroundTransparency = 1
-    boardTitle.Text = "📋 HOW TO HEIST"
-    boardTitle.TextColor3 = rgb(C.GOLD)
-    boardTitle.Font = Enum.Font.GothamBlack
-    boardTitle.TextScaled = true
-
-    local boardBody = Instance.new("TextLabel", boardBg)
-    boardBody.Size = UDim2.new(0.9, 0, 0.7, 0)
-    boardBody.Position = UDim2.new(0.05, 0, 0.27, 0)
-    boardBody.BackgroundTransparency = 1
-    boardBody.Text = "1. Walk to the mansion 🏛\n2. Sneak past guards (yellow cones!)\n3. Hold E on the gold vault\n4. Run to the green getaway car 🚗\n5. Cash in! 💰"
-    boardBody.TextColor3 = Color3.fromRGB(255, 255, 255)
-    boardBody.Font = Enum.Font.GothamBold
-    boardBody.TextScaled = true
-    boardBody.TextXAlignment = Enum.TextXAlignment.Left
-    boardBody.TextYAlignment = Enum.TextYAlignment.Top
-
-    -- Boss NPC
+    -- v0.7.0: the marble plaza, pedestal sign, plaza lamps and tutorial board are
+    -- gone — the lobby is the safehouse now (SafehouseBuilder). The Boss moved
+    -- inside to the planning table; the trees stay outside.
     self:_buildBoss(folder)
-
-    -- Decorative trees scattered around plaza edge
     self:_buildTrees(folder)
 end
 
@@ -448,8 +249,11 @@ function HeistBuilder:_buildBoss(folder)
         return
     end
     root.Anchored = true    -- he stands still; anchoring stops players shoving him
-    bossModel:PivotTo(CFrame.new(pos + Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2, 0))
-        * CFrame.Angles(0, math.rad(180), 0))
+    -- v0.7.0: stands on the safehouse floor (top at y 0.5) at the planning
+    -- table, turned toward the spawn so he's the first face you see.
+    local standAt = pos + Vector3.new(0, 0.5 + humanoid.HipHeight + root.Size.Y / 2, 0)
+    local spawnPos = v3(W.SPAWN_POSITION)
+    bossModel:PivotTo(CFrame.lookAt(standAt, Vector3.new(spawnPos.X, standAt.Y, spawnPos.Z)))
     bossModel.Parent = folder
     NpcFactory.animate(humanoid)
     local head = bossModel:FindFirstChild("Head") or root
@@ -506,6 +310,27 @@ function HeistBuilder:_buildTrees(folder)
         Vector3.new( 25, 0, 30),
         Vector3.new(-25, 0, 30),
     }
+    -- v0.7.0: drop any tree that would land on the safehouse, the street or
+    -- the mansion now that those exist; add a few around the new buildings.
+    for _, extra in ipairs({
+        Vector3.new(-34, 0, 30), Vector3.new(34, 0, 32), Vector3.new(-30, 0, 48),
+        Vector3.new(12, 0, 50), Vector3.new(-40, 0, -40), Vector3.new(40, 0, -44),
+    }) do table.insert(treePositions, extra) end
+    local function blocked(p)
+        local sh = W.SAFEHOUSE_CENTER
+        if math.abs(p.X - sh.x) < W.SAFEHOUSE_HALF_WIDTH + 5 and math.abs(p.Z - sh.z) < W.SAFEHOUSE_HALF_DEPTH + 5 then return true end
+        if math.abs(p.Z - W.STREET_Z) < W.STREET_HALF_WIDTH + 7 then return true end
+        if math.abs(p.X - W.MANSION_CENTER.x) < W.MANSION_HALF_WIDTH + 5
+            and math.abs(p.Z - W.MANSION_CENTER.z) < W.MANSION_HALF_DEPTH + 5 then return true end
+        local g = W.GETAWAY_POSITION
+        if math.abs(p.X - g.x) < 8 and math.abs(p.Z - g.z) < 12 then return true end
+        return false
+    end
+    local kept = {}
+    for _, p in ipairs(treePositions) do
+        if not blocked(p) then table.insert(kept, p) end
+    end
+    treePositions = kept
     for i, pos in ipairs(treePositions) do
         local trunk = makePart({
             Name = "TreeTrunk_" .. i,
@@ -531,69 +356,8 @@ end
 -- 🛣 PATH from lobby to mansion
 -- ──────────────────────────────────────────────
 function HeistBuilder:_buildPath(folder)
-    local startZ = W.PATH_START.z
-    local endZ = W.PATH_END.z
-    local length = math.abs(endZ - startZ)
-    local centerZ = (startZ + endZ) / 2
-
-    local path = makePart({
-        Name = "MansionPath",
-        Size = Vector3.new(8, 0.4, length),
-        Position = Vector3.new(0, 0.2, centerZ),
-        Color = rgb(C.PATH_STONE),
-        Material = Enum.Material.Slate,
-    })
-    path.Parent = folder
-
-    -- Path edging. v0.5.0: these were full-length GOLD NEON strips running the
-    -- whole walkway — two more big emissive surfaces in the same frame as the
-    -- plaza. Now they're brass kerb stones, and the glow comes from the path
-    -- lamps instead. Light should come from light sources, not from the floor.
-    for _, xOffset in ipairs({-4.2, 4.2}) do
-        local edge = makePart({
-            Name = "PathEdge",
-            Size = Vector3.new(0.5, 0.35, length),
-            Position = Vector3.new(xOffset, 0.45, centerZ),
-            Color = rgb(C.GOLD_DEEP),
-            Material = Enum.Material.Metal,
-        })
-        edge.Parent = folder
-    end
-
-    for _, xOffset in ipairs({-6, 6}) do
-        local pos = Vector3.new(xOffset, 0, centerZ)
-        local pole = makePart({
-            Name = "PathLamp_Pole",
-            Size = Vector3.new(0.5, 9, 0.5),
-            Position = pos + Vector3.new(0, 4.5, 0),
-            Color = rgb(C.MARBLE_DARK),
-            Material = Enum.Material.Metal,
-        })
-        pole.Parent = folder
-        local bulb = makePart({
-            Name = "PathLamp_Bulb",
-            Size = Vector3.new(0.8, 0.8, 0.8),
-            Position = pos + Vector3.new(0, 9.1, 0),
-            Color = Color3.fromRGB(255, 226, 170),
-            Material = Enum.Material.Neon,
-            Shape = Enum.PartType.Ball,
-        })
-        bulb.Parent = folder
-        local shade = makePart({
-            Name = "PathLamp_Shade",
-            Size = Vector3.new(0.6, 1.9, 1.9),
-            Color = rgb(C.MARBLE_DARK),
-            Material = Enum.Material.Metal,
-            Shape = Enum.PartType.Cylinder,
-            CanCollide = false,
-        })
-        shade.CFrame = CFrame.new(pos + Vector3.new(0, 9.7, 0)) * CFrame.Angles(0, 0, math.rad(90))
-        shade.Parent = folder
-        local light = Instance.new("PointLight", bulb)
-        light.Brightness = 1.6
-        light.Range = 18
-        light.Color = Color3.fromRGB(255, 220, 150)
-    end
+    -- v0.7.0: the lobby→mansion walkway is now a real street, built by
+    -- SafehouseBuilder:buildStreet(). Kept as a no-op so nothing that calls it breaks.
 end
 
 -- ──────────────────────────────────────────────
@@ -944,8 +708,8 @@ function HeistBuilder:build()
     self:_setupLighting()
     self:_setupAmbientMusic()
     self:_setupGround(heistFolder)
+    local safehouse = SafehouseBuilder:build(heistFolder)
     self:_buildLobby(heistFolder)
-    self:_buildPath(heistFolder)
     local mansionFolder = self:_buildMansion(heistFolder)
     local vault = self:_buildVault(heistFolder)
     local getawayCar, getawayLabel = self:_buildGetawayCar(heistFolder)
@@ -964,16 +728,20 @@ function HeistBuilder:build()
     spawn.Anchored = true
     spawn.CanCollide = true
     spawn.Position = Vector3.new(W.SPAWN_POSITION.x, W.SPAWN_POSITION.y, W.SPAWN_POSITION.z)
-    spawn.Size = Vector3.new(6, 1, 6)
     spawn.Color = rgb(C.GREEN_PRIMARY)
-    spawn.Material = Enum.Material.Metal   -- was see-through Neon (art rule #1)
+    -- v0.7.0: invisible — you just appear in the safehouse, facing north
+    -- toward the planning table and the garage door.
+    spawn.Material = Enum.Material.SmoothPlastic
     spawn.TopSurface = Enum.SurfaceType.Smooth
     spawn.BottomSurface = Enum.SurfaceType.Smooth
-    spawn.Transparency = 0
+    spawn.Transparency = 1
+    spawn.CanCollide = false
+    spawn.CanTouch = false
+    spawn.Size = Vector3.new(6, 0.2, 6)
     spawn.Parent = heistFolder
 
     print("[HeistBuilder] World built ✨")
-    print(string.format("[HeistBuilder]   Lobby plaza @ (%d, %d, %d)", W.LOBBY_CENTER.x, 0, W.LOBBY_CENTER.z))
+    print(string.format("[HeistBuilder]   Safehouse @ (%d, %d, %d)", W.SAFEHOUSE_CENTER.x, 0, W.SAFEHOUSE_CENTER.z))
     print(string.format("[HeistBuilder]   Mansion centered @ (%d, %d, %d)", W.MANSION_CENTER.x, 0, W.MANSION_CENTER.z))
     print(string.format("[HeistBuilder]   Vault @ (%d, %d, %d)", W.MANSION_VAULT.x, W.MANSION_VAULT.y, W.MANSION_VAULT.z))
     print(string.format("[HeistBuilder]   Getaway car @ (%d, %d, %d)", W.GETAWAY_POSITION.x, W.GETAWAY_POSITION.y, W.GETAWAY_POSITION.z))
@@ -984,6 +752,7 @@ function HeistBuilder:build()
         vault = vault,
         getawayCar = getawayCar,
         getawayLabel = getawayLabel,
+        safehouse = safehouse,
     }
 end
 

@@ -172,7 +172,9 @@ end
 local function sendToLobby(player)
     if player and player.Character then
         local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then hrp.CFrame = CFrame.new(0, 10, 0) end
+        -- back to the safehouse spawn (was a hardcoded (0,10,0), the old plaza)
+        local sp = Constants.WORLD.SPAWN_POSITION
+        if hrp then hrp.CFrame = CFrame.new(sp.x, sp.y + 2, sp.z) end
     end
 end
 

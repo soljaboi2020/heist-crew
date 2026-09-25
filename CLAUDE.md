@@ -292,6 +292,51 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   flat-yellow neon blobs → 0.9-stud warm-white bulb under a dark metal shade (path lamps too)
   ④ TestPad sign no longer AlwaysOnTop.
 
+- **2026-09-24 → 25** — **🔑 KENNEY PIPELINE LIVE (Open Cloud).** Malachi made a Roblox Open Cloud
+  key (`assets` API, read+write) → vaulted at `~/.claude/roblox-opencloud-key` (listed in
+  `~/.claude/CREDENTIALS.md`). His user id **2501618318** (display name "Karen").
+  - **`tools/upload_kenney.py`** uploads the Kenney `.fbx` files straight from the zips via
+    `POST apis.roblox.com/assets/v1/assets` (assetType `Model`), polls the operation, writes the
+    ledger **`tools/kenney_assets.json`** after EVERY upload, and generates
+    **`src/shared/KenneyAssets.lua`**. Preview by default, `--go` to upload, never re-uploads.
+    Furniture (140) + factory (143) kits uploaded; dungeon kit skipped (medieval). **Moderation
+    approved every one instantly.**
+  - Factory texture atlas also uploaded: Image **94958674308524** (Decal 76890606501727) —
+    `KenneyLoader` applies it if a factory mesh arrives with no `TextureID`.
+  - **Verified in Studio:** `InsertService:LoadAsset(108470551669951)` loaded `HC_furniture_desk`.
+  - Also: `tools/fix_kenney_sizes.lua` — command-bar snippet to shrink hand-inserted Kenney meshes.
+- **2026-09-25** — **🏚 v0.7.0 — THE SAFEHOUSE + NEW UI** (Malachi picked lobby option A and said
+  *"make sure ui is nice not like crappy blocky"*). Roadmap agreed in chat: ① Safehouse ② Mansion
+  2.0 (loot bags, cameras/keycards, rebuilt interior) ③ roles + masks ④ shop/progression + Jewelry
+  Store ⑤ driving getaway + police ⑥ monetization + soft launch. **Show-before-build (Rule #12)
+  applies to ② onward.**
+  - **World re-laid out** (`Constants.WORLD`): plaza/pedestal/plaza lamps/tutorial board DELETED.
+    Spawn is inside the safehouse at (0, 0.6, 27) facing north; street runs east-west at z −14;
+    getaway car moved to (38, 2.5, 8) off the new sidewalk. `sendToLobby` now uses SPAWN_POSITION
+    (was a hardcoded `(0,10,0)`).
+  - **`SafehouseBuilder.lua`** — brick warehouse x −24..24 / z 4..40: auto roll-up garage door
+    (slats stack into the header — they'd have gone through the roof in the first draft),
+    planning table + live SurfaceGui **blueprint** of the mansion job, 4 **crew pads** + wall signs,
+    **gear wall** (shadow-board teaser for the shop) + workbench, **lounge + TV** (next job, top-5
+    earners, crew roster), hanging industrial lamps w/ shadows, skylights, trusses, "RIVERSIDE AUTO
+    BODY" front sign. Plus the **street**: asphalt, dashed line, kerbs, sidewalks, zebra crossing,
+    14 streetlights, mansion garden path + hedges.
+  - **`KenneyLoader.lua`** — LoadAsset (cached) → ScaleTo real size (diagonal match, robust to axis
+    swaps; furniture ×1.25 because avatars are chunky) → anchor → sit on the floor → recolour.
+    ⚠️ **`FRONT_YAW` is an unverified guess** (`math.pi`): if furniture faces the wall, flip it to 0.
+  - **`CrewService.lua`** — pads assign roles (one per role, swap by stepping on another, freed on
+    leave), `Role` player attribute, pad glow + sign status, TV refresh every 2s. **Roles are
+    cosmetic** — abilities not built.
+  - **`EconomyService`** mirrors cash to a `Cash` player attribute + standard `leaderstats` → fixes
+    the HUD sitting at **$0** when it missed the first `CashUpdated` event (seen in screenshots).
+  - **New UI (`Shared/UITheme.lua`)** — one look for all HUD + in-world screens: smoked-glass
+    panels, hairline strokes, BuilderSans type, colour only for meaning. Rewrote **CashHud**
+    (rolling number, "+$X" delta), **Notifications** (CanvasGroup toasts, accent bar, max 4),
+    **HeistHud** (red edge-glow alarm vignette, slim vault bar, HEIST COMPLETE / BUSTED result card),
+    new **CrewHud** (role card, objective pill w/ escape countdown, "HEIST CREW" title card on join).
+  - Every .lua in the repo passes `luau-compile` + `luau-analyze` (no unknown globals).
+  - ⏸️ **PENDING IN-STUDIO CHECK** — props loading + orientation, door, pads, TV, UI layout.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot
