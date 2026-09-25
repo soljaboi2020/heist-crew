@@ -443,8 +443,13 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   on E, a few studs apart → Roblox flip-flopped) → Boss is now **F**, Ready (E) / Pick heist (R) sit on their
   own attachments on the spawn side of the table. Role pad text was upside down → rotated 180. All Boss
   briefing lines, tips and step text rewritten **so a 7-year-old gets it** (Malachi's bar — keep it that way).
-  ⏳ OPEN: Malachi wants to drop in **inside the heist**, not on the sidewalk by the car — pitched options,
-  awaiting his pick (villa foyer is watched by camera C1; jewelry entrance is on guard A's aisle).
+- **2026-09-25** — **v1.2.3 SNEAKY ENTRANCES** (Malachi picked option C over door-step / grace-period):
+  launch now drops the crew at a **STAFF ONLY side door** via `refs.sneakIn {at, face, spread}` →
+  `JobService.dropPoints` (sidewalk-by-the-car is the fallback). **Villa:** east wall z -57..-53 →
+  security room right beside the breaker (no camera there; Guard B's x=20 route is >40° off). East fake
+  window at z -57 skipped. **Jewelry:** east alley z 18.3..21.7 → back office (no guard/camera; closet +
+  breaker next door; keycard door still gates the safe). Office bookcase moved off the doorway.
+  ⏭️ Malachi is sending a **screen recording** next — pull frames with ffmpeg + Whisper his narration.
 
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
