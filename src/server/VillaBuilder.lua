@@ -1288,7 +1288,9 @@ function VillaBuilder:build(folder)
         smashCases = {},
         guardRoutes = {
             { name = "Guard_A", spawn = Vector3.new(-6, 3, -44), a = Vector3.new(-6, 3, -44), b = Vector3.new(6, 3, -56) },
-            { name = "Guard_B", spawn = Vector3.new(20, 3, -44), a = Vector3.new(20, 3, -44), b = Vector3.new(20, 3, -76) },
+            -- (v1.2.4) Guard B used to walk kitchen -> security -> gallery and walked
+            -- straight into the crew at the side door. Now he walks the gallery only.
+            { name = "Guard_B", spawn = Vector3.new(14, 3, -74), a = Vector3.new(14, 3, -74), b = Vector3.new(26, 3, -74) },
             { name = "Guard_C", spawn = Vector3.new(-20, 3, -44), a = Vector3.new(-20, 3, -44), b = Vector3.new(-20, 3, -76) },
         },
         plan = {

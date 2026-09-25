@@ -215,7 +215,8 @@ local frameMax = {}   -- [player] = { value, from }  rebuilt every scan
 
 local function checkVision(guard, dt)
     guard.sus = guard.sus or {}
-    local stunned = guard.stunnedUntil and os.clock() < guard.stunnedUntil
+    local stunned = (guard.stunnedUntil and os.clock() < guard.stunnedUntil)
+        or os.clock() < (GuardService.graceUntil or 0)   -- (v1.2.4) drop-in grace
     local headPos = guard.head.Position
     local lookVector = guard.root.CFrame.LookVector
     local cosFovHalf = math.cos(math.rad(Constants.GUARD_VISION_FOV_DEGREES / 2))

@@ -725,6 +725,7 @@ local function launch()
             hrp.CFrame = CFrame.lookAt(pos, Vector3.new(faceTarget.X, pos.Y, faceTarget.Z))
         end
     end
+    S.guards.graceUntil = os.clock() + (Constants.DETECTION.DROP_IN_GRACE or 0)
     startRun(nil, "launch")
     launchRemote:FireAllClients({ phase = "title", jobName = j.cfg.name, tagline = j.cfg.tagline })
 end

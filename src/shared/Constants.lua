@@ -213,8 +213,11 @@ Constants.SECURITY = {
 -- Detection: guards/cameras fill a meter before the alarm (v1.1) — seeing you
 -- up close fills it fast, at the edge of their vision it fills slowly.
 Constants.DETECTION = {
-    GUARD_NEAR_TIME = 0.4,    -- seconds to spot you at point-blank
-    GUARD_FAR_TIME  = 1.4,    -- seconds to spot you at the edge of vision
+    -- (v1.2.4) was 0.4 / 1.4 -- Malachi got busted 6s into his first run. Now you
+    -- get a real moment to duck out of sight.
+    GUARD_NEAR_TIME = 1.2,    -- seconds to spot you at point-blank
+    GUARD_FAR_TIME  = 3.0,    -- seconds to spot you at the edge of vision
+    DROP_IN_GRACE   = 8,      -- seconds after the drop-in when guards can't spot anyone
     DECAY           = 0.6,    -- meter drains this much per second once you're out of sight
 }
 
