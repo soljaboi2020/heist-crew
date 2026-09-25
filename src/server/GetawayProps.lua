@@ -387,7 +387,7 @@ local function buildShutter(parent)
     door.Name = "Door"
     local first
     for i = 0, 9 do
-        local slat = box(door, "Slat", -W2, i * 0.92, -0.12, W2, i * 0.92 + 0.88, 0.12, GREY, Enum.Material.CorrugatedSteel)
+        local slat = box(door, "Slat", -W2, i * 0.92, -0.12, W2, i * 0.92 + 0.88, 0.12, GREY, Enum.Material.DiamondPlate)
         first = first or slat
     end
     local stripe = box(door, "HazardStripe", -W2, 0.2, -0.16, W2, 0.5, -0.12, Color3.fromRGB(245, 196, 40), Enum.Material.Metal)

@@ -1316,7 +1316,7 @@ function MartBuilder:_stockRoom(f, refs, loot)
     box("ShutterHood", x + 0.25, DOOR_H + 0.3, SIDE_DOOR_Z0 - 0.2, x + 1.05, DOOR_H + 1.1, SIDE_DOOR_Z1 + 0.2,
         rgb(96, 100, 110), M.Metal, s, nc())
     box("ShutterSlats", x + 0.25, DOOR_H - 0.25, SIDE_DOOR_Z0 + 0.05, x + 0.4, DOOR_H + 0.3, SIDE_DOOR_Z1 - 0.05,
-        rgb(150, 156, 166), M.CorrugatedSteel, s, nc())
+        rgb(150, 156, 166), M.DiamondPlate, s, nc())
     for _, gz in ipairs({ SIDE_DOOR_Z0, SIDE_DOOR_Z1 - 0.15 }) do
         box("ShutterGuide", x + 0.25, FLOOR, gz, x + 0.4, DOOR_H, gz + 0.15, STEEL, M.Metal, s, nc())
     end

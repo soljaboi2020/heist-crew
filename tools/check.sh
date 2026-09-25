@@ -6,5 +6,6 @@ fail=0
 for f in $(find src -name '*.lua'); do
   out=$("$LC" --null "$f" 2>&1) || { echo "FAIL $f"; echo "$out"; fail=1; }
 done
-[ $fail = 0 ] && echo "all Luau files parse OK"
+python3 "$(dirname "$0")/check_materials.py" || fail=1
+[ $fail = 0 ] && echo "all Luau files parse OK + materials valid"
 exit $fail
