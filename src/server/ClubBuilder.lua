@@ -432,9 +432,21 @@ function ClubBuilder:_holoTable(f, refs)
     light("PointLight", sheet, { Brightness = 2, Range = 16, Color = CYAN })
 
     refs.readyPart = ring
-    local r = prompt(ring, "ReadyUp", "Ready up", "Holo table", Enum.KeyCode.E, 0.3)
+    -- (fix v1.2.2) the two prompts used to share one point AND the Boss's E prompt was
+    -- a few studs away, so Roblox flipped between them every frame. Each prompt now
+    -- sits on its own spot on the spawn side of the table, and the Boss uses F.
+    local function spot(name, dx)
+        local a = Instance.new("Attachment")
+        a.Name = name
+        a.Parent = ring   -- parent first: WorldPosition needs the part
+        a.WorldPosition = Vector3.new(c.x + dx, top + 1.2, c.z + 5.4)
+        return a
+    end
+    local r = prompt(spot("ReadySpot", 2.6), "ReadyUp", "I'm ready!", "Holo table", Enum.KeyCode.E, 0.3)
+    r.MaxActivationDistance = 8
     r.Triggered:Connect(function(player) if ClubBuilder.onReadyUp then ClubBuilder.onReadyUp(player) end end)
-    local n = prompt(ring, "NextJob", "Change job", "Holo table", Enum.KeyCode.R, 0.4)
+    local n = prompt(spot("JobSpot", -2.6), "NextJob", "Pick a different heist", "Holo table", Enum.KeyCode.R, 0.4)
+    n.MaxActivationDistance = 8
     n.GamepadKeyCode = Enum.KeyCode.ButtonY
     n.Triggered:Connect(function(player) if ClubBuilder.onNextJob then ClubBuilder.onNextJob(player) end end)
 
@@ -487,6 +499,8 @@ function ClubBuilder:_crewPads(f, refs)
             CFrame = CFrame.new(x, F + 0.15, z) * CFrame.Angles(0, 0, math.rad(90)) }, f)
         local label = box(role.id .. "PadLabel", x - 0.8, F + 0.31, z - 2.1, x + 0.8, F + 0.32, z + 2.1,
             Color3.new(), Enum.Material.SmoothPlastic, f, { Transparency = 1, CanCollide = false })
+        -- (fix v1.2.2) text read upside down from the room side; turn it to face you
+        label.CFrame = label.CFrame * CFrame.Angles(0, math.pi, 0)
         local lg = surface(label, Enum.NormalId.Top, 40)
         text({ Text = string.upper(role.id), Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
             FontFace = UITheme.F.display, TextScaled = true, TextColor3 = col }, lg)

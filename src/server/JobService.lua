@@ -228,7 +228,7 @@ local function buildInfo()
     local held = false
     for _, p in ipairs(Players:GetPlayers()) do if p:GetAttribute("HasKeycard") then held = true end end
     add("keycard", "Find the keycard", doorsOpen or held, false)
-    add("door", j.cfg.id == "jewelry" and "Get into the back room" or "Open the vault wing", doorsOpen)
+    add("door", j.cfg.id == "jewelry" and "Open the back room door" or "Open the locked vault door", doorsOpen)
     local noun = j.cfg.id == "jewelry" and "Safe" or "Vault"
     add("vault", drillLabel(noun), run ~= nil and run.vaultOpen == true)
     local vaultBags = c.total - c.cases

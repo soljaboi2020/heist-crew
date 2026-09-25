@@ -1,7 +1,7 @@
 --[[
     HEIST CREW — BriefingUI  (v1.1)
     ────────────────────────────────────────────────
-    1. THE BRIEFING — press E on the Boss. The camera leaves your character
+    1. THE BRIEFING — press F on the Boss. The camera leaves your character
        and slowly glides over three shots (the blueprint, the TV, the garage
        door) while the Boss's lines for the selected job type out in a
        subtitle bar (Constants.JOBS[..].briefing). Skip with the button,

@@ -24,15 +24,15 @@ local TipHud = {}
 local localPlayer = Players.LocalPlayer
 
 local TIPS = {
-    welcome = { "Welcome to The Vault", "Pick a role on the pads by the east wall, talk to me (E) for the plan, then ready up at the holo table." },
-    start   = { "You're in", "Follow the markers. Stay out of flashlights and red camera cones — they fill a meter before the alarm." },
-    spotted = { "They're onto you", "That meter means someone can see you. Break line of sight and it drains." },
-    bag     = { "Heavy, huh?", "Bags slow you down. Take it to the car and press E at the trunk — or G to throw it to a teammate." },
-    trunk   = { "Load it up", "Hold E at the back of the car to load the bag. Loaded bags pay out at the marina." },
-    alarm   = { "Now it's loud", "Forget the rest. Everyone in the car and drive to the marina before the timer runs out." },
-    drive   = { "You're driving", "WASD to drive. Follow the marker to the marina. Driver role: Shift for nitro." },
-    vault   = { "The vault", "Place the drill and guard it. When it jams, hold E to fix it." },
-    lasers  = { "Lasers", "Watch the beams blink. Go through when a row is off." },
+    welcome = { "Welcome to The Vault!", "1. Stand on a colored circle to pick your role.  2. Talk to the Boss (press F).  3. Press E at the glowing table when you're ready." },
+    start   = { "You're in!", "Follow the markers. Stay out of flashlights and red camera beams, or you'll get caught." },
+    spotted = { "Someone sees you!", "Hide! Get out of their sight and the meter goes back down." },
+    bag     = { "Heavy bag!", "Bags make you slow. Take it to the car and press E at the trunk. Or press G to throw it to a friend." },
+    trunk   = { "Load it up", "Hold E at the back of the car to put the bag in. Bags in the car = money at the end." },
+    alarm   = { "The alarm is on!", "Forget the rest! Jump in the car and drive to the marina before time runs out." },
+    drive   = { "You're driving", "Use WASD to drive. Follow the marker to the marina. Drivers: press Shift to go super fast." },
+    vault   = { "The vault", "Put the drill on the vault and stay close. If it gets stuck, hold E to fix it." },
+    lasers  = { "Lasers!", "The red beams blink on and off. Walk through when they're off." },
 }
 
 function TipHud:_build()

@@ -186,10 +186,12 @@ function HeistBuilder:_buildBoss(folder)
     -- v1.1: talk to him for the briefing (client BriefingUI plays it)
     local bp = Instance.new("ProximityPrompt")
     bp.Name = "Briefing"
-    bp.ActionText = "Get the briefing"
+    bp.ActionText = "Hear the plan"
     bp.ObjectText = "The Boss"
     bp.MaxActivationDistance = 10
     bp.RequiresLineOfSight = false
+    bp.KeyboardKeyCode = Enum.KeyCode.F     -- (fix v1.2.2) E is the table's key
+    bp.GamepadKeyCode = Enum.KeyCode.ButtonX
     bp.Parent = root
     local head = bossModel:FindFirstChild("Head") or root
 
@@ -208,7 +210,7 @@ function HeistBuilder:_buildBoss(folder)
     bg.Parent = bb
     UITheme.caption("The Boss", { Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -32, 0, 14),
         TextColor3 = UITheme.C.gold, TextSize = 12 }).Parent = bg
-    UITheme.label({ Text = "Crack that vault, kid. Don't get caught.", Position = UDim2.fromOffset(16, 26),
+    UITheme.label({ Text = "Hey kid! Press F and I'll tell you the plan.", Position = UDim2.fromOffset(16, 26),
         Size = UDim2.new(1, -32, 0, 42), TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 17,
         TextYAlignment = Enum.TextYAlignment.Top }).Parent = bg
 end

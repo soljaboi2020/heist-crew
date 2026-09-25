@@ -166,11 +166,13 @@ Constants.JOBS = {
         alarmTimer = 90,           -- seconds to get the loaded car to the marina once the alarm trips
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
         briefing = {
-            "Villa Rosa. Beachfront. Owner's in Monaco — the vault isn't.",
-            "Three guards with flashlights, three cameras. Cut the cameras at the breaker in the security room.",
-            "The vault wing needs a keycard. It moves around — search the office, bedroom, kitchen and gallery.",
-            "Lasers blink. Time it. Drill the vault, and if the drill jams, fix it.",
-            "Bag everything, load the car, drive it to the marina. Quiet pays extra.",
+            "This job is Villa Rosa. It's a rich guy's beach house. He's on vacation, but his vault is full of money!",
+            "There are 3 guards with flashlights and 3 cameras. Don't let them see you!",
+            "Tip: find the breaker box in the security room. Use it to turn the cameras off.",
+            "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
+            "Red lasers blink on and off. Walk through when they turn off.",
+            "Put the drill on the vault. If the drill gets stuck, hold E to fix it.",
+            "Put the money bags in the car and drive to the boats (the marina). If nobody sees you, you get extra cash!",
         },
     },
     {
@@ -180,10 +182,10 @@ Constants.JOBS = {
         stealthBonus = 0.15,
         silentAlarmDelay = 45,     -- first smashed case starts a hidden clock; police roll after this
         briefing = {
-            "Diamond Dolls. Eight glass cases, and every one of them is wired.",
-            "The first case you smash trips a silent alarm. Cops are on their way — you just won't hear them.",
-            "Grab what you can, then the back room: keycard door, one laser, a safe.",
-            "Load the car and get to the marina before the block goes red.",
+            "This job is Diamond Dolls. It's a jewelry store with 8 glass cases full of shiny stuff!",
+            "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
+            "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
+            "Put the bags in the car and drive to the boats (the marina) before the timer runs out!",
         },
     },
 }

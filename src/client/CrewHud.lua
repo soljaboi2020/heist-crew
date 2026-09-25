@@ -123,7 +123,7 @@ function CrewHud:_renderRole()
         ui.bar.BackgroundColor3 = T.faint
         ui.name.Text = "No role yet"
         ui.name.TextColor3 = T.text
-        ui.blurb.Text = "Crew pads are on the east wall"
+        ui.blurb.Text = "Stand on a colored circle to pick one"
     end
 end
 
@@ -172,13 +172,13 @@ function CrewHud:_refresh()
         local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))
         self:_setObjective("Rolling out", string.format("Everyone's ready — drop-in in %d", left))
     elseif not localPlayer:GetAttribute("Role") then
-        self:_setObjective("Step 1 of 3", "Pick a role — stand on a crew pad (east wall)")
+        self:_setObjective("Step 1 of 3", "Stand on a colored circle to pick your role")
     elseif (info.readyCount or 0) > 0 then
-        self:_setObjective("Step 3 of 3", string.format("Ready up at the holo table  (%d/%d ready)",
+        self:_setObjective("Step 3 of 3", string.format("Press E at the glowing table  (%d/%d ready)",
             info.readyCount or 0, info.playerCount or 1))
     else
         local name = info.jobName or "the job"
-        self:_setObjective("Step 2 of 3", "Talk to the Boss for the plan, then ready up · " .. name)
+        self:_setObjective("Step 2 of 3", "Talk to the Boss (F), then press E at the table · " .. name)
     end
 end
 
