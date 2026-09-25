@@ -195,30 +195,8 @@ function SafehouseBuilder:_shell(f)
         box("Truss", WEST + 0.5, top - 1.2, z - 0.35, EAST - 0.5, top - 0.5, z + 0.35, STEEL, Enum.Material.Metal, f)
     end
 
-    -- ── Exterior: shop sign over the garage + a wall light on the driveway ──
-    local sign = box("ShopSign", -11, FLOOR + GH + 0.6, NORTH - 0.9, 11, FLOOR + GH + 3.4, NORTH - 0.5,
-        Color3.fromRGB(26, 28, 34), Enum.Material.Metal, f)
-    local sg = surface(sign, Enum.NormalId.Front, 40)
-    text({ Text = "RIVERSIDE AUTO BODY", Size = UDim2.fromScale(1, 0.62), Position = UDim2.fromScale(0, 0.1),
-        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
-        TextColor3 = Color3.fromRGB(236, 226, 206) }, sg)
-    text({ Text = "COLLISION  ·  PAINT  ·  NO QUESTIONS", Size = UDim2.fromScale(1, 0.24), Position = UDim2.fromScale(0, 0.72),
-        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold,
-        TextColor3 = T.gold }, sg)
-    -- a wall light either side of the garage, lighting the driveway
-    for _, sx in ipairs({ -1, 1 }) do
-        local lx = sx * (GW / 2 + 2)
-        local wallLamp = box("WallLamp", lx - 0.6, FLOOR + 9, NORTH - 1.4, lx + 0.6, FLOOR + 9.5, NORTH - 0.5, STEEL, Enum.Material.Metal, f)
-        box("WallLampLens", lx - 0.45, FLOOR + 8.9, NORTH - 1.3, lx + 0.45, FLOOR + 9, NORTH - 0.6, WARM_LIGHT, Enum.Material.Neon, f, { CanCollide = false })
-        local wl = Instance.new("SpotLight")
-        wl.Face = Enum.NormalId.Bottom
-        wl.Angle = 120
-        wl.Brightness = 1.8
-        wl.Range = 18
-        wl.Color = WARM_LIGHT
-        wl.Shadows = true
-        wl.Parent = wallLamp
-    end
+    -- v1.0: the exterior sign + wall lamps are built by MiamiBuilder:skinSafehouse()
+    -- (neon Miami version) — nothing here any more.
 end
 
 -- Roll-up door: horizontal slats that slide up into the header when anyone
@@ -291,38 +269,14 @@ function SafehouseBuilder:_planningTable(f, refs)
     for i = 1, 11 do
         frame({ Size = UDim2.new(1, 0, 0, 1), Position = UDim2.fromScale(0, i / 12), BackgroundColor3 = INK, BackgroundTransparency = 0.88 }, bg)
     end
-    text({ Text = "JOB 01  —  THE MANSION", Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 30),
+    -- v1.0: title, floor plan and notes are drawn per job by SafehouseBuilder:showJob()
+    local title = text({ Text = "", Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, -36, 0, 30),
         TextColor3 = INK, FontFace = UITheme.F.display, TextSize = 26 }, bg)
-    text({ Text = "NORTH SIDE · 2 GUARDS · VAULT ON BACK WALL", Position = UDim2.fromOffset(18, 40), Size = UDim2.new(1, -36, 0, 18),
+    local sub = text({ Text = "", Position = UDim2.fromOffset(18, 40), Size = UDim2.new(1, -36, 0, 18),
         TextColor3 = INK, TextTransparency = 0.3, FontFace = UITheme.F.bold, TextSize = 14 }, bg)
-    -- floor plan
     local plan = frame({ Size = UDim2.fromScale(0.62, 0.62), Position = UDim2.fromScale(0.08, 0.28), BackgroundTransparency = 1 }, bg)
-    UITheme.stroke(plan, INK, 0.1, 3)
-    -- front door gap (bottom edge)
-    frame({ Size = UDim2.new(0.22, 0, 0, 7), Position = UDim2.new(0.39, 0, 1, -3), BackgroundColor3 = BLUE }, plan)
-    text({ Text = "ENTRY", Size = UDim2.new(0.3, 0, 0, 16), Position = UDim2.new(0.35, 0, 1, 6), TextColor3 = INK,
-        FontFace = UITheme.F.bold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center }, plan)
-    -- vault
-    local vault = frame({ Size = UDim2.fromScale(0.2, 0.2), Position = UDim2.fromScale(0.4, 0.04), BackgroundColor3 = Color3.fromRGB(220, 60, 60), BackgroundTransparency = 0.2 }, plan)
-    UITheme.stroke(vault, Color3.fromRGB(255, 140, 140), 0, 2)
-    text({ Text = "VAULT", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
-        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = Color3.new(1, 1, 1) }, vault)
-    -- guard routes (dashed)
-    for _, yRel in ipairs({ 0.36, 0.7 }) do
-        for i = 0, 9 do
-            frame({ Size = UDim2.new(0.05, 0, 0, 3), Position = UDim2.fromScale(0.05 + i * 0.095, yRel),
-                BackgroundColor3 = Color3.fromRGB(250, 204, 21) }, plan)
-        end
-    end
-    text({ Text = "GUARD ROUTES", Size = UDim2.new(0.5, 0, 0, 14), Position = UDim2.fromScale(0.05, 0.41),
-        TextColor3 = Color3.fromRGB(250, 204, 21), FontFace = UITheme.F.bold, TextSize = 12 }, plan)
-    -- side notes
     local notes = frame({ Size = UDim2.fromScale(0.24, 0.62), Position = UDim2.fromScale(0.74, 0.28), BackgroundTransparency = 1 }, bg)
-    local lines = { "1  CROSS THE STREET", "2  AVOID THE LIGHT", "3  HOLD E ON VAULT", "4  RUN TO THE CAR", "", "PAYOUT", "$3,000 EACH" }
-    for i, l in ipairs(lines) do
-        text({ Text = l, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, (i - 1) * 24), TextColor3 = (i >= 6) and T.gold or INK,
-            FontFace = (i == 7) and UITheme.F.display or UITheme.F.bold, TextSize = (i == 7) and 22 or 14 }, notes)
-    end
+    refs.blueprint = { title = title, sub = sub, plan = plan, notes = notes, ink = INK, paper = BLUE }
     -- CONFIDENTIAL stamp
     local stamp = text({ Text = "CONFIDENTIAL", Size = UDim2.fromOffset(220, 40), Position = UDim2.fromScale(0.72, 0.06),
         Rotation = -10, TextColor3 = Color3.fromRGB(239, 68, 68), TextTransparency = 0.15, FontFace = UITheme.F.display,
@@ -340,6 +294,22 @@ function SafehouseBuilder:_planningTable(f, refs)
         table.insert(props, { kit = "furniture", name = "stoolBar", pos = Vector3.new(x + p[1], FLOOR, z + p[2]), facing = Vector3.new(0, 0, -p[2]) })
     end
     KenneyLoader.placeMany(props, f)
+
+    -- v1.0: change the job from the table
+    local tableTop = f:FindFirstChild("TableTop")
+    if tableTop then
+        local p = Instance.new("ProximityPrompt")
+        p.Name = "NextJob"
+        p.ActionText = "Change job"
+        p.ObjectText = "Planning table"
+        p.HoldDuration = 0.4
+        p.MaxActivationDistance = 9
+        p.RequiresLineOfSight = false
+        p.Parent = tableTop
+        p.Triggered:Connect(function(player)
+            if SafehouseBuilder.onNextJob then SafehouseBuilder.onNextJob(player) end
+        end)
+    end
 
     -- Bright work lamp right over the table so the blueprint pops
     hangingLamp(f, x, z, FLOOR + 11, 3.2, 18, Color3.fromRGB(235, 240, 255))
@@ -417,7 +387,7 @@ function SafehouseBuilder:_gearWall(f)
     local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, g)
     text({ Text = "GEAR", Position = UDim2.fromOffset(24, 14), Size = UDim2.fromOffset(300, 50),
         TextColor3 = Color3.fromRGB(30, 22, 16), FontFace = UITheme.F.display, TextSize = 48 }, bg)
-    text({ Text = "SHOP OPENS SOON", Position = UDim2.fromOffset(26, 60), Size = UDim2.fromOffset(300, 20),
+    text({ Text = "OPEN  ·  PRESS E", Position = UDim2.fromOffset(26, 60), Size = UDim2.fromOffset(300, 20),
         TextColor3 = Color3.fromRGB(80, 50, 30), FontFace = UITheme.F.bold, TextSize = 18 }, bg)
     -- tool outlines, like a real shop's shadow board
     local tools = { { "LOCKPICK", 0.05 }, { "EMP", 0.29 }, { "DRILL", 0.53 }, { "THERMAL", 0.77 } }
@@ -432,6 +402,15 @@ function SafehouseBuilder:_gearWall(f)
         text({ Text = "?", Size = UDim2.fromScale(1, 0.7), TextXAlignment = Enum.TextXAlignment.Center,
             TextColor3 = Color3.fromRGB(50, 34, 24), TextTransparency = 0.5, FontFace = UITheme.F.display, TextSize = 60 }, slot)
     end
+
+    -- v1.0: the shop opens from here (client ShopUI listens for this prompt)
+    local sp = Instance.new("ProximityPrompt")
+    sp.Name = "OpenShop"
+    sp.ActionText = "Open shop"
+    sp.ObjectText = "Gear wall"
+    sp.MaxActivationDistance = 10
+    sp.RequiresLineOfSight = false
+    sp.Parent = board
 
     -- workbench
     local bx0, bx1 = EAST - 4.2, EAST - 0.8
@@ -489,18 +468,19 @@ function SafehouseBuilder:_lounge(f, refs)
     -- left: next job
     local left = frame({ Size = UDim2.fromScale(0.52, 0.72), BackgroundTransparency = 1 }, bg)
     text({ Text = "NEXT JOB", Size = UDim2.new(1, 0, 0, 22), TextColor3 = T.gold, FontFace = UITheme.F.bold, TextSize = 22 }, left)
-    text({ Text = "THE MANSION", Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 70),
+    local jobName = text({ Text = "", Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 70),
         TextColor3 = T.text, FontFace = UITheme.F.display, TextScaled = true }, left)
-    text({ Text = "Crack the vault. Get out clean.", Position = UDim2.fromOffset(0, 100), Size = UDim2.new(1, 0, 0, 26),
+    local jobTag = text({ Text = "", Position = UDim2.fromOffset(0, 100), Size = UDim2.new(1, 0, 0, 26),
         TextColor3 = T.muted, FontFace = UITheme.F.medium, TextSize = 24 }, left)
-    local stats = { { "DIFFICULTY", "■ ■ □ □ □" }, { "GUARDS", "2" }, { "PAYOUT", "$3,000 each" } }
+    local statCells = {}
+    local stats = { { "DIFFICULTY", "" }, { "GUARDS", "" }, { "TAKE", "" } }
     for i, s in ipairs(stats) do
         local cell = frame({ Size = UDim2.new(0.31, 0, 0, 74), Position = UDim2.new((i - 1) * 0.345, 0, 0, 150),
             BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.94 }, left)
         UITheme.corner(cell, 10)
         text({ Text = s[1], Position = UDim2.fromOffset(12, 8), Size = UDim2.new(1, -24, 0, 18), TextColor3 = T.muted,
             FontFace = UITheme.F.bold, TextSize = 15 }, cell)
-        text({ Text = s[2], Position = UDim2.fromOffset(12, 30), Size = UDim2.new(1, -24, 0, 34),
+        statCells[i] = text({ Text = s[2], Position = UDim2.fromOffset(12, 30), Size = UDim2.new(1, -24, 0, 34),
             TextColor3 = (i == 3) and T.money or T.text, FontFace = UITheme.F.display, TextScaled = true }, cell)
     end
 
@@ -536,7 +516,7 @@ function SafehouseBuilder:_lounge(f, refs)
             TextColor3 = T.muted, FontFace = UITheme.F.bold, TextScaled = true, TextTruncate = Enum.TextTruncate.AtEnd }, chip)
     end
 
-    refs.tv = { rows = rows, crew = crew }
+    refs.tv = { rows = rows, crew = crew, jobName = jobName, jobTag = jobTag, stats = statCells }
 
     -- furniture
     local toTV = Vector3.new(0, 0, 1)
@@ -649,6 +629,87 @@ function SafehouseBuilder:buildStreet(f)
     box("FrontPath", -4, 0, doorZ, 4, 0.45, pathZ0, Color3.fromRGB(170, 164, 152), Enum.Material.Slate, f)
     for _, sx in ipairs({ -1, 1 }) do
         box("Hedge", sx * 5, 0, doorZ + 1, sx * 6.4, 2, pathZ0 - 0.5, Color3.fromRGB(44, 88, 48), Enum.Material.Grass, f)
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- 🗺 v1.0: redraw the blueprint + TV for the selected job
+-- ──────────────────────────────────────────────
+local NOTES = {
+    villa = { "1  CUT THE CAMERAS", "2  FIND THE KEYCARD", "3  TIME THE LASERS", "4  DRILL THE VAULT",
+              "5  LOAD THE CAR", "6  DRIVE TO THE MARINA" },
+    jewelry = { "1  SMASH THE CASES", "2  SILENT ALARM — MOVE", "3  BACK-ROOM KEYCARD", "4  DRILL THE SAFE",
+                "5  LOAD THE CAR", "6  DRIVE TO THE MARINA" },
+}
+
+function SafehouseBuilder:showJob(refs, cfg, jobRefs)
+    local bp = refs and refs.blueprint
+    if bp then
+        local idx = 1
+        for i, j in ipairs(Constants.JOBS) do if j.id == cfg.id then idx = i end end
+        bp.title.Text = string.format("JOB 0%d  —  %s", idx, cfg.name)
+        bp.sub.Text = string.upper(cfg.tagline)
+        bp.plan:ClearAllChildren()
+        bp.notes:ClearAllChildren()
+        local INK, PAPER = bp.ink, bp.paper
+        local pl = jobRefs.plan
+        if pl and pl.bounds then
+            local x0, z0, x1, z1 = pl.bounds[1], pl.bounds[2], pl.bounds[3], pl.bounds[4]
+            local function rel(x, z) return (x - x0) / (x1 - x0), (z - z0) / (z1 - z0) end
+            UITheme.stroke(bp.plan, INK, 0.1, 3)
+            for _, r in ipairs(pl.rooms or {}) do
+                local ax, az = rel(math.min(r[1], r[3]), math.min(r[2], r[4]))
+                local bx, bz = rel(math.max(r[1], r[3]), math.max(r[2], r[4]))
+                local room = frame({ Position = UDim2.fromScale(ax, az), Size = UDim2.fromScale(bx - ax, bz - az),
+                    BackgroundTransparency = 1 }, bp.plan)
+                UITheme.stroke(room, INK, 0.35, 1)
+                text({ Text = r[5] or "", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+                    TextColor3 = INK, TextTransparency = 0.25, FontFace = UITheme.F.bold, TextScaled = true }, room)
+            end
+            for _, route in ipairs(jobRefs.guardRoutes or {}) do
+                if route.a and route.b then
+                    for k = 0, 8 do
+                        local pnt = route.a:Lerp(route.b, k / 8)
+                        local rx, rz = rel(pnt.X, pnt.Z)
+                        frame({ Position = UDim2.fromScale(rx, rz), Size = UDim2.fromOffset(6, 6), AnchorPoint = Vector2.new(0.5, 0.5),
+                            BackgroundColor3 = Color3.fromRGB(250, 204, 21) }, bp.plan)
+                    end
+                end
+            end
+            if pl.vault then
+                local vx, vz = rel(pl.vault[1], pl.vault[2])
+                local v = frame({ Position = UDim2.fromScale(vx, vz), Size = UDim2.fromOffset(60, 30), AnchorPoint = Vector2.new(0.5, 0.5),
+                    BackgroundColor3 = Color3.fromRGB(220, 60, 60), BackgroundTransparency = 0.15 }, bp.plan)
+                UITheme.corner(v, 4)
+                text({ Text = cfg.id == "jewelry" and "SAFE" or "VAULT", Size = UDim2.fromScale(1, 1),
+                    TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 15,
+                    TextColor3 = Color3.new(1, 1, 1) }, v)
+            end
+            if pl.entry then
+                local ex, ez = rel(pl.entry[1], pl.entry[2])
+                frame({ Position = UDim2.fromScale(ex, ez), Size = UDim2.fromOffset(44, 7), AnchorPoint = Vector2.new(0.5, 0.5),
+                    BackgroundColor3 = PAPER }, bp.plan)
+                text({ Text = "ENTRY", Position = UDim2.new(ex, -30, ez, 6), Size = UDim2.fromOffset(60, 14),
+                    TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = INK, FontFace = UITheme.F.bold, TextSize = 12 }, bp.plan)
+            end
+        end
+        for i, l in ipairs(NOTES[cfg.id] or {}) do
+            text({ Text = l, Size = UDim2.new(1, 0, 0, 20), Position = UDim2.fromOffset(0, (i - 1) * 24), TextColor3 = INK,
+                FontFace = UITheme.F.bold, TextSize = 14 }, bp.notes)
+        end
+    end
+
+    local tv = refs and refs.tv
+    if tv then
+        tv.jobName.Text = cfg.name
+        tv.jobTag.Text = cfg.tagline
+        local d = cfg.difficulty or 1
+        tv.stats[1].Text = string.rep("■ ", d) .. string.rep("□ ", 5 - d)
+        tv.stats[2].Text = tostring(#(jobRefs.guardRoutes or {}))
+        local take = 0
+        for _, sp in ipairs(jobRefs.lootSpots or {}) do take = take + ((Constants.LOOT[sp.kind] or {}).value or 0) end
+        for _, c in ipairs(jobRefs.smashCases or {}) do take = take + ((Constants.LOOT[c.kind or "Jewels"] or {}).value or 0) end
+        tv.stats[3].Text = "up to " .. UITheme.money(take)
     end
 end
 

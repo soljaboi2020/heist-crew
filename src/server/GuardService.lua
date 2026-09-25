@@ -23,6 +23,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
@@ -98,6 +99,7 @@ local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, hea
         local player = Players:GetPlayerFromCharacter(character)
         if not player then return end
         if guard.cooldown > 0 then return end
+        if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
         guard.cooldown = 2  -- prevent multi-fire
         callbacks.onPlayerCaught(player, guard)
     end
@@ -117,7 +119,7 @@ local function flatDist(a, b)
     return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
 end
 
-local function walkTo(guard, target, gen)
+local function walkTo(guard, target, gen, budget)
     local hum, root = guard.humanoid, guard.root
     local points = { target }
 
@@ -130,12 +132,15 @@ local function walkTo(guard, target, gen)
         for _, wp in ipairs(path:GetWaypoints()) do table.insert(points, wp.Position) end
     end
 
+    local hardStop = budget and (os.clock() + budget) or math.huge
     for _, point in ipairs(points) do
+        if os.clock() > hardStop then return false end
         local deadline = os.clock() + (flatDist(root.Position, point) / math.max(hum.WalkSpeed, 1)) + 3
         local lastIssue = 0
         while flatDist(root.Position, point) > 2 do
             if guard.gen ~= gen or not guards[guard.name] then return false end
-            if os.clock() > deadline then return false end
+            if os.clock() > deadline or os.clock() > hardStop then return false end
+            if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return false end
             -- Humanoid:MoveTo silently gives up after 8s, so keep re-issuing it
             if os.clock() - lastIssue > 2 then
                 hum:MoveTo(point)
@@ -147,15 +152,36 @@ local function walkTo(guard, target, gen)
     return true
 end
 
+local function nearestPlayer(from, maxDist)
+    local best, bestD = nil, maxDist or math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        local char = p.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hum and hrp and hum.Health > 0 and not hum.SeatPart then
+            local d = (hrp.Position - from).Magnitude
+            if d < bestD then best, bestD = hrp.Position, d end
+        end
+    end
+    return best
+end
+
 local function runBrain(guard)
     task.spawn(function()
         while guards[guard.name] do
             local gen = guard.gen
-            if guard.alarmActive then
+            if guard.stunnedUntil and os.clock() < guard.stunnedUntil then
+                task.wait(0.2)
+            elseif guard.alarmActive then
+                -- v1.0: chase the NEAREST player live (re-plan every ~1s) instead of
+                -- walking to one stale "last known position" and standing there.
                 guard.humanoid.WalkSpeed = Constants.GUARD_CHASE_SPEED
-                walkTo(guard, guard._chaseTarget or guard.waypointA, gen)
-                -- Reached the last-known spot: stand and look around until orders change
-                while guard.gen == gen and guards[guard.name] do task.wait(0.2) end
+                local target = nearestPlayer(guard.root.Position, 90) or guard._chaseTarget
+                if target then
+                    walkTo(guard, target, gen, 1)
+                else
+                    task.wait(0.3)
+                end
             else
                 guard.humanoid.WalkSpeed = Constants.GUARD_PATROL_SPEED
                 local target = guard.nextWaypoint
@@ -175,6 +201,7 @@ end
 -- ──────────────────────────────────────────────
 local function checkVision(guard)
     if guard.alarmActive then return end  -- already chasing, no need to "spot"
+    if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
 
     local headPos = guard.head.Position
     local lookVector = guard.root.CFrame.LookVector
@@ -220,70 +247,118 @@ end
 -- ──────────────────────────────────────────────
 -- Public API
 -- ──────────────────────────────────────────────
-function GuardService:spawnPatrols(cb)
-    callbacks.onPlayerSpotted = cb.onPlayerSpotted or function() end
-    callbacks.onPlayerCaught = cb.onPlayerCaught or function() end
+local guardFolder = nil
+local heartbeat = nil
 
-    local W = Constants.WORLD
-    local center = Vector3.new(W.MANSION_CENTER.x, W.MANSION_CENTER.y, W.MANSION_CENTER.z)
+-- Muscle takedown: knocks a guard out for a while if you get him from behind.
+local TAKEDOWN_TIME = 10
+local function addTakedown(guard)
+    local p = Instance.new("ProximityPrompt")
+    p.Name = "Takedown"
+    p.ActionText = "Takedown"
+    p.ObjectText = "Guard"
+    p.HoldDuration = 0.6
+    p.MaxActivationDistance = 6
+    p.RequiresLineOfSight = false
+    p:SetAttribute("RoleOnly", "Muscle")
+    p.Parent = guard.root
+    p.Triggered:Connect(function(player)
+        if player:GetAttribute("Role") ~= "Muscle" then return end
+        if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local toPlayer = (hrp.Position - guard.root.Position)
+        toPlayer = Vector3.new(toPlayer.X, 0, toPlayer.Z)
+        local look = guard.root.CFrame.LookVector
+        if toPlayer.Magnitude > 0.1 and Vector3.new(look.X, 0, look.Z).Unit:Dot(toPlayer.Unit) > -0.2 and not guard.alarmActive then
+            callbacks.onTakedownFailed(player, guard)   -- he saw you coming
+            return
+        end
+        GuardService:stun(guard, TAKEDOWN_TIME)
+        callbacks.onTakedown(player, guard)
+    end)
+end
 
-    -- Two guards patrolling the mansion: one east-west, one diagonal
-    local guardConfigs = {
-        {
-            name = "Guard_Patrol_A",
-            spawn = center + Vector3.new(-15, 3, 0),
-            waypointA = center + Vector3.new(-20, 3, -10),
-            waypointB = center + Vector3.new(20, 3, -10),
-        },
-        {
-            name = "Guard_Patrol_B",
-            spawn = center + Vector3.new(15, 3, 8),
-            waypointA = center + Vector3.new(20, 3, 8),
-            waypointB = center + Vector3.new(-20, 3, 8),
-        },
-    }
+function GuardService:stun(guard, seconds)
+    guard.stunnedUntil = os.clock() + seconds
+    guard.gen = guard.gen + 1
+    guard.humanoid:MoveTo(guard.root.Position)
+    guard.humanoid.PlatformStand = true
+    local light = guard.head and guard.head:FindFirstChildOfClass("SpotLight")
+    if light then light.Enabled = false end
+    task.delay(seconds, function()
+        if not guard.model.Parent then return end
+        guard.humanoid.PlatformStand = false
+        if light then light.Enabled = true end
+        -- stand back up where he fell
+        guard.root.CFrame = CFrame.new(guard.root.Position + Vector3.new(0, 2, 0))
+    end)
+end
 
-    local guardFolder = Instance.new("Folder")
+-- routes: { { name, spawn = Vector3, a = Vector3, b = Vector3 } }
+function GuardService:spawnPatrols(cb, routes)
+    cb = cb or {}
+    callbacks.onPlayerSpotted = cb.onPlayerSpotted or callbacks.onPlayerSpotted
+    callbacks.onPlayerCaught = cb.onPlayerCaught or callbacks.onPlayerCaught
+    callbacks.onTakedown = cb.onTakedown or callbacks.onTakedown or function() end
+    callbacks.onTakedownFailed = cb.onTakedownFailed or callbacks.onTakedownFailed or function() end
+
+    self:despawnAll()
+    guardFolder = Instance.new("Folder")
     guardFolder.Name = "Guards"
     guardFolder.Parent = Workspace
 
     local spawned = 0
-    for _, cfg in ipairs(guardConfigs) do
-        local model, humanoid, root, head = buildGuardModel(cfg.name, cfg.spawn)
+    for i, cfg in ipairs(routes or {}) do
+        local name = cfg.name or ("Guard_" .. i)
+        local model, humanoid, root, head = buildGuardModel(name, cfg.spawn or cfg.a)
         if model then
             model.Parent = guardFolder
+            CollectionService:AddTag(model, "Guard")
             -- Server owns the physics so the guard can't be flung/lagged by a client
             pcall(function() root:SetNetworkOwner(nil) end)
             NpcFactory.animate(humanoid)
-            local guard = spawnGuard(cfg.name, cfg.waypointA, cfg.waypointB, model, humanoid, root, head)
-            guards[cfg.name] = guard
+            local guard = spawnGuard(name, cfg.a, cfg.b, model, humanoid, root, head)
+            guards[name] = guard
+            addTakedown(guard)
             runBrain(guard)
             spawned = spawned + 1
         else
-            warn("[GuardService] could not build", cfg.name)
+            warn("[GuardService] could not build", name)
         end
     end
 
-    -- Heartbeat: tick catch cooldowns + scan vision
-    RunService.Heartbeat:Connect(function(dt)
-        for _, guard in pairs(guards) do
-            if guard.cooldown > 0 then
-                guard.cooldown = math.max(0, guard.cooldown - dt)
+    if not heartbeat then
+        heartbeat = RunService.Heartbeat:Connect(function(dt)
+            for _, guard in pairs(guards) do
+                if guard.cooldown > 0 then
+                    guard.cooldown = math.max(0, guard.cooldown - dt)
+                end
             end
-        end
-        -- Vision scan less frequently (every ~0.1s)
-        if RunService:IsServer() then
             self._scanAccumulator = (self._scanAccumulator or 0) + dt
             if self._scanAccumulator > 0.1 then
                 self._scanAccumulator = 0
                 for _, guard in pairs(guards) do
-                    checkVision(guard)
+                    local ok, err = pcall(checkVision, guard)
+                    if not ok then warn("[GuardService] vision:", err) end
                 end
             end
-        end
-    end)
+        end)
+    end
 
     print("[GuardService] Spawned", spawned, "guards")
+end
+
+function GuardService:despawnAll()
+    for name, guard in pairs(guards) do
+        guards[name] = nil
+        if guard.model then guard.model:Destroy() end
+    end
+    if guardFolder then guardFolder:Destroy() guardFolder = nil end
+end
+
+function GuardService:getGuards()
+    return guards
 end
 
 function GuardService:setAlarmActive(active, chaseTarget)
@@ -297,6 +372,12 @@ function GuardService:setAlarmActive(active, chaseTarget)
 end
 
 function GuardService:reset()
+    for _, guard in pairs(guards) do
+        guard.stunnedUntil = nil
+        guard.humanoid.PlatformStand = false
+        local light = guard.head and guard.head:FindFirstChildOfClass("SpotLight")
+        if light then light.Enabled = true end
+    end
     self:setAlarmActive(false)
 end
 

@@ -451,6 +451,126 @@
     "assetId": 94698463247475,
     "moderation": "Approved"
   },
+  "factory/scanner-high": {
+    "assetId": 106490540735982,
+    "moderation": "Approved"
+  },
+  "factory/scanner-low": {
+    "assetId": 115941125806204,
+    "moderation": "Approved"
+  },
+  "factory/screen-flat": {
+    "assetId": 80048097377053,
+    "moderation": "Approved"
+  },
+  "factory/screen-hanging-small": {
+    "assetId": 131135067729050,
+    "moderation": "Approved"
+  },
+  "factory/screen-hanging-wide": {
+    "assetId": 117048122282266,
+    "moderation": "Approved"
+  },
+  "factory/screen-panel-flat": {
+    "assetId": 94467656710758,
+    "moderation": "Approved"
+  },
+  "factory/screen-panel-small": {
+    "assetId": 129130599590751,
+    "moderation": "Approved"
+  },
+  "factory/screen-panel-wide": {
+    "assetId": 92879585835429,
+    "moderation": "Approved"
+  },
+  "factory/screen-small": {
+    "assetId": 121452028974770,
+    "moderation": "Approved"
+  },
+  "factory/screen-wide": {
+    "assetId": 137716090597199,
+    "moderation": "Approved"
+  },
+  "factory/structure-corner-inner": {
+    "assetId": 138873778621364,
+    "moderation": "Approved"
+  },
+  "factory/structure-corner-outer": {
+    "assetId": 76845014477996,
+    "moderation": "Approved"
+  },
+  "factory/structure-doorway": {
+    "assetId": 103001593746332,
+    "moderation": "Approved"
+  },
+  "factory/structure-doorway-wide": {
+    "assetId": 76078176787491,
+    "moderation": "Approved"
+  },
+  "factory/structure-high": {
+    "assetId": 139699087177565,
+    "moderation": "Approved"
+  },
+  "factory/structure-medium": {
+    "assetId": 74984770265739,
+    "moderation": "Approved"
+  },
+  "factory/structure-short": {
+    "assetId": 129100083169120,
+    "moderation": "Approved"
+  },
+  "factory/structure-tall": {
+    "assetId": 96650875787341,
+    "moderation": "Approved"
+  },
+  "factory/structure-wall": {
+    "assetId": 92294063966216,
+    "moderation": "Approved"
+  },
+  "factory/structure-window": {
+    "assetId": 105442378643076,
+    "moderation": "Approved"
+  },
+  "factory/structure-window-wide": {
+    "assetId": 98496173155400,
+    "moderation": "Approved"
+  },
+  "factory/structure-yellow-high": {
+    "assetId": 109984181106917,
+    "moderation": "Approved"
+  },
+  "factory/structure-yellow-medium": {
+    "assetId": 107467348631833,
+    "moderation": "Approved"
+  },
+  "factory/structure-yellow-short": {
+    "assetId": 102616651052715,
+    "moderation": "Approved"
+  },
+  "factory/structure-yellow-tall": {
+    "assetId": 87510779042118,
+    "moderation": "Approved"
+  },
+  "factory/top": {
+    "assetId": 99162185630738,
+    "moderation": "Approved"
+  },
+  "factory/top-large": {
+    "assetId": 86472340095420,
+    "moderation": "Approved"
+  },
+  "factory/top-large-checkerboard": {
+    "assetId": 137228585886995,
+    "moderation": "Approved"
+  },
+  "factory/warning-orange": {
+    "assetId": 96217410007933,
+    "moderation": "Approved"
+  },
+  "factory/warning-traffic": {
+    "assetId": 113783293625095,
+    "moderation": "Approved"
+  },
   "furniture/bathroomCabinet": {
     "assetId": 132463685358398,
     "moderation": "Approved"

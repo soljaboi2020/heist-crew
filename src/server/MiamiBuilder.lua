@@ -1,0 +1,1278 @@
+--[[
+    HEIST CREW — MiamiBuilder
+    ────────────────────────────────────────────────
+    v1.0 "NEON MIAMI" world art (2026-09-25). Malachi's pick:
+    "Vice City at midnight — pastel art-deco, pink/teal neon, palm trees,
+    beach + ocean, neon reflecting on wet streets."
+
+    What it builds (coordinates: docs/V1_SPEC.md §1):
+      • Midnight lighting preset (moon, stars, purple/teal haze, neon bloom)
+      • Lawn (Part, south of z -88) + Terrain beach, marina sand spit, ocean
+      • Ocean Drive extension x -150..-120 / 120..150 (+ streetlights), and
+        wet-street puddles that catch the neon
+      • 7 art-deco buildings on the spec lots: pastel Plaster, white eyebrows,
+        a fin with a vertical neon name, roofline neon tube, lit window grid
+        (SurfaceGui, not parts), door + striped awning, facade uplights
+      • Procedural palms along Ocean Drive, at the villa garden, the safehouse
+        driveway, on the beach and the lawn
+      • Beach: 2 lifeguard towers, striped umbrellas + loungers
+      • Marina: pier on posts, an 80s speedboat, the DROP-OFF ring + sign
+      • 4 parked pastel 80s cars along the kerbs
+      • skinSafehouse(): pastel stucco + deco fins/bands/parapet over the brick
+        warehouse, big "RIVERSIDE AUTO" neon sign, two neon wall lamps
+
+    Art rules (docs/ART_DIRECTION.md): Neon only on thin tubes, bulbs, stripes
+    and lenses. Every word is on a surface (SurfaceGui). Every part has a real
+    Material. Everything anchored; decoration CanCollide=false.
+
+    PUBLIC API:
+        MiamiBuilder:applyLighting()
+        MiamiBuilder:build(folder)
+        MiamiBuilder.palm(parent, position, height?, leanDir?, seed?) -> Model
+            leanDir: horizontal direction of the lean. Its magnitude (0.3..2,
+            default 1) scales how far the crown leans (~20% of height at 1).
+        MiamiBuilder:skinSafehouse(folder)
+--]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+
+local Constants = require(ReplicatedStorage.Shared.Constants)
+local UITheme = require(ReplicatedStorage.Shared.UITheme)
+
+local MiamiBuilder = {}
+
+local W = Constants.WORLD
+local M = Constants.MIAMI
+
+local function rgb(t) return Color3.fromRGB(t[1], t[2], t[3]) end
+
+local UP = Vector3.new(0, 1, 0)
+local WHITE = Color3.new(1, 1, 1)
+
+local PASTEL = {}
+for i, t in ipairs(M.PASTELS) do PASTEL[i] = rgb(t) end
+local NEON = {}
+for i, t in ipairs(M.NEONS) do NEON[i] = rgb(t) end
+local PINK, CYAN, PURPLE, ORANGE = NEON[1], NEON[2], NEON[3], NEON[4]
+local STUCCO = rgb(M.STUCCO)
+
+local SIGN_DARK  = Color3.fromRGB(18, 16, 30)
+local METAL_DARK = Color3.fromRGB(40, 42, 50)
+local CHROME     = Color3.fromRGB(196, 200, 208)
+local WARM_LIGHT = Color3.fromRGB(255, 200, 140)
+local DARK_GLASS = Color3.fromRGB(24, 30, 56)
+local PAVING     = Color3.fromRGB(176, 170, 162)
+
+-- decoration that players / cars should never snag on
+local DECO = { CanCollide = false }
+local GLOW = { CanCollide = false, CastShadow = false }
+
+-- ──────────────────────────────────────────────
+-- helpers (same style as SafehouseBuilder)
+-- ──────────────────────────────────────────────
+local function inst(class, props, parent)
+    local p = Instance.new(class)
+    p.Anchored = true
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    for k, v in pairs(props) do p[k] = v end
+    p.Parent = parent
+    return p
+end
+
+local function part(props, parent)
+    return inst("Part", props, parent)
+end
+
+-- A box described by its min/max corners
+local function box(name, x0, y0, z0, x1, y1, z1, color, material, parent, extra)
+    local props = {
+        Name = name,
+        Size = Vector3.new(math.abs(x1 - x0), math.abs(y1 - y0), math.abs(z1 - z0)),
+        Position = Vector3.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2),
+        Color = color,
+        Material = material,
+    }
+    for k, v in pairs(extra or {}) do props[k] = v end
+    return part(props, parent)
+end
+
+-- CFrame at `pos` whose local X axis points along `xAxis` (cylinders run along X)
+local function axisCF(pos, xAxis)
+    local x = xAxis.Unit
+    local helper = (math.abs(x.Y) < 0.9) and UP or Vector3.new(1, 0, 0)
+    local y = (helper - x * helper:Dot(x)).Unit
+    return CFrame.fromMatrix(pos, x, y)
+end
+
+-- Cylinder from point a to point b
+local function cyl(name, a, b, diameter, color, material, parent, extra)
+    local props = {
+        Name = name,
+        Shape = Enum.PartType.Cylinder,
+        Size = Vector3.new((b - a).Magnitude, diameter, diameter),
+        CFrame = axisCF((a + b) / 2, b - a),
+        Color = color,
+        Material = material,
+    }
+    for k, v in pairs(extra or {}) do props[k] = v end
+    return part(props, parent)
+end
+
+local function ball(name, pos, d, color, material, parent, extra)
+    local props = {
+        Name = name, Shape = Enum.PartType.Ball, Size = Vector3.new(d, d, d),
+        Position = pos, Color = color, Material = material,
+    }
+    for k, v in pairs(extra or {}) do props[k] = v end
+    return part(props, parent)
+end
+
+local function gui(p, face, pps, brightness, lightInfluence)
+    local g = Instance.new("SurfaceGui")
+    g.Face = face
+    g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    g.PixelsPerStud = pps or 40
+    g.LightInfluence = lightInfluence or 0
+    g.Brightness = brightness or 1
+    g.Parent = p
+    return g
+end
+
+local function gframe(parent, x, y, w, h, color, transparency)
+    local f = Instance.new("Frame")
+    f.BorderSizePixel = 0
+    f.Position = UDim2.fromScale(x, y)
+    f.Size = UDim2.fromScale(w, h)
+    f.BackgroundColor3 = color or WHITE
+    f.BackgroundTransparency = transparency or 0
+    f.Parent = parent
+    return f
+end
+
+-- Neon-tube text: a hot, near-white core with a coloured halo (UIStroke)
+local function neonLabel(parent, str, color, props, strokePx)
+    local l = UITheme.label({
+        Text = str,
+        TextColor3 = color:Lerp(WHITE, 0.35),
+        FontFace = UITheme.F.display,
+        TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        Size = UDim2.fromScale(1, 1),
+    })
+    for k, v in pairs(props or {}) do l[k] = v end
+    local s = Instance.new("UIStroke")
+    s.Color = color
+    s.Thickness = strokePx or 3
+    s.Transparency = 0.4
+    s.Parent = l
+    l.Parent = parent
+    return l
+end
+
+local function pointLight(parent, color, brightness, range, shadows)
+    local l = Instance.new("PointLight")
+    l.Color = color
+    l.Brightness = brightness
+    l.Range = range
+    l.Shadows = shadows or false
+    l.Parent = parent
+    return l
+end
+
+local function spotLight(parent, face, color, brightness, range, angle, shadows)
+    local l = Instance.new("SpotLight")
+    l.Face = face
+    l.Color = color
+    l.Brightness = brightness
+    l.Range = range
+    l.Angle = angle
+    l.Shadows = shadows or false
+    l.Parent = parent
+    return l
+end
+
+-- Small ground fixture throwing a coloured cone straight up (palms, facades)
+local function uplight(parent, pos, color, range, angle, brightness)
+    local fx = box("Uplight", pos.X - 0.35, pos.Y, pos.Z - 0.35, pos.X + 0.35, pos.Y + 0.35, pos.Z + 0.35,
+        METAL_DARK, Enum.Material.Metal, parent, DECO)
+    spotLight(fx, Enum.NormalId.Top, color, brightness or 2.4, range or 20, angle or 40)
+    return fx
+end
+
+-- Dark sign board with a glowing neon word + a real light in the same colour
+local function neonBoard(parent, name, x0, y0, z0, x1, y1, z1, face, str, color, pps)
+    local board = box(name, x0, y0, z0, x1, y1, z1, SIGN_DARK, Enum.Material.Metal, parent, DECO)
+    local g = gui(board, face, pps or 40, 2.5, 0)
+    neonLabel(g, str, color, { Size = UDim2.fromScale(0.9, 0.78), Position = UDim2.fromScale(0.05, 0.11) })
+    pointLight(board, color, 1.1, 10)
+    return board
+end
+
+local function folder(parent, name)
+    local f = Instance.new("Folder")
+    f.Name = name
+    f.Parent = parent
+    return f
+end
+
+-- ──────────────────────────────────────────────
+-- 🌙 LIGHTING — midnight on Ocean Drive
+-- ──────────────────────────────────────────────
+function MiamiBuilder:applyLighting()
+    Lighting.ClockTime = 0.3              -- just after midnight, moon up
+    Lighting.GeographicLatitude = 25.8    -- Miami
+    Lighting.Brightness = 1.4             -- moonlight strength
+    -- Ambient = what reaches under roofs. Stays DARK so interiors are stealth
+    -- spaces lit only by their own lamps. OutdoorAmbient keeps streets readable.
+    Lighting.Ambient = Color3.fromRGB(22, 20, 34)
+    Lighting.OutdoorAmbient = Color3.fromRGB(100, 70, 135)
+    Lighting.ColorShift_Top = Color3.fromRGB(120, 100, 200)    -- lilac moonlight on top faces
+    Lighting.ColorShift_Bottom = Color3.fromRGB(30, 16, 48)
+    Lighting.ExposureCompensation = 0.15
+    Lighting.GlobalShadows = true
+    Lighting.ShadowSoftness = 0.25
+    Lighting.EnvironmentDiffuseScale = 0.3
+    Lighting.EnvironmentSpecularScale = 1   -- wet, glossy look on glass/water/puddles
+    Lighting.FogColor = Color3.fromRGB(38, 20, 58)
+    Lighting.FogStart = 180
+    Lighting.FogEnd = 900
+
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") or child:IsA("Atmosphere") or child:IsA("BloomEffect")
+            or child:IsA("ColorCorrectionEffect") then
+            child:Destroy()
+        end
+    end
+
+    -- Roblox default sky textures (left unset) + a big star field + moon
+    local sky = Instance.new("Sky")
+    sky.StarCount = 3000
+    sky.CelestialBodiesShown = true
+    sky.MoonAngularSize = 14
+    sky.SunAngularSize = 8
+    sky.Parent = Lighting
+
+    -- Purple haze with a teal fall-off toward the horizon
+    local atmo = Instance.new("Atmosphere")
+    atmo.Density = 0.34
+    atmo.Offset = 0.12
+    atmo.Color = Color3.fromRGB(120, 80, 170)
+    atmo.Decay = Color3.fromRGB(40, 140, 160)
+    atmo.Glare = 0.25
+    atmo.Haze = 1.8
+    atmo.Parent = Lighting
+
+    -- Only things brighter than white bloom: neon + lit signs glow, white
+    -- stucco under a streetlight does not smear.
+    local bloom = Instance.new("BloomEffect")
+    bloom.Intensity = 0.55
+    bloom.Size = 26
+    bloom.Threshold = 0.97
+    bloom.Parent = Lighting
+
+    local cc = Instance.new("ColorCorrectionEffect")
+    cc.Brightness = 0
+    cc.Contrast = 0.12
+    cc.Saturation = 0.15
+    cc.TintColor = Color3.fromRGB(255, 236, 252)   -- slight magenta
+    cc.Parent = Lighting
+
+    print("[MiamiBuilder] Midnight lighting applied 🌙")
+end
+
+-- ──────────────────────────────────────────────
+-- 🌴 PALM TREE
+-- ──────────────────────────────────────────────
+local TRUNK_A = Color3.fromRGB(122, 94, 64)
+local TRUNK_B = Color3.fromRGB(104, 80, 54)
+local TRUNK_RING = Color3.fromRGB(84, 64, 44)
+local LEAF_A = Color3.fromRGB(58, 122, 60)
+local LEAF_B = Color3.fromRGB(80, 146, 68)
+local LEAF_DEAD = Color3.fromRGB(128, 104, 64)
+local CROWN = Color3.fromRGB(88, 96, 54)
+local COCONUT = Color3.fromRGB(96, 72, 40)
+
+function MiamiBuilder.palm(parent, position, height, leanDir, seed)
+    height = height or 18
+    local s = seed or (math.floor(math.abs(position.X * 7919 + position.Z * 104729 + height * 31)) % 2147483000)
+    local rng = Random.new(s)
+
+    local model = Instance.new("Model")
+    model.Name = "Palm"
+
+    -- how far (and which way) the crown drifts from the base
+    local lean
+    local flat = leanDir and Vector3.new(leanDir.X, 0, leanDir.Z) or nil
+    if flat and flat.Magnitude > 0.01 then
+        lean = flat.Unit * height * 0.2 * math.clamp(flat.Magnitude, 0.3, 2)
+    else
+        local a = rng:NextNumber(0, math.pi * 2)
+        lean = Vector3.new(math.cos(a), 0, math.sin(a)) * height * rng:NextNumber(0.12, 0.24)
+    end
+    -- the bend grows toward the top, so the trunk curves instead of tilting
+    local function trunkAt(t)
+        return position + UP * (height * t) + lean * (t ^ 1.7)
+    end
+
+    -- Trunk: tapered segments in alternating browns, with a darker collar at
+    -- each joint — reads as the ringed bark of a real palm.
+    local SEGS = 6
+    for i = 1, SEGS do
+        local a, b = trunkAt((i - 1) / SEGS), trunkAt(i / SEGS)
+        if i == 1 then a = a - UP * 0.6 end
+        local dir = (b - a).Unit
+        local d = 1.55 - 0.55 * ((i - 1) / (SEGS - 1))
+        cyl("Trunk", a - dir * 0.12, b + dir * 0.12, d, (i % 2 == 0) and TRUNK_A or TRUNK_B,
+            Enum.Material.Wood, model)
+        if i < SEGS then
+            cyl("TrunkRing", b - dir * 0.14, b + dir * 0.14, d + 0.14, TRUNK_RING, Enum.Material.Wood, model, DECO)
+        end
+    end
+
+    local top = trunkAt(1)
+    ball("Crown", top + UP * 0.1, 1.7, CROWN, Enum.Material.Grass, model, DECO)
+
+    -- coconuts tucked under the crown
+    local c0 = rng:NextNumber(0, math.pi * 2)
+    for k = 0, 2 do
+        local a = c0 + k * (math.pi * 2 / 3)
+        ball("Coconut", top + Vector3.new(math.cos(a), 0, math.sin(a)) * 0.7 - UP * 0.75, 0.85,
+            COCONUT, Enum.Material.Wood, model, DECO)
+    end
+
+    -- Fronds: 3 chained leaf segments each, arching up then drooping,
+    -- tapering to a pointed tip. Upper/lower tiers alternate.
+    local scale = math.clamp(height / 18, 0.8, 1.25)
+    local nFronds = rng:NextInteger(8, 10)
+    local phase = rng:NextNumber(0, math.pi * 2)
+    for i = 1, nFronds do
+        local yaw = phase + i * (math.pi * 2 / nFronds) + rng:NextNumber(-0.22, 0.22)
+        local upper = (i % 2 == 1)
+        local p1 = upper and rng:NextNumber(34, 50) or rng:NextNumber(10, 24)
+        local p2 = p1 - rng:NextNumber(28, 38)
+        local p3 = p2 - rng:NextNumber(30, 44)
+        local pitches = { p1, p2, p3 }
+        local k0 = upper and 0.85 or 1
+        local lens = { 2.4 * scale * k0, 2.7 * scale * k0, 2.3 * scale * k0 }
+        local widths = { 1.15, 1.55, 1.55 }
+        local drift = rng:NextNumber(-0.09, 0.09)
+        local col = upper and LEAF_B or LEAF_A
+        local mat = upper and Enum.Material.LeafyGrass or Enum.Material.Grass
+
+        local hd0 = Vector3.new(math.cos(yaw), 0, math.sin(yaw))
+        local start = top + UP * 0.35 + hd0 * 0.3
+        for k = 1, 3 do
+            local p = math.rad(pitches[k])
+            local y = yaw + drift * (k - 1)
+            local hd = Vector3.new(math.cos(y), 0, math.sin(y))
+            local dir = hd * math.cos(p) + UP * math.sin(p)
+            local len = lens[k]
+            local c = start + dir * (len / 2)
+            local look = CFrame.lookAt(c, c + dir)
+            if k < 3 then
+                part({
+                    Name = "Frond", Size = Vector3.new(widths[k], 0.12, len + 0.25),
+                    CFrame = look * CFrame.Angles(0, 0, (k == 1) and 0.18 or -0.14),
+                    Color = col, Material = mat, CanCollide = false,
+                }, model)
+            else
+                -- WedgePart turned on its side: a flat triangle = pointed leaf tip
+                inst("WedgePart", {
+                    Name = "FrondTip", Size = Vector3.new(0.12, widths[k], len),
+                    CFrame = look * CFrame.Angles(0, 0, (i % 2 == 0) and math.rad(90) or math.rad(-90)),
+                    Color = col, Material = mat, CanCollide = false,
+                }, model)
+            end
+            start = start + dir * len
+        end
+    end
+
+    -- two dead brown fronds hanging down the trunk
+    for k = 1, 2 do
+        local yaw = phase + k * math.pi + 0.6
+        local p = math.rad(-66)
+        local dir = Vector3.new(math.cos(yaw), 0, math.sin(yaw)) * math.cos(p) + UP * math.sin(p)
+        local c = top - UP * 0.2 + dir * 1.5
+        part({
+            Name = "DeadFrond", Size = Vector3.new(0.9, 0.1, 3),
+            CFrame = CFrame.lookAt(c, c + dir), Color = LEAF_DEAD, Material = Enum.Material.Grass,
+            CanCollide = false,
+        }, model)
+    end
+
+    model.Parent = parent
+    return model
+end
+
+-- ──────────────────────────────────────────────
+-- 🌍 GROUND: lawn part + Terrain beach / ocean
+-- ──────────────────────────────────────────────
+function MiamiBuilder:_ground(f)
+    local beachZ0 = W.BEACH_Z0   -- -88
+    -- Lawn: everything south of the beach (top at y 0). Replaces the old
+    -- 400x400 grass plane in HeistBuilder:_setupGround.
+    box("Lawn", -300, -2, beachZ0, 300, 0, 220, Color3.fromRGB(58, 112, 64), Enum.Material.Grass, f)
+
+    local T = workspace.Terrain
+    T.WaterColor = Color3.fromRGB(20, 110, 130)
+    T.WaterReflectance = 1
+    T.WaterTransparency = 0.35
+    T.WaterWaveSize = 0.12
+    T.WaterWaveSpeed = 8
+
+    -- All boundaries except the water surface sit on the 4-stud voxel grid so
+    -- FillBlocks overwrite each other cleanly. Order matters (later wins).
+    -- 1. Ocean: z -104 .. -420, surface ≈ y -0.6
+    T:FillBlock(CFrame.new(0, -6.3, -262), Vector3.new(800, 11.4, 316), Enum.Material.Water)
+    -- 2. Seabed under it
+    T:FillBlock(CFrame.new(0, -16, -262), Vector3.new(800, 8, 316), Enum.Material.Sand)
+    -- 3. Shallow shelf just off the beach (shows through the clear water)
+    T:FillBlock(CFrame.new(0, -8, -110), Vector3.new(600, 8, 12), Enum.Material.Sand)
+    -- 4. The beach: z -88 .. -108, top at y 0
+    T:FillBlock(CFrame.new(0, -8, -98), Vector3.new(600, 16, 20), Enum.Material.Sand)
+    -- 5. Marina spit: the drop-off ring (radius 14 around z -96) reaches
+    --    z -110, so the sand runs out to z -116 around it.
+    T:FillBlock(CFrame.new(106, -8, -110), Vector3.new(36, 16, 12), Enum.Material.Sand)
+end
+
+-- ──────────────────────────────────────────────
+-- 🛣 OCEAN DRIVE extension + streetlights + puddles
+-- ──────────────────────────────────────────────
+local function streetlight(f, x, side)
+    local zc, hw = W.STREET_Z, W.STREET_HALF_WIDTH
+    local z = zc + side * (hw + 3.8)
+    box("LightPole", x - 0.25, 0.5, z - 0.25, x + 0.25, 12, z + 0.25, METAL_DARK, Enum.Material.Metal, f)
+    local armEnd = z - side * 3
+    box("LightArm", x - 0.15, 11.6, math.min(z, armEnd), x + 0.15, 11.9, math.max(z, armEnd), METAL_DARK, Enum.Material.Metal, f)
+    local head = box("LightHead", x - 0.5, 11.3, armEnd - 0.9, x + 0.5, 11.8, armEnd + 0.9, METAL_DARK, Enum.Material.Metal, f)
+    box("LightLens", x - 0.35, 11.2, armEnd - 0.7, x + 0.35, 11.3, armEnd + 0.7, WARM_LIGHT, Enum.Material.Neon, f, GLOW)
+    spotLight(head, Enum.NormalId.Bottom, WARM_LIGHT, 2.2, 22, 115, true)
+end
+
+function MiamiBuilder:_streetExtension(f)
+    local zc, hw = W.STREET_Z, W.STREET_HALF_WIDTH
+    local asphalt = Color3.fromRGB(46, 48, 52)
+    local walk = Color3.fromRGB(150, 150, 148)
+    local yellow = Color3.fromRGB(230, 190, 60)
+
+    for _, seg in ipairs({ { -150, -120 }, { 120, 150 } }) do
+        local x0, x1 = seg[1], seg[2]
+        box("Asphalt", x0, -0.2, zc - hw, x1, 0.2, zc + hw, asphalt, Enum.Material.Asphalt, f, { Reflectance = 0.04 })
+        for _, side in ipairs({ -1, 1 }) do
+            local edge = zc + side * hw
+            box("Kerb", x0, 0, math.min(edge, edge + side * 0.6), x1, 0.55, math.max(edge, edge + side * 0.6),
+                Color3.fromRGB(175, 175, 172), Enum.Material.Concrete, f)
+            local w0, w1 = edge + side * 0.6, edge + side * 4.6
+            box("Sidewalk", x0, 0, math.min(w0, w1), x1, 0.5, math.max(w0, w1), walk, Enum.Material.Concrete, f)
+        end
+        -- dashes continue the existing 10-stud rhythm (…106, 116 → 126, 136, 146)
+        local sgn = (x0 < 0) and -1 or 1
+        for _, ax in ipairs({ 126, 136, 146 }) do
+            local x = sgn * ax
+            box("CentreDash", x - 2, 0.2, zc - 0.18, x + 2, 0.23, zc + 0.18, yellow, Enum.Material.SmoothPlastic, f, DECO)
+        end
+    end
+
+    -- Streetlights for the new stretches (existing ones stop at |x| = 84).
+    -- None on the north side at x 112: that's the marina drive route.
+    streetlight(f, -140, -1); streetlight(f, -140, 1)
+    streetlight(f, -112, -1); streetlight(f, -112, 1)
+    streetlight(f, 112, 1)
+    streetlight(f, 140, -1); streetlight(f, 140, 1)
+end
+
+-- Rain-slick puddles: near-black glossy glass that catches the neon + lamp
+-- highlights (Future lighting renders specular on Glass). Flat, no collision.
+function MiamiBuilder:_puddles(f)
+    local spots = {
+        { -138, -17 }, { -112, -9.5 }, { -86, -18.5 }, { -64, -10 }, { -40, -19 }, { -17, -9 },
+        { 14, -18 }, { 36, -10.5 }, { 63, -16.5 }, { 92, -8.5 }, { 116, -19 }, { 141, -12 },
+    }
+    local rng = Random.new(1985)
+    for _, sp in ipairs(spots) do
+        for k = 1, 2 do
+            local d = rng:NextNumber(2.6, 4.6) * ((k == 1) and 1 or 0.7)
+            local ox = (k == 1) and 0 or rng:NextNumber(-1.6, 1.6)
+            local oz = (k == 1) and 0 or rng:NextNumber(-0.8, 0.8)
+            part({
+                Name = "Puddle", Shape = Enum.PartType.Cylinder,
+                Size = Vector3.new(0.02 + k * 0.004, d, d * rng:NextNumber(0.6, 0.9)),
+                CFrame = CFrame.new(sp[1] + ox, 0.205 + k * 0.003, sp[2] + oz)
+                    * CFrame.Angles(0, rng:NextNumber(0, math.pi), math.rad(90)),
+                Color = Color3.fromRGB(16, 18, 32), Material = Enum.Material.Glass,
+                Transparency = 0.25, Reflectance = 0.3,
+                CanCollide = false, CastShadow = false, CanQuery = false, CanTouch = false,
+            }, f)
+        end
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- 🏨 ART-DECO BUILDING
+-- ──────────────────────────────────────────────
+local LIT_COLORS = {
+    Color3.fromRGB(240, 190, 120), Color3.fromRGB(240, 190, 120), Color3.fromRGB(236, 172, 108),
+    Color3.fromRGB(236, 172, 108), Color3.fromRGB(232, 150, 190), Color3.fromRGB(150, 195, 235),
+}
+
+local function windowPane(litRoot, darkRoot, fx, fy, fw, fh, isLit, rng)
+    if isLit then
+        local col = LIT_COLORS[rng:NextInteger(1, #LIT_COLORS)]
+        local f = gframe(litRoot, fx, fy, fw, fh, col)
+        local blind = rng:NextNumber(0, 0.5)
+        if blind > 0.15 then
+            gframe(f, 0, 0, 1, blind, col:Lerp(Color3.new(0, 0, 0), 0.45))
+        end
+        gframe(f, 0.47, 0, 0.06, 1, Color3.fromRGB(70, 56, 46))
+    else
+        local f = gframe(darkRoot, fx, fy, fw, fh, DARK_GLASS)
+        local s = Instance.new("UIStroke")
+        s.Color = Color3.fromRGB(200, 205, 225)
+        s.Transparency = 0.55
+        s.Thickness = 1
+        s.Parent = f
+        gframe(f, 0.47, 0, 0.06, 1, Color3.fromRGB(70, 74, 92))
+    end
+end
+
+-- Fit k windows of width `ww` (gap 0.8) centred inside [a, b]; append centres
+local function fitCols(a, b, ww, out)
+    local len = b - a
+    local k = math.floor((len + 0.8) / (ww + 0.8))
+    if k <= 0 then return end
+    local total = k * ww + (k - 1) * 0.8
+    local start = a + (len - total) / 2 + ww / 2
+    for i = 0, k - 1 do
+        table.insert(out, start + i * (ww + 0.8))
+    end
+end
+
+--[[ spec fields:
+    name, cx, frontZ, n (+1 = north lot facing south, -1 = south lot facing north),
+    w, d, h, color (pastel), neon (fin letters / roof tube), neon2 (fin tubes),
+    finU (0 = centre fin, else corner offset), apron (depth to sidewalk edge),
+    sign = { kind = "band"|"side"|"window", text, color }, seed
+--]]
+function MiamiBuilder:_decoBuilding(parent, b)
+    local model = Instance.new("Model")
+    model.Name = "Deco_" .. string.gsub(b.name, " ", "")
+    local n, w, d, h = b.n, b.w, b.d, b.h
+    local hw = w / 2
+    local rng = Random.new(b.seed)
+    local body = b.color
+    local trim = STUCCO
+    local plinth = body:Lerp(Color3.fromRGB(60, 50, 70), 0.35)
+    local face = (n > 0) and Enum.NormalId.Back or Enum.NormalId.Front   -- face toward the street
+    local finU = b.finU
+
+    -- local (u along x, y up, v = depth away from the street) → world
+    local function X(u) return b.cx + u end
+    local function Z(v) return b.frontZ - n * v end
+    local function lb(name, u0, y0, v0, u1, y1, v1, color, mat, extra)
+        return box(name, X(u0), y0, Z(v0), X(u1), y1, Z(v1), color, mat, model, extra)
+    end
+    -- fraction across the street-face GUI (left edge = 0) for local u
+    local function gx(u: number): number
+        if n > 0 then return (u + hw) / w end
+        return (hw - u) / w
+    end
+
+    -- ── mass ──
+    local bodyPart = lb("Body", -hw, 0, 0, hw, h, d, body, Enum.Material.Plaster)
+    lb("Plinth", -hw - 0.15, 0, -0.15, hw + 0.15, 1.0, d + 0.15, plinth, Enum.Material.Concrete)
+    lb("Forecourt", -hw, 0, -b.apron, hw, 0.5, 0, PAVING, Enum.Material.Concrete)
+    lb("Cornice", -hw - 0.5, h - 0.7, -0.5, hw + 0.5, h, d + 0.5, trim, Enum.Material.Plaster)
+    -- stepped (ziggurat) parapet
+    lb("Step1", -w * 0.3, h, -0.4, w * 0.3, h + 2, 5, body, Enum.Material.Plaster)
+    lb("Step1Cap", -w * 0.3 - 0.2, h + 2, -0.6, w * 0.3 + 0.2, h + 2.35, 5.2, trim, Enum.Material.Plaster)
+    lb("Step2", -w * 0.15, h + 2.35, -0.3, w * 0.15, h + 4, 3.5, body, Enum.Material.Plaster)
+    lb("Step2Cap", -w * 0.15 - 0.2, h + 4, -0.5, w * 0.15 + 0.2, h + 4.35, 3.7, trim, Enum.Material.Plaster)
+
+    -- thin neon tube just under the cornice lip
+    lb("RoofNeon", -hw + 0.3, h - 1.05, -0.62, hw - 0.3, h - 0.85, -0.42, b.neon, Enum.Material.Neon, GLOW)
+
+    -- ── fin with a vertical neon name ──
+    local finBottom, finTop = 9.6, h + 6.5
+    lb("Fin", finU - 1.5, finBottom, -1.6, finU + 1.5, finTop, 3, trim, Enum.Material.Plaster)
+    lb("FinCap", finU - 1.8, finTop, -1.9, finU + 1.8, finTop + 0.5, 3.3, body, Enum.Material.Plaster)
+    cyl("FinMast", Vector3.new(X(finU), finTop + 0.5, Z(0.6)), Vector3.new(X(finU), finTop + 3.4, Z(0.6)), 0.22,
+        CHROME, Enum.Material.Metal, model, DECO)
+    ball("FinBeacon", Vector3.new(X(finU), finTop + 3.55, Z(0.6)), 0.45, b.neon2, Enum.Material.Neon, model, GLOW)
+    local panelY0, panelY1 = finBottom + 0.8, finTop - 0.8
+    local panel = lb("FinSign", finU - 1.05, panelY0, -1.78, finU + 1.05, panelY1, -1.6, SIGN_DARK, Enum.Material.Metal)
+    for _, side in ipairs({ -1, 1 }) do
+        lb("FinTube", finU + side * 1.22, finBottom + 0.4, -1.8, finU + side * 1.4, finTop - 0.4, -1.62,
+            b.neon2, Enum.Material.Neon, GLOW)
+    end
+    do
+        local PPS = 40
+        local g = gui(panel, face, PPS, 2.6, 0)
+        local chars = {}
+        for c in string.gmatch(b.name, ".") do table.insert(chars, c) end
+        local count = #chars
+        local cellPx = (panelY1 - panelY0) / count * PPS
+        -- one fixed size for every letter (TextScaled would size each differently)
+        local size = math.floor(math.min(cellPx * 0.9, 2.1 * PPS * 0.9))
+        local holder = Instance.new("Frame")
+        holder.BackgroundTransparency = 1
+        holder.Size = UDim2.fromScale(1, 1)
+        holder.Parent = g
+        local list = Instance.new("UIListLayout")
+        list.FillDirection = Enum.FillDirection.Vertical
+        list.SortOrder = Enum.SortOrder.LayoutOrder
+        list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        list.VerticalAlignment = Enum.VerticalAlignment.Center
+        list.Parent = holder
+        for i, c in ipairs(chars) do
+            neonLabel(holder, c, b.neon, {
+                Size = UDim2.new(1, 0, 1 / count, 0), TextScaled = false, TextSize = size, LayoutOrder = i,
+            }, math.max(2, math.floor(size * 0.06)))
+        end
+    end
+    pointLight(panel, b.neon, 1.5, 18)
+
+    -- ── window rows: eyebrow ledges + lit/dark window grid (SurfaceGui) ──
+    local rows = {}
+    local base = 8.6
+    while base + 4.5 <= h - 3.8 do
+        table.insert(rows, base)
+        base += 5.5
+    end
+    local winW = 2.0
+    local cols = {}
+    fitCols(-hw + 0.9, finU - 2.1, winW, cols)
+    fitCols(finU + 2.1, hw - 0.9, winW, cols)
+
+    local litGui = gui(bodyPart, face, 10, 1, 0)       -- warm windows ignore scene lighting
+    local darkGui = gui(bodyPart, face, 10, 1, 1)      -- dark glass takes the scene lighting
+    local litRoot = gframe(litGui, 0, 0, 1, 1, WHITE, 1)
+    local darkRoot = gframe(darkGui, 0, 0, 1, 1, WHITE, 1)
+
+    for _, rb in ipairs(rows) do
+        local yTop = rb + 3.6
+        for _, u in ipairs(cols) do
+            local fx = math.min(gx(u - winW / 2), gx(u + winW / 2))
+            windowPane(litRoot, darkRoot, fx, (h - yTop) / h, winW / w, 3.0 / h, rng:NextNumber() < 0.4, rng)
+        end
+        -- eyebrow ledge over the row, split around the fin
+        local e0, e1 = finU - 1.5, finU + 1.5
+        local a, c = -hw + 0.6, hw - 0.6
+        if e0 - a > 0.5 then lb("Eyebrow", a, rb + 4.0, -1.1, e0, rb + 4.35, 0, trim, Enum.Material.Concrete) end
+        if c - e1 > 0.5 then lb("Eyebrow", e1, rb + 4.0, -1.1, c, rb + 4.35, 0, trim, Enum.Material.Concrete) end
+    end
+
+    -- side windows (mostly dark) on both flanks
+    local sideCols = {}
+    fitCols(1.2, d - 1.2, winW, sideCols)
+    for _, sideFace in ipairs({ Enum.NormalId.Right, Enum.NormalId.Left }) do
+        local sl = gui(bodyPart, sideFace, 10, 1, 0)
+        local sd = gui(bodyPart, sideFace, 10, 1, 1)
+        local slRoot = gframe(sl, 0, 0, 1, 1, WHITE, 1)
+        local sdRoot = gframe(sd, 0, 0, 1, 1, WHITE, 1)
+        for _, rb in ipairs(rows) do
+            for _, v in ipairs(sideCols) do
+                windowPane(slRoot, sdRoot, (v - winW / 2) / d, (h - (rb + 3.6)) / h, winW / d, 3.0 / h,
+                    rng:NextNumber() < 0.25, rng)
+            end
+        end
+    end
+
+    -- ── ground floor: display windows, door, awning, entrance light ──
+    for _, span in ipairs({ { -hw + 1.0, -3.0 }, { 3.0, hw - 1.0 } }) do
+        local a, c = span[1], span[2]
+        if c - a > 1 then
+            local fx = math.min(gx(a), gx(c))
+            local pane = gframe(litRoot, fx, (h - 5.9) / h, (c - a) / w, 4.6 / h, Color3.fromRGB(226, 168, 112))
+            local grad = Instance.new("UIGradient")
+            grad.Rotation = 90
+            grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(150, 120, 110))
+            grad.Parent = pane
+            gframe(pane, 0.49, 0, 0.02, 1, Color3.fromRGB(60, 50, 44))
+            gframe(pane, 0, 0.3, 1, 0.025, Color3.fromRGB(60, 50, 44))
+        end
+    end
+
+    lb("DoorFrame", -2.6, 0, -0.25, 2.6, 7.2, 0, trim, Enum.Material.Concrete)
+    local door = lb("Door", -2.0, 0.1, -0.32, 2.0, 6.6, -0.2, Color3.fromRGB(60, 44, 40), Enum.Material.Glass,
+        { Reflectance = 0.2 })
+    do
+        local g = gui(door, face, 30, 0.9, 0)
+        local lobby = gframe(g, 0, 0, 1, 1, Color3.fromRGB(232, 172, 110))
+        local grad = Instance.new("UIGradient")
+        grad.Rotation = 90
+        grad.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(120, 90, 80))
+        grad.Parent = lobby
+        gframe(lobby, 0.485, 0, 0.03, 1, Color3.fromRGB(190, 160, 110))   -- door split (brass)
+        gframe(lobby, 0.4, 0.45, 0.02, 0.18, Color3.fromRGB(210, 180, 120))
+        gframe(lobby, 0.58, 0.45, 0.02, 0.18, Color3.fromRGB(210, 180, 120))
+    end
+
+    -- striped awning, sloping down toward the street
+    local awning = part({
+        Name = "Awning", Size = Vector3.new(6, 0.2, 3.1),
+        CFrame = CFrame.new(X(0), 7.1, Z(-1.5)) * CFrame.Angles(n * math.rad(15), 0, 0),
+        Color = trim, Material = Enum.Material.Fabric, CanCollide = false,
+    }, model)
+    do
+        local g = gui(awning, Enum.NormalId.Top, 20, 1, 1)
+        for i = 0, 5 do
+            gframe(g, i / 6 + 1 / 24, 0, 1 / 12, 1, b.neon2:Lerp(WHITE, 0.25))
+        end
+    end
+    lb("Valance", -3, 6.1, -3.1, 3, 6.75, -2.95, b.neon2:Lerp(WHITE, 0.25), Enum.Material.Fabric, DECO)
+    local lamp = lb("EntryLamp", -0.4, 6.6, -1.1, 0.4, 6.95, -0.6, METAL_DARK, Enum.Material.Metal, DECO)
+    lb("EntryLens", -0.3, 6.55, -1.0, 0.3, 6.6, -0.7, WARM_LIGHT, Enum.Material.Neon, GLOW)
+    pointLight(lamp, WARM_LIGHT, 1.3, 13)
+
+    -- ── art-deco "speed lines" wrapping the corner opposite the fin ──
+    local s = (finU > 0.1) and -1 or 1
+    for k = 0, 2 do
+        local y0 = h - 3.2 + k * 0.55
+        lb("SpeedLine", s * (hw - 5.5), y0, -0.2, s * (hw + 0.2), y0 + 0.25, 0, trim, Enum.Material.Plaster)
+        lb("SpeedLine", s * hw, y0, -0.2, s * (hw + 0.2), y0 + 0.25, 7, trim, Enum.Material.Plaster)
+    end
+
+    -- ── facade uplights (pools of coloured light washing up the wall) ──
+    for i, su in ipairs({ -1, 1 }) do
+        local u = su * (hw - 2.4)
+        uplight(model, Vector3.new(X(u), 0.5, Z(-0.8)), (i == 1) and b.neon or b.neon2, 24, 38, 2.6)
+    end
+
+    -- ── roof clutter for the silhouette ──
+    local acU = (finU > 0.1) and -hw * 0.45 or hw * 0.4
+    lb("RoofAC", acU - 1.5, h, d * 0.55, acU + 1.5, h + 1.6, d * 0.55 + 2.4, CHROME, Enum.Material.Metal)
+    if h >= 26 then
+        local tv = Vector3.new(X(-acU), h, Z(d - 4))
+        cyl("WaterTank", tv, tv + UP * 3.4, 3, Color3.fromRGB(150, 146, 140), Enum.Material.Metal, model)
+    end
+
+    -- ── extra neon sign ──
+    local sg = b.sign
+    if sg then
+        local fz0, fz1
+        if sg.kind == "band" then          -- "HOTEL" band above the awning
+            fz0, fz1 = Z(-0.3), Z(0)
+            neonBoard(model, "NeonSign", X(-4), 7.75, fz0, X(4), 9.35, fz1, face, sg.text, sg.color)
+        elseif sg.kind == "side" then      -- "COCKTAILS" over the right display window
+            fz0, fz1 = Z(-0.25), Z(0)
+            neonBoard(model, "NeonSign", X(hw - 7.2), 6.1, fz0, X(hw - 1.0), 7.3, fz1, face, sg.text, sg.color)
+        else                               -- "OPEN 24/7" hanging in the left display window
+            fz0, fz1 = Z(-0.12), Z(-0.02)
+            neonBoard(model, "NeonSign", X(-hw + 1.6), 2.8, fz0, X(-hw + 5.6), 4.2, fz1, face, sg.text, sg.color)
+        end
+    end
+
+    model.Parent = parent
+    return model
+end
+
+function MiamiBuilder:_buildings(f)
+    local P = PASTEL
+    local northApron = -26.6 - (-28)   -- building front → outer edge of north sidewalk
+    local southApron = 1 - (-1.4)      -- building front → outer edge of south sidewalk
+    local specs = {
+        -- north side (front face z -28, facing south onto the street)
+        { name = "FLAMINGO", cx = -80, w = 24, d = 20, h = 30, color = P[1], neon = CYAN, neon2 = PINK, finU = 0,
+          sign = { kind = "band", text = "HOTEL", color = PINK } },
+        { name = "NEPTUNE", cx = -50, w = 22, d = 18, h = 24, color = P[2], neon = PINK, neon2 = PURPLE, finU = 22 / 2 - 1.8,
+          sign = { kind = "side", text = "COCKTAILS", color = CYAN } },
+        { name = "CORAL", cx = 50, w = 22, d = 18, h = 26, color = P[4], neon = CYAN, neon2 = ORANGE, finU = -(22 / 2 - 1.8),
+          sign = { kind = "window", text = "OPEN 24/7", color = PINK } },
+        { name = "THE PALMS", cx = 78, w = 24, d = 20, h = 34, color = P[3], neon = PINK, neon2 = CYAN, finU = 0,
+          sign = { kind = "band", text = "HOTEL", color = CYAN } },
+        -- south side (front face z 1, facing north onto the street)
+        { name = "LUNA", cx = -92, w = 24, d = 20, h = 28, color = P[5], neon = PURPLE, neon2 = PINK, finU = 0,
+          sign = { kind = "side", text = "COCKTAILS", color = PINK } },
+        { name = "MIRAGE", cx = 62, w = 20, d = 18, h = 22, color = P[6], neon = PINK, neon2 = CYAN, finU = 20 / 2 - 1.8,
+          sign = { kind = "window", text = "OPEN 24/7", color = CYAN } },
+        { name = "SUNSET", cx = 88, w = 20, d = 18, h = 26, color = P[2], neon = ORANGE, neon2 = PINK, finU = 0,
+          sign = { kind = "band", text = "HOTEL", color = ORANGE } },
+    }
+    for i, sp in ipairs(specs) do
+        local north = (i <= 4)
+        sp.n = north and 1 or -1
+        sp.frontZ = north and -28 or 1
+        sp.apron = north and northApron or southApron
+        sp.seed = 1000 + i * 37
+        self:_decoBuilding(f, sp)
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- 🌴 PALM PLACEMENT
+-- ──────────────────────────────────────────────
+function MiamiBuilder:_palms(f)
+    local zc, hw = W.STREET_Z, W.STREET_HALF_WIDTH
+    local northZ = zc - hw - 3.2    -- -25.2: outer edge of the north sidewalk
+    local southZ = zc + hw + 3.4    -- -2.6: outer edge of the south sidewalk
+    local toStreetN = Vector3.new(0, 0, 1)     -- lean over the road, away from facades
+    local toStreetS = Vector3.new(0, 0, -1)
+
+    local lit = 0
+    local function sidewalkPalm(x, z, lean)
+        local rng = Random.new(math.floor(x * 13 + z * 7 + 5000))
+        local h = rng:NextNumber(16, 19)
+        MiamiBuilder.palm(f, Vector3.new(x, 0.5, z), h, lean * rng:NextNumber(0.95, 1.15))
+        lit += 1
+        uplight(f, Vector3.new(x, 0.5, z) + lean.Unit * 1.3, (lit % 2 == 0) and PINK or CYAN, 20, 34, 2.2)
+    end
+
+    -- Ocean Drive: midpoints between streetlights (+ the extension), outer edge.
+    -- North skips x 94..122 (marina route). South skips x 42 (car alley mouth)
+    -- and uses -74 instead of -70 (jewelry store corner).
+    for _, x in ipairs({ -126, -98, -70, -42, 42, 70, 126 }) do sidewalkPalm(x, northZ, toStreetN) end
+    for _, x in ipairs({ -126, -98, -74, 70, 98, 126 }) do sidewalkPalm(x, southZ, toStreetS) end
+
+    -- Villa Rosa front garden pair
+    for _, sx in ipairs({ -1, 1 }) do
+        local pos = Vector3.new(sx * 9, 0, -30)
+        local lean = Vector3.new(sx * 0.5, 0, 0.8)
+        MiamiBuilder.palm(f, pos, 21, lean, 700 + sx)
+        uplight(f, pos + lean.Unit * 1.3, PINK, 22, 34, 2.4)
+    end
+
+    -- Safehouse driveway pair — tall, leaning out so they frame the sign
+    for _, sx in ipairs({ -1, 1 }) do
+        local pos = Vector3.new(sx * 13, 0, 1)
+        local lean = Vector3.new(sx * 1, 0, -0.55)
+        MiamiBuilder.palm(f, pos, 20, lean, 800 + sx)
+        uplight(f, pos + lean.Unit * 1.3, CYAN, 22, 34, 2.4)
+    end
+
+    -- Beach scatter (on the sand, clear of the towers, umbrellas and marina)
+    local beach = {
+        { -150, -99, 17 }, { -138, -92, 20 }, { -118, -98, 16 }, { -92, -92, 19 }, { -54, -100, 18 },
+        { -40, -92, 21 }, { 44, -91, 19 }, { 84, -92, 17 }, { 132, -95, 20 }, { 146, -91, 16 },
+    }
+    for i, p in ipairs(beach) do
+        MiamiBuilder.palm(f, Vector3.new(p[1], 0, p[2]), p[3], nil, 900 + i)
+    end
+
+    -- A few on the lawns behind the lots
+    for i, p in ipairs({ { -120, -62 }, { -142, -40 }, { 138, -58 }, { -122, 32 }, { 130, 30 } }) do
+        MiamiBuilder.palm(f, Vector3.new(p[1], 0, p[2]), 18 + (i % 3) * 1.5, nil, 950 + i)
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- 🏖 BEACH: lifeguard towers, umbrellas, loungers
+-- ──────────────────────────────────────────────
+function MiamiBuilder:_lifeguardTower(parent, x, z, hut, stripeA, stripeB)
+    local m = Instance.new("Model")
+    m.Name = "LifeguardTower"
+    local wood = Color3.fromRGB(150, 112, 78)
+    local woodDark = Color3.fromRGB(112, 82, 58)
+    -- stilts (sunk into the sand)
+    for _, dx in ipairs({ -2.2, 2.2 }) do
+        for _, dz in ipairs({ -2.2, 2.2 }) do
+            cyl("Stilt", Vector3.new(x + dx, -1.5, z + dz), Vector3.new(x + dx, 6.1, z + dz), 0.6, woodDark,
+                Enum.Material.Wood, m)
+        end
+    end
+    -- platform with a deck out front (the tower looks out to sea, north)
+    box("Platform", x - 3, 6, z - 4.6, x + 3, 6.4, z + 3, wood, Enum.Material.WoodPlanks, m)
+    -- hut
+    box("Hut", x - 2.2, 6.4, z - 1.8, x + 2.2, 10.2, z + 2.6, hut, Enum.Material.Plaster, m)
+    box("HutStripe", x - 2.26, 7.2, z - 1.86, x + 2.26, 7.65, z + 2.66, stripeA, Enum.Material.Plaster, m, DECO)
+    box("HutStripe", x - 2.26, 7.85, z - 1.86, x + 2.26, 8.1, z + 2.66, stripeB, Enum.Material.Plaster, m, DECO)
+    local window = box("Window", x - 1.5, 8.35, z - 1.92, x + 1.5, 9.7, z - 1.78, Color3.fromRGB(30, 40, 60),
+        Enum.Material.Glass, m, { Reflectance = 0.2 })
+    pointLight(window, WARM_LIGHT, 0.8, 10)
+    -- striped roof: four bands across
+    local roofCols = { stripeA, STUCCO, stripeB, STUCCO }
+    for i = 0, 3 do
+        local x0 = x - 2.8 + i * 1.4
+        box("RoofStripe", x0, 10.2, z - 2.6, x0 + 1.4, 10.65, z + 3.2, roofCols[i + 1], Enum.Material.Plaster, m)
+    end
+    -- front railing
+    box("Rail", x - 3, 7.5, z - 4.55, x + 3, 7.7, z - 4.35, STUCCO, Enum.Material.Wood, m, DECO)
+    for _, dx in ipairs({ -2.9, 2.9 }) do
+        box("RailPost", x + dx - 0.1, 6.4, z - 4.55, x + dx + 0.1, 7.5, z - 4.35, STUCCO, Enum.Material.Wood, m, DECO)
+    end
+    -- ramp down the east side
+    local rise, run = 6.4, 9.6
+    local len = math.sqrt(rise * rise + run * run)
+    part({
+        Name = "Ramp", Size = Vector3.new(len, 0.3, 2.4),
+        CFrame = CFrame.new(x + 3 + run / 2, rise / 2 - 0.1, z + 1.6) * CFrame.Angles(0, 0, -math.atan2(rise, run)),
+        Color = wood, Material = Enum.Material.WoodPlanks,
+    }, m)
+    -- flag
+    cyl("FlagPole", Vector3.new(x + 2.5, 10.65, z - 2.3), Vector3.new(x + 2.5, 14.2, z - 2.3), 0.15, CHROME,
+        Enum.Material.Metal, m, DECO)
+    box("Flag", x + 2.55, 13, z - 2.33, x + 4.15, 14, z - 2.27, Color3.fromRGB(210, 40, 50), Enum.Material.Fabric, m, DECO)
+    m.Parent = parent
+end
+
+function MiamiBuilder:_umbrellaSet(parent, x, z, col)
+    local m = Instance.new("Model")
+    m.Name = "BeachUmbrella"
+    local apex = Vector3.new(x, 7.2, z)
+    cyl("Pole", Vector3.new(x, -0.8, z), apex, 0.2, STUCCO, Enum.Material.Metal, m)
+    for i = 0, 5 do
+        local yaw = i * (math.pi / 3)
+        local p = math.rad(-18)
+        local dir = Vector3.new(math.cos(yaw), 0, math.sin(yaw)) * math.cos(p) + UP * math.sin(p)
+        local c = apex + dir * 1.6
+        part({
+            Name = "Canopy", Size = Vector3.new(1.95, 0.08, 3.2),
+            CFrame = CFrame.lookAt(c, c + dir),
+            Color = (i % 2 == 0) and col or Color3.fromRGB(245, 240, 235), Material = Enum.Material.Fabric,
+            CanCollide = false,
+        }, m)
+    end
+    ball("Finial", apex + UP * 0.2, 0.35, STUCCO, Enum.Material.Metal, m, DECO)
+
+    -- two loungers facing the ocean (north), backrests to the south
+    for _, dx in ipairs({ -2.3, 2.3 }) do
+        local lx = x + dx
+        box("LoungerFrame", lx - 0.9, 0.7, z - 2.2, lx + 0.9, 1.0, z + 2.2, Color3.fromRGB(236, 232, 226),
+            Enum.Material.Wood, m)
+        box("LoungerLeg", lx - 0.8, -0.3, z - 2.0, lx + 0.8, 0.7, z - 1.7, CHROME, Enum.Material.Metal, m, DECO)
+        box("LoungerLeg", lx - 0.8, -0.3, z + 1.7, lx + 0.8, 0.7, z + 2.0, CHROME, Enum.Material.Metal, m, DECO)
+        box("Cushion", lx - 0.8, 1.0, z - 2.1, lx + 0.8, 1.25, z + 0.8, col, Enum.Material.Fabric, m, DECO)
+        part({
+            Name = "Backrest", Size = Vector3.new(1.6, 0.25, 1.8),
+            CFrame = CFrame.new(lx, 1.75, z + 1.55) * CFrame.Angles(math.rad(-50), 0, 0),
+            Color = col, Material = Enum.Material.Fabric, CanCollide = false,
+        }, m)
+    end
+    m.Parent = parent
+end
+
+function MiamiBuilder:_beach(f)
+    self:_lifeguardTower(f, -72, -97, PASTEL[2], PINK:Lerp(WHITE, 0.2), CYAN:Lerp(WHITE, 0.2))
+    self:_lifeguardTower(f, 58, -98, PASTEL[4], CYAN:Lerp(WHITE, 0.2), PURPLE:Lerp(WHITE, 0.3))
+    local cols = { Color3.fromRGB(240, 120, 175), Color3.fromRGB(70, 200, 210), Color3.fromRGB(250, 170, 90),
+        Color3.fromRGB(170, 120, 230) }
+    for i, p in ipairs({ { -110, -95 }, { -50, -95 }, { 38, -96 }, { 76, -95 } }) do
+        self:_umbrellaSet(f, p[1], p[2], cols[i])
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- ⚓ MARINA: pier, speedboat, drop-off ring + sign
+-- ──────────────────────────────────────────────
+function MiamiBuilder:_speedboat(parent, cf)
+    local m = Instance.new("Model")
+    m.Name = "Speedboat"
+    local HULL = Color3.fromRGB(244, 244, 248)
+    -- local: forward = -Z, hull centre y = 0 (≈ waterline at -0.3 below)
+    local function bp(class, name, size, offset, color, mat, extra)
+        local props = { Name = name, Size = size, CFrame = cf * offset, Color = color, Material = mat }
+        for k, v in pairs(extra or {}) do props[k] = v end
+        return inst(class, props, m)
+    end
+    bp("Part", "Hull", Vector3.new(5, 2.2, 11), CFrame.new(0, 0, 2.5), HULL, Enum.Material.Metal)
+    -- pointed bow: two side-lying wedges meeting on the centreline
+    bp("WedgePart", "BowR", Vector3.new(2.2, 2.5, 5), CFrame.new(1.25, 0, -5.5) * CFrame.Angles(0, 0, math.rad(-90)),
+        HULL, Enum.Material.Metal)
+    bp("WedgePart", "BowL", Vector3.new(2.2, 2.5, 5), CFrame.new(-1.25, 0, -5.5) * CFrame.Angles(0, 0, math.rad(90)),
+        HULL, Enum.Material.Metal)
+    bp("Part", "Deck", Vector3.new(4.4, 0.15, 7.2), CFrame.new(0, 1.17, 3.7), Color3.fromRGB(150, 100, 64),
+        Enum.Material.WoodPlanks)
+    -- hot-pink go-faster stripe down both sides and along the bow
+    for _, sx in ipairs({ -1, 1 }) do
+        bp("Part", "Stripe", Vector3.new(0.12, 0.3, 11), CFrame.new(sx * 2.55, 0.25, 2.5), PINK, Enum.Material.Neon, GLOW)
+        bp("Part", "RubRail", Vector3.new(0.22, 0.22, 11), CFrame.new(sx * 2.56, 1.05, 2.5), METAL_DARK,
+            Enum.Material.Metal, DECO)
+        local a = Vector3.new(sx * 2.5, 0.25, -3)
+        local tip = Vector3.new(0, 0.25, -8)
+        local mid = (a + tip) / 2
+        local normal = Vector3.new(sx * 5, 0, -2.5).Unit
+        mid = mid + normal * 0.06
+        bp("Part", "BowStripe", Vector3.new(0.12, 0.3, (tip - a).Magnitude), CFrame.lookAt(mid, mid + (tip - a)),
+            PINK, Enum.Material.Neon, GLOW)
+    end
+    -- raked windshield
+    bp("Part", "Windshield", Vector3.new(4.2, 1.3, 0.12), CFrame.new(0, 1.9, -1.2) * CFrame.Angles(math.rad(30), 0, 0),
+        Color3.fromRGB(170, 220, 255), Enum.Material.Glass, { Transparency = 0.4, CanCollide = false })
+    bp("Part", "ShieldFrame", Vector3.new(4.3, 0.12, 0.2),
+        CFrame.new(0, 1.9 + 0.65 * math.cos(math.rad(30)), -1.2 + 0.65 * math.sin(math.rad(30)))
+            * CFrame.Angles(math.rad(30), 0, 0), CHROME, Enum.Material.Metal, DECO)
+    -- seats
+    for _, sx in ipairs({ -1, 1 }) do
+        bp("Part", "Seat", Vector3.new(1.5, 0.8, 1.4), CFrame.new(sx * 1.1, 1.65, 1.5), STUCCO, Enum.Material.Fabric, DECO)
+        bp("Part", "SeatBack", Vector3.new(1.5, 1.1, 0.3), CFrame.new(sx * 1.1, 2.2, 2.3), PINK:Lerp(WHITE, 0.4),
+            Enum.Material.Fabric, DECO)
+    end
+    bp("Part", "RearBench", Vector3.new(4, 0.8, 1.2), CFrame.new(0, 1.6, 6.9), STUCCO, Enum.Material.Fabric, DECO)
+    bp("Part", "Outboard", Vector3.new(1.4, 2.6, 1.2), CFrame.new(0, 0.9, 8.6), METAL_DARK, Enum.Material.Metal)
+    -- nav lights (port red, starboard green)
+    bp("Part", "NavPort", Vector3.new(0.3, 0.3, 0.3), CFrame.new(-2.3, 1.3, -2.6), Color3.fromRGB(255, 40, 60),
+        Enum.Material.Neon, GLOW)
+    bp("Part", "NavStarboard", Vector3.new(0.3, 0.3, 0.3), CFrame.new(2.3, 1.3, -2.6), Color3.fromRGB(40, 255, 120),
+        Enum.Material.Neon, GLOW)
+    m.Parent = parent
+    return m
+end
+
+function MiamiBuilder:_marina(f)
+    local wood = Color3.fromRGB(150, 112, 78)
+    local woodDark = Color3.fromRGB(96, 70, 50)
+    local pier = folder(f, "Pier")
+    -- deck x 100..106, z -100 .. -130
+    box("PierDeck", 100, 0.6, -130, 106, 1.0, -100, wood, Enum.Material.WoodPlanks, pier)
+    box("PierBeam", 100, 0.2, -130, 100.4, 0.6, -100, woodDark, Enum.Material.Wood, pier)
+    box("PierBeam", 105.6, 0.2, -130, 106, 0.6, -100, woodDark, Enum.Material.Wood, pier)
+    -- step up from the sand
+    inst("WedgePart", {
+        Name = "PierRamp", Size = Vector3.new(6, 1.0, 2.5),
+        CFrame = CFrame.new(103, 0.5, -98.75) * CFrame.Angles(0, math.pi, 0),
+        Color = wood, Material = Enum.Material.WoodPlanks,
+    }, pier)
+    for _, z in ipairs({ -100.5, -106, -112, -118, -124, -129.5 }) do
+        for _, x in ipairs({ 100.3, 105.7 }) do
+            cyl("PierPost", Vector3.new(x, -10, z), Vector3.new(x, 1.4, z), 0.7, woodDark, Enum.Material.Wood, pier)
+        end
+    end
+    -- two lamps: warm pools on the boards and a reflection on the water
+    for _, z in ipairs({ -110, -127 }) do
+        cyl("PierLampPole", Vector3.new(100.6, 1, z), Vector3.new(100.6, 7, z), 0.25, METAL_DARK, Enum.Material.Metal, pier)
+        local lantern = box("PierLantern", 100.2, 7, z - 0.4, 101.0, 7.9, z + 0.4, METAL_DARK, Enum.Material.Metal, pier, DECO)
+        box("PierLanternGlow", 100.3, 6.8, z - 0.3, 100.9, 7.0, z + 0.3, WARM_LIGHT, Enum.Material.Neon, pier, GLOW)
+        pointLight(lantern, WARM_LIGHT, 1.3, 16, true)
+    end
+    -- cleats + mooring lines to the boat
+    local boatCF = CFrame.new(109, -0.3, -125)
+    for _, z in ipairs({ -118, -129 }) do
+        box("Cleat", 105.3, 1.0, z - 0.4, 105.8, 1.25, z + 0.4, CHROME, Enum.Material.Metal, pier, DECO)
+    end
+    cyl("MooringLine", Vector3.new(105.6, 1.2, -118), (boatCF * CFrame.new(-2.3, 1.1, 5)).Position, 0.1,
+        Color3.fromRGB(220, 210, 180), Enum.Material.Fabric, pier, DECO)
+    cyl("MooringLine", Vector3.new(105.6, 1.2, -129), (boatCF * CFrame.new(-2.2, 1.1, -3.5)).Position, 0.1,
+        Color3.fromRGB(220, 210, 180), Enum.Material.Fabric, pier, DECO)
+    self:_speedboat(pier, boatCF)
+
+    -- ── DROP-OFF ring: dashed neon outline on the sand (not a disc) ──
+    local ring = folder(f, "DropoffRing")
+    local c = Vector3.new(W.DROPOFF.x, W.DROPOFF.y, W.DROPOFF.z)
+    local R = W.DROPOFF_RADIUS
+    local N = 40
+    for i = 0, N - 1 do
+        local a = i * (math.pi * 2 / N)
+        local pos = c + Vector3.new(math.cos(a) * R, 0.06, math.sin(a) * R)
+        local tangent = Vector3.new(-math.sin(a), 0, math.cos(a))
+        local seg = part({
+            Name = "RingSegment", Size = Vector3.new(0.35, 0.12, 1.5),
+            CFrame = CFrame.lookAt(pos, pos + tangent),
+            Color = CYAN, Material = Enum.Material.Neon,
+            CanCollide = false, CastShadow = false, CanTouch = false, CanQuery = false,
+        }, ring)
+        if i % 10 == 0 then pointLight(seg, CYAN, 0.9, 10) end
+    end
+    -- soft cyan pool inside the ring from an invisible panel overhead
+    local glow = box("DropoffGlow", c.X - 12, 9, c.Z - 12, c.X + 12, 9.2, c.Z + 12, CYAN, Enum.Material.SmoothPlastic, ring,
+        { Transparency = 1, CanCollide = false, CastShadow = false, CanTouch = false, CanQuery = false })
+    local sl = Instance.new("SurfaceLight")
+    sl.Face = Enum.NormalId.Bottom
+    sl.Color = CYAN
+    sl.Brightness = 0.6
+    sl.Range = 12
+    sl.Angle = 70
+    sl.Parent = glow
+
+    -- ── DROP-OFF sign, post-mounted, facing south toward the street.
+    --    Sits just east of the marina route (x 94..122 stays clear). ──
+    local signF = folder(f, "DropoffSign")
+    local sz = -84
+    for _, x in ipairs({ 124.6, 129.4 }) do
+        box("SignPost", x - 0.15, 0, sz - 0.15, x + 0.15, 4.6, sz + 0.15, METAL_DARK, Enum.Material.Metal, signF)
+    end
+    local board = box("SignBoard", 124, 4.4, sz - 0.3, 130, 7.3, sz + 0.15, SIGN_DARK, Enum.Material.Metal, signF)
+    local g = gui(board, Enum.NormalId.Back, 40, 2.5, 0)
+    neonLabel(g, "DROP-OFF", CYAN, { Size = UDim2.fromScale(0.9, 0.55), Position = UDim2.fromScale(0.05, 0.08) }, 4)
+    neonLabel(g, "DRIVE IN  ·  CASH OUT", PINK, { Size = UDim2.fromScale(0.8, 0.22), Position = UDim2.fromScale(0.1, 0.68),
+        FontFace = UITheme.F.bold }, 2)
+    box("SignTube", 124.2, 4.15, sz + 0.15, 129.8, 4.3, sz + 0.3, CYAN, Enum.Material.Neon, signF, GLOW)
+    pointLight(board, CYAN, 1.2, 12)
+end
+
+-- ──────────────────────────────────────────────
+-- 🚗 PARKED 80s CARS
+-- ──────────────────────────────────────────────
+function MiamiBuilder:_parkedCar(parent, pos, facing, paint, stripe)
+    local m = Instance.new("Model")
+    m.Name = "ParkedCar"
+    local cf = CFrame.lookAt(pos, pos + facing)   -- local -Z = front
+    local function cp(class, name, size, offset, color, mat, extra)
+        local props = { Name = name, Size = size, CFrame = cf * offset, Color = color, Material = mat }
+        for k, v in pairs(extra or {}) do props[k] = v end
+        return inst(class, props, m)
+    end
+    local glass = Color3.fromRGB(26, 34, 52)
+    cp("Part", "Body", Vector3.new(4.6, 1.4, 10), CFrame.new(0, 1.5, 0), paint, Enum.Material.Metal, { Reflectance = 0.08 })
+    cp("Part", "Cabin", Vector3.new(4.0, 1.4, 4.6), CFrame.new(0, 2.9, 0.6), glass, Enum.Material.Glass,
+        { Reflectance = 0.25, Transparency = 0.1 })
+    cp("WedgePart", "Windshield", Vector3.new(4.0, 1.4, 1.2), CFrame.new(0, 2.9, -2.3), glass, Enum.Material.Glass,
+        { Reflectance = 0.25, Transparency = 0.1 })
+    cp("WedgePart", "RearWindow", Vector3.new(4.0, 1.4, 1.0), CFrame.new(0, 2.9, 3.4) * CFrame.Angles(0, math.pi, 0),
+        glass, Enum.Material.Glass, { Reflectance = 0.25, Transparency = 0.1 })
+    cp("Part", "Roof", Vector3.new(4.1, 0.25, 4.0), CFrame.new(0, 3.72, 0.7), paint, Enum.Material.Metal)
+    for _, sx in ipairs({ -1, 1 }) do
+        for _, sz in ipairs({ -3.3, 3.3 }) do
+            cp("Part", "Wheel", Vector3.new(0.9, 2, 2), CFrame.new(sx * 2.05, 1.0, sz), Color3.fromRGB(24, 24, 26),
+                Enum.Material.Rubber, { Shape = Enum.PartType.Cylinder })
+            cp("Part", "Hubcap", Vector3.new(0.12, 1.1, 1.1), CFrame.new(sx * 2.52, 1.0, sz), CHROME, Enum.Material.Metal,
+                { Shape = Enum.PartType.Cylinder, CanCollide = false })
+        end
+        cp("Part", "SideStripe", Vector3.new(0.08, 0.25, 9), CFrame.new(sx * 2.32, 1.85, 0), stripe, Enum.Material.Metal, DECO)
+        cp("Part", "Headlight", Vector3.new(0.9, 0.35, 0.1), CFrame.new(sx * 1.5, 1.8, -5.02), Color3.fromRGB(235, 232, 210),
+            Enum.Material.Glass, DECO)
+        cp("Part", "Taillight", Vector3.new(0.9, 0.3, 0.1), CFrame.new(sx * 1.5, 1.8, 5.02), Color3.fromRGB(200, 30, 50),
+            Enum.Material.Neon, GLOW)
+    end
+    for _, sz in ipairs({ -5.1, 5.1 }) do
+        cp("Part", "Bumper", Vector3.new(4.7, 0.5, 0.35), CFrame.new(0, 1.1, sz), CHROME, Enum.Material.Metal)
+    end
+    m.Parent = parent
+    return m
+end
+
+function MiamiBuilder:_cars(f)
+    local zc, hw = W.STREET_Z, W.STREET_HALF_WIDTH
+    local roadY = 0.2
+    local northKerbZ = zc - hw + 2.7   -- -19.3, parked on the north (westbound) side
+    local southKerbZ = zc + hw - 2.7   -- -8.7,  parked on the south (eastbound) side
+    local west, east = Vector3.new(-1, 0, 0), Vector3.new(1, 0, 0)
+    -- Clear of: zebra x -5..5, getaway bay x -48..-30 (north lane), jewelry
+    -- police bay x -66..-50 (south lane), marina turn x 94..122, street ends.
+    self:_parkedCar(f, Vector3.new(-100, roadY, northKerbZ), west, Color3.fromRGB(240, 150, 185), WHITE)
+    -- (removed: sat in a police cruiser lane — see PoliceService spawns)
+    -- (removed: sat in a police cruiser lane — see PoliceService spawns)
+    self:_parkedCar(f, Vector3.new(60, roadY, southKerbZ), east, Color3.fromRGB(245, 225, 140), Color3.fromRGB(70, 200, 210))
+end
+
+-- ──────────────────────────────────────────────
+-- 🏚 SAFEHOUSE SKIN — pastel stucco over the brick warehouse
+-- ──────────────────────────────────────────────
+function MiamiBuilder:skinSafehouse(parentFolder)
+    local f = folder(parentFolder, "SafehouseSkin")
+    local SKIN = Color3.fromRGB(172, 228, 212)       -- mint stucco
+    local BASE = Color3.fromRGB(112, 160, 152)
+    local BAND = PASTEL[1]
+    local TRIM = STUCCO
+    local P = Enum.Material.Plaster
+    -- outer faces: x ±24.5, z 3.5 (north), z 40.5 (south); roof top y 17.5
+    local N0, N1 = 3.2, 3.5
+    local S0, S1 = 40.5, 40.8
+    local top = 17.5
+    local gx0, gx1, gy1 = -9, 9, 12.5    -- garage opening (keep clear)
+
+    -- stucco shell, 0.3 thick, corners wrapped
+    box("SkinNorthW", -24.8, 0, N0, gx0, top, N1, SKIN, P, f)
+    box("SkinNorthE", gx1, 0, N0, 24.8, top, N1, SKIN, P, f)
+    box("SkinHeader", gx0, gy1, N0, gx1, top, N1, SKIN, P, f)
+    box("SkinSouth", -24.8, 0, S0, 24.8, top, S1, SKIN, P, f)
+    box("SkinWest", -24.8, 0, N0, -24.5, top, S1, SKIN, P, f)
+    box("SkinEast", 24.5, 0, N0, 24.8, top, S1, SKIN, P, f)
+
+    -- plinth band
+    box("PlinthNW", -24.95, 0, N0 - 0.15, gx0, 1.2, N0, BASE, Enum.Material.Concrete, f)
+    box("PlinthNE", gx1, 0, N0 - 0.15, 24.95, 1.2, N0, BASE, Enum.Material.Concrete, f)
+    box("PlinthS", -24.95, 0, S1, 24.95, 1.2, S1 + 0.15, BASE, Enum.Material.Concrete, f)
+    box("PlinthW", -24.95, 0, N0 - 0.15, -24.8, 1.2, S1 + 0.15, BASE, Enum.Material.Concrete, f)
+    box("PlinthE", 24.8, 0, N0 - 0.15, 24.95, 1.2, S1 + 0.15, BASE, Enum.Material.Concrete, f)
+
+    -- pink band under the parapet, all the way round
+    box("BandN", -24.95, 16.7, N0 - 0.25, 24.95, 17.3, N0, BAND, P, f)
+    box("BandS", -24.95, 16.7, S1, 24.95, 17.3, S1 + 0.25, BAND, P, f)
+    box("BandW", -25.05, 16.7, N0 - 0.25, -24.8, 17.3, S1 + 0.25, BAND, P, f)
+    box("BandE", 24.8, 16.7, N0 - 0.25, 25.05, 17.3, S1 + 0.25, BAND, P, f)
+
+    -- parapet + white coping around the roof edge
+    box("ParapetN", -24.8, 16.5, N0, 24.8, 19, N0 + 1, SKIN, P, f)
+    box("ParapetS", -24.8, 16.5, S1 - 1, 24.8, 19, S1, SKIN, P, f)
+    box("ParapetW", -24.8, 16.5, N0, -23.8, 19, S1, SKIN, P, f)
+    box("ParapetE", 23.8, 16.5, N0, 24.8, 19, S1, SKIN, P, f)
+    box("CopingN", -24.95, 19, N0 - 0.15, 24.95, 19.3, N0 + 1.15, TRIM, P, f)
+    box("CopingS", -24.95, 19, S1 - 1.15, 24.95, 19.3, S1 + 0.15, TRIM, P, f)
+    box("CopingW", -24.95, 19, N0 - 0.15, -23.65, 19.3, S1 + 0.15, TRIM, P, f)
+    box("CopingE", 23.65, 19, N0 - 0.15, 24.95, 19.3, S1 + 0.15, TRIM, P, f)
+
+    -- stepped deco crown over the sign
+    box("StepA", -13, 19, N0, 13, 20.6, N0 + 2, SKIN, P, f)
+    box("StepACap", -13.2, 20.6, N0 - 0.15, 13.2, 20.85, N0 + 2.15, TRIM, P, f)
+    box("StepB", -7, 20.85, N0, 7, 22.2, N0 + 1.4, BAND, P, f)
+    box("StepBCap", -7.2, 22.2, N0 - 0.15, 7.2, 22.45, N0 + 1.55, TRIM, P, f)
+    box("StepC", -2.5, 22.45, N0, 2.5, 23.8, N0 + 1, SKIN, P, f)
+    box("StepCCap", -2.7, 23.8, N0 - 0.15, 2.7, 24.05, N0 + 1.15, TRIM, P, f)
+
+    -- vertical fins: both north corners + flanking the garage, rising past the roof
+    for _, sx in ipairs({ -1, 1 }) do
+        box("CornerFin", sx * 23.4, 0, N0 - 0.9, sx * 24.8, 21.2, N0, TRIM, P, f)
+        box("CornerFinCap", sx * 23.25, 21.2, N0 - 1.05, sx * 24.95, 21.5, N0 + 0.2, BAND, P, f)
+        box("GarageFin", sx * 11.3, 0, N0 - 0.9, sx * 12.5, 21.8, N0, TRIM, P, f)
+        box("GarageFinCap", sx * 11.15, 21.8, N0 - 1.05, sx * 12.65, 22.1, N0 + 0.2, BAND, P, f)
+        -- three speed lines between the fins, wrapping onto the side wall
+        for k = 0, 2 do
+            local y = 9.8 + k * 0.7
+            box("SpeedLine", sx * 12.5, y, N0 - 0.25, sx * 23.4, y + 0.3, N0, TRIM, P, f)
+            box("SpeedLine", sx * 24.8, y, N0, sx * 25.05, y + 0.3, 14, TRIM, P, f)
+        end
+    end
+
+    -- eyebrow canopy over the garage + a warm downlight onto the driveway
+    local canopy = box("GarageCanopy", -11.2, 12.5, 1.6, 11.2, 12.8, N0, TRIM, Enum.Material.Concrete, f)
+    spotLight(canopy, Enum.NormalId.Bottom, WARM_LIGHT, 1.5, 16, 100, true)
+
+    -- ── the big neon sign ──
+    local board = box("NeonShopSign", -11, 13, 2.8, 11, 16.4, N0, SIGN_DARK, Enum.Material.Metal, f)
+    local g = gui(board, Enum.NormalId.Front, 30, 2.6, 0)
+    neonLabel(g, "RIVERSIDE AUTO", PINK, { Size = UDim2.fromScale(0.94, 0.58), Position = UDim2.fromScale(0.03, 0.07) }, 4)
+    neonLabel(g, "BODY SHOP", CYAN, { Size = UDim2.fromScale(0.44, 0.24), Position = UDim2.fromScale(0.28, 0.7) }, 2)
+    for _, x in ipairs({ 0.06, 0.74 }) do
+        local line = gframe(g, x, 0.815, 0.2, 0.025, CYAN:Lerp(WHITE, 0.3))
+        local st = Instance.new("UIStroke")
+        st.Color = CYAN
+        st.Transparency = 0.4
+        st.Thickness = 2
+        st.Parent = line
+    end
+    -- neon tube border around the board
+    box("SignTubeTop", -11.2, 16.4, 2.6, 11.2, 16.6, 2.8, CYAN, Enum.Material.Neon, f, GLOW)
+    box("SignTubeBottom", -11.2, 12.8, 2.6, 11.2, 13.0, 2.8, CYAN, Enum.Material.Neon, f, GLOW)
+    box("SignTubeLeft", -11.2, 13.0, 2.6, -11.0, 16.4, 2.8, CYAN, Enum.Material.Neon, f, GLOW)
+    box("SignTubeRight", 11.0, 13.0, 2.6, 11.2, 16.4, 2.8, CYAN, Enum.Material.Neon, f, GLOW)
+    -- real light: pink spill on the stucco around it + a wash down the driveway
+    pointLight(board, PINK, 1.6, 14)
+    local wash = Instance.new("SurfaceLight")
+    wash.Face = Enum.NormalId.Front
+    wash.Color = PINK
+    wash.Brightness = 1.2
+    wash.Range = 16
+    wash.Angle = 110
+    wash.Parent = board
+
+    -- two neon wall lamps either side of the garage (between opening and fins)
+    for _, sx in ipairs({ -1, 1 }) do
+        local x0, x1 = sx * 9.8, sx * 10.8
+        box("WallLampPlate", x0, 7, 2.95, x1, 9.6, N0, METAL_DARK, Enum.Material.Metal, f, DECO)
+        box("WallLampShade", x0 - sx * 0.1, 9.3, 2.6, x1 + sx * 0.1, 9.6, N0, CHROME, Enum.Material.Metal, f, DECO)
+        local tube = box("WallLampTube", sx * 10.15, 7.3, 2.7, sx * 10.45, 9.3, 2.95, CYAN, Enum.Material.Neon, f, GLOW)
+        pointLight(tube, CYAN, 1.2, 10)
+    end
+
+    print("[MiamiBuilder] Safehouse skinned in pastel stucco 🎨")
+end
+
+-- ──────────────────────────────────────────────
+-- 🚀 BUILD
+-- ──────────────────────────────────────────────
+function MiamiBuilder:build(parentFolder)
+    local root = folder(parentFolder, "NeonMiami")
+    self:_ground(folder(root, "Ground"))
+    local street = folder(root, "OceanDriveExt")
+    self:_streetExtension(street)
+    self:_puddles(folder(root, "Puddles"))
+    self:_buildings(folder(root, "DecoBuildings"))
+    self:_palms(folder(root, "Palms"))
+    self:_beach(folder(root, "Beach"))
+    self:_marina(folder(root, "Marina"))
+    self:_cars(folder(root, "ParkedCars"))
+    print("[MiamiBuilder] Neon Miami built 🌴")
+end
+
+return MiamiBuilder

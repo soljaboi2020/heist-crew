@@ -350,6 +350,39 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   ⏳ **Malachi: "the brick building gives basic, I want this game out of this world"** → art-direction
   options pitched (Rule #12), awaiting his pick before any exterior rebuild.
 
+- **2026-09-25** — **🌴 v1.0.0 "NEON MIAMI" — EVERYTHING AT ONCE.** Malachi picked art direction A
+  (Neon Miami Nights) and said *"knock everything out in one — every upgrade — we'll go through it
+  when it's done."* The whole roadmap was built in one pass. **Contract: `docs/V1_SPEC.md`** (world
+  map, attributes, remotes, JobRefs, file ownership) — read it first.
+  - **Built in parallel by 5 subagents** (each owned its own files): `MiamiBuilder` (world art),
+    `VillaBuilder` (job 1 map), `JewelryBuilder` (job 2 map), `VehicleService`+`PoliceService`+
+    `CarHud`, and the UI set `JobHud`/`LootHud`/`AbilityHud`/`ShopUI`. Claude wrote the core +
+    integration.
+  - **Core (Claude):** `JobService` replaces `HeistService` (deleted) — run lifecycle IDLE→ACTIVE,
+    alarm + timer, **drill** (place → runs → random jams to fix → vault swings open), silent alarm
+    (jewelry), catch/bust/drop-off, payouts (each escapee gets the FULL take, + stealth bonus if no
+    alarm), XP, reset. `SecurityService` (sweeping cameras w/ LOS + detect time, breaker, random
+    keycard, keycard doors + Hacker hack, rhythmic laser rows via GetPartBoundsInBox). `LootService`
+    (duffel bags on your back, slowdown, G to throw, pick up, load into the car trunk).
+    `ShopService` (gear, Roblox-made catalog masks worn during jobs, codes, VIP pass, daily streak)
+    over the `ShopAction` RemoteFunction. `ProgressService` (XP/levels). `AbilityService` (Lookout
+    mark). `GuardService` now route-driven, live-chases the nearest player, Muscle takedowns (stun).
+    Saves migrated to the v1.0 shape in `PlayerDataService`. `HeistBuilder` is now a coordinator that
+    pcall-wraps every builder; `init.server`/`init.client` load optional modules defensively.
+  - **Getaway = drive the loaded car to the marina** (`WORLD.DROPOFF` (106,0,-96)). Only players IN
+    the car at the drop-off are paid. Car busted by cruisers → everyone in it is out.
+  - **Monetization is inert until Malachi acts:** `Constants.GAMEPASSES.VIP = 0` — create the pass in
+    the Creator Dashboard and paste the id. Codes live in `Constants.CODES`.
+  - **Integration notes from the subagents (all handled):** vault/safe `door` is a flat lock plate
+    (a cylinder can't face the corridor) — the disc is in `vault.parts`; the car is open-top with
+    F-key seat prompts; a `CarInput` remote carries driver input (VehicleSeat input on an anchored
+    seat is unverified); two parked cars removed from police lanes; smashed case glass now shatters
+    (LootService); client `Remotes.getRemote` no longer creates a shadow folder.
+  - **Unverified guesses to check first in Studio:** `KenneyLoader.FRONT_YAW` (props facing the
+    wall?), WedgePart orientation on the cars (`VehicleService` `Build.wedge`), whether PivotTo
+    carries seated players, touch-button positions (`TOUCH_POS` in LootHud/AbilityHud).
+  - ⏸️ **NOTHING HERE HAS BEEN PLAYTESTED.** Everything compiles + analyzes clean; that's all.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

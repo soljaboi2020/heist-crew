@@ -9,7 +9,8 @@
             no role          → Step on a crew pad to pick your role
             idle             → Cross the street and crack the mansion vault
             cracking         → Hold E on the vault — stay out of the flashlights
-            escaping         → Get to the getaway car   0:42   (turns red)
+            active           → the first unfinished step of the job (JobInfo)
+            alarm            → Get the car to the marina   0:42   (turns red)
             after a run      → Head back to the safehouse
       • TITLE CARD — "HEIST CREW" fades in and out once when you join.
 
@@ -135,37 +136,72 @@ function CrewHud:_setObjective(caption, text, danger)
     end
 end
 
+-- v1.0: the pill is driven by the JobInfo remote (see V1_SPEC §5): it always
+-- names the first unfinished step of the job, or the escape countdown.
 function CrewHud:_refresh()
-    if self._escapeUntil then return end   -- the countdown owns the pill while escaping
-    self._obj.timer.Visible = false
-    if self._phase == "cracking" then
-        self:_setObjective("Objective", "Hold E on the vault — stay out of the flashlights")
-    elseif self._phase == "after" then
+    local info = self._info or {}
+    local o = self._obj
+    if info.alarm and (info.alarmEndsAt or 0) > 0 then
+        self:_startEscape(info.alarmEndsAt)
+        return
+    end
+    self._escapeUntil = nil
+    o.timer.Visible = false
+    if self._phase == "after" then
         self:_setObjective("Objective", "Head back to the safehouse")
+        return
+    end
+    if info.stage == "ACTIVE" then
+        for _, step in ipairs(info.steps or {}) do
+            if not step.done and not step.optional then
+                self:_setObjective(info.silentAlarm and "Hurry" or "Objective", step.label, false)
+                return
+            end
+        end
+        self:_setObjective("Objective", "Load the car and drive to the marina")
     elseif not localPlayer:GetAttribute("Role") then
         self:_setObjective("Objective", "Step on a crew pad to pick your role")
     else
-        self:_setObjective("Objective", "Cross the street and crack the mansion vault")
+        local name = info.jobName or "the job"
+        self:_setObjective("Objective", "Cross Ocean Drive and hit " .. name)
     end
 end
 
-function CrewHud:_startEscape(seconds)
-    local untilT = os.clock() + (seconds or Constants.GETAWAY_TIMER)
-    self._escapeUntil = untilT
-    self:_setObjective("Escape", "Get to the getaway car", true)
+function CrewHud:_startEscape(endsAt)
+    if self._escapeUntil == endsAt then return end
+    self._escapeUntil = endsAt
+    self:_setObjective("Escape", "Get the car to the marina", true)
     local o = self._obj
     o.timer.Visible = true
     task.spawn(function()
-        while self._escapeUntil == untilT do
-            local left = math.max(0, math.ceil(untilT - os.clock()))
+        while self._escapeUntil == endsAt do
+            local left = math.max(0, math.ceil(endsAt - workspace:GetServerTimeNow()))
             o.timer.Text = string.format("%d:%02d", math.floor(left / 60), left % 60)
-            -- the dot blinks in the last 10 seconds
             o.dot.BackgroundTransparency = (left <= 10 and math.floor(os.clock() * 4) % 2 == 0) and 0.8 or 0
             if left <= 0 then break end
             task.wait(0.1)
         end
         o.dot.BackgroundTransparency = 0
     end)
+end
+
+-- Role-only prompts (Hacker: fast breaker / hack keypad, Muscle: takedown).
+-- The server re-checks the role; this only decides what each player SEES.
+function CrewHud:_filterPrompt(p)
+    if not p:IsA("ProximityPrompt") then return end
+    local only, hide = p:GetAttribute("RoleOnly"), p:GetAttribute("RoleHide")
+    if not only and not hide then return end
+    local role = localPlayer:GetAttribute("Role")
+    local show = true
+    if only then show = (role == only) end
+    if hide and role == hide then show = false end
+    p.Enabled = show
+end
+
+function CrewHud:_filterAll()
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then self:_filterPrompt(d) end
+    end
 end
 
 function CrewHud:_titleCard()
@@ -202,26 +238,28 @@ function CrewHud:start()
     localPlayer:GetAttributeChangedSignal("Role"):Connect(function()
         self:_renderRole()
         self:_refresh()
+        self:_filterAll()
+    end)
+    self:_filterAll()
+    workspace.DescendantAdded:Connect(function(d)
+        if d:IsA("ProximityPrompt") then task.defer(function() self:_filterPrompt(d) end) end
     end)
 
-    Remotes.getRemote(Remotes.NAMES.VaultProgress, "RemoteEvent").OnClientEvent:Connect(function(p)
-        if self._escapeUntil then return end
-        local was = self._phase
-        self._phase = (p > 0 and p < 1) and "cracking" or (self._phase == "cracking" and "idle" or self._phase)
-        if was ~= self._phase then self:_refresh() end
-    end)
+    local infoRemote = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")
+    if infoRemote then
+        infoRemote.OnClientEvent:Connect(function(info)
+            self._info = info or {}
+            if self._info.stage == "ACTIVE" then self._phase = "idle" end
+            self:_refresh()
+        end)
+    end
 
-    Remotes.getRemote(Remotes.NAMES.HeistState, "RemoteEvent").OnClientEvent:Connect(function(state, payload)
-        payload = payload or {}
-        if state == "ESCAPING" then
-            self._phase = "escaping"
-            self:_startEscape(payload.escapeSeconds)
-        elseif state == "COMPLETE" or state == "FAILED" then
-            self._escapeUntil = nil
+    Remotes.getRemote(Remotes.NAMES.HeistState, "RemoteEvent").OnClientEvent:Connect(function(state)
+        if state == "COMPLETE" or state == "FAILED" then
             self._phase = "after"
+            self._escapeUntil = nil
             self:_refresh()
         elseif state == "IDLE" then
-            self._escapeUntil = nil
             self._phase = "idle"
             self:_refresh()
         end

@@ -84,7 +84,7 @@ function HeistHud:_buildUi()
         radius = 14,
     })
     crack.Parent = screen
-    UITheme.caption("Cracking vault", { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -36, 0, 14),
+    UITheme.caption("Drill", { Position = UDim2.fromOffset(18, 12), Size = UDim2.new(1, -36, 0, 14),
         TextColor3 = T.gold }).Parent = crack
     local pct = UITheme.label({ Text = "0%", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 8),
         Size = UDim2.fromOffset(80, 22), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.mono, TextSize = 18 })
@@ -126,7 +126,7 @@ function HeistHud:_buildUi()
     accent.Size = UDim2.new(1, 0, 0, 4)
     accent.BorderSizePixel = 0
     accent.Parent = result
-    local rCaption = UITheme.caption("Job 01 · The Mansion", { Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 14),
+    local rCaption = UITheme.caption("", { Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 14),
         TextXAlignment = Enum.TextXAlignment.Center })
     rCaption.Parent = result
     local rTitle = UITheme.label({ Position = UDim2.fromOffset(0, 46), Size = UDim2.new(1, 0, 0, 56),
@@ -139,6 +139,7 @@ function HeistHud:_buildUi()
     self._vignette = vignette
     self._crack, self._fill, self._pct = crack, fill, pct
     self._result, self._rScale, self._rAccent, self._rTitle, self._rSub = result, rScale, accent, rTitle, rSub
+    self._rCaption = rCaption
 end
 
 function HeistHud:setAlarm(active)
@@ -185,11 +186,18 @@ function HeistHud:showResult(win, payload)
     local total = payload.crewSize or 0
     local escaped = payload.escaped
     local n = type(escaped) == "table" and #escaped or tonumber(escaped) or 0
-    if total > 0 then
-        self._rSub.Text = string.format("%d of %d crew made it out", n, total)
+    local each = tonumber(payload.each) or 0
+    if win and each > 0 then
+        self._rSub.Text = string.format("%d of %d made it out  ·  %s each", n, math.max(total, n), UITheme.money(each))
+    elseif win then
+        self._rSub.Text = "Clean getaway — but the car was empty"
     else
-        self._rSub.Text = win and "Clean getaway." or "Nobody made it to the car."
+        local why = ({ busted = "The cops boxed in the car.", time = "Out of time.", caught = "Everyone got caught.",
+            timeout = "The Boss called it off.", abandoned = "The crew bailed." })[payload.result or ""]
+        self._rSub.Text = why or "Nobody made it to the marina."
     end
+    local jobName = game:GetService("ReplicatedStorage"):GetAttribute("ActiveJob")
+    self._rCaption.Text = jobName == "jewelry" and "DIAMOND DOLLS" or "VILLA ROSA"
 
     r.Visible = true
     r.GroupTransparency = 1

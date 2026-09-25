@@ -25,6 +25,7 @@ Remotes.NAMES = {
     JobInfo         = "JobInfo",           -- server→client (info:table)  see spec §5
     ThrowBag        = "ThrowBag",          -- client→server (dir:Vector3)
     UseAbility      = "UseAbility",        -- client→server ()  Lookout mark
+    CarInput        = "CarInput",          -- client→server (throttle, steer) while driving
     Nitro           = "Nitro",             -- client→server ()  Driver boost
     ShopAction      = "ShopAction",        -- RemoteFunction (action:string, payload:table) -> {ok,msg,state}
 
@@ -43,6 +44,12 @@ end
 
 function Remotes.getRemote(name, classType)
     classType = classType or "RemoteEvent"
+    if not RunService:IsServer() then
+        -- Client: never CREATE the folder (a local copy would shadow the real one
+        -- and every WaitForChild below would wait in the wrong place forever).
+        local real = ReplicatedStorage:WaitForChild("Remotes", 10)
+        return real and real:WaitForChild(name, 10) or nil
+    end
     local folder = getRemotesFolder()
 
     if RunService:IsServer() then

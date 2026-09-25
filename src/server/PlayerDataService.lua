@@ -48,8 +48,28 @@ local function makeDefaultData()
     return {
         cash = Constants.STARTING_CASH,
         level = 1,
+        xp = 0,
         heistsCompleted = 0,
+        gear = {},              -- [gearId] = true
+        masks = { Bandit = true },
+        mask = "Bandit",
+        codes = {},             -- [CODE] = true
+        dailyDay = 0,           -- day number (os.time()//86400) of the last claim
+        dailyStreak = 0,
+        bagsSecured = 0,
     }
+end
+
+-- v1.0: older saves (v0.x) only had cash/level/heistsCompleted. Fill anything
+-- missing so every service can assume the full shape.
+local function migrate(data)
+    local defaults = makeDefaultData()
+    for k, v in pairs(defaults) do
+        if data[k] == nil then data[k] = v end
+    end
+    if type(data.masks) ~= "table" then data.masks = { Bandit = true } end
+    data.masks.Bandit = true
+    return data
 end
 
 function PlayerDataService:loadPlayer(player)
@@ -67,6 +87,7 @@ function PlayerDataService:loadPlayer(player)
     if not data then
         data = makeDefaultData()
     end
+    data = migrate(data)
 
     cache[player.UserId] = data
     print(string.format("[PlayerDataService] Loaded %s — cash: $%d, level: %d",

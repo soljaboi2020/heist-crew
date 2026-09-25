@@ -1,37 +1,44 @@
 --[[
-    HEIST CREW — Client Bootstrap
+    HEIST CREW — Client Bootstrap (v1.0)
     ────────────────────────────────────────────────
-    Runs on each player's device. Mounts UI, listens for server events,
-    handles input + camera + visual effects.
+    Mounts every piece of UI. All of it shares one look: Shared.UITheme.
 
-    Phase 2 wiring:
-      ✅ CashHud        — green cash counter in the top-right corner
-      ✅ Notifications  — top-center sliding toast messages
-      ✅ HeistHud       — alarm vignette + vault crack bar + result card
-      ✅ CrewHud        — role card + objective pill + title card (v0.7.0)
-    All UI shares one look: Shared.UITheme.
+      CashHud        cash card (top-right)
+      Notifications  toasts (top-centre, under the objective)
+      HeistHud       alarm vignette + drill bar + result card
+      CrewHud        role card, objective pill, title card, role-only prompt filter
+      JobHud         THE JOB checklist + take + level (right side)
+      LootHud        carrying pill + G to throw + keycard chip
+      AbilityHud     role perks, Lookout mark (Q), guard/camera highlights
+      ShopUI         gear / masks / codes / VIP (opens at the gear wall)
+      CarHud         speed, bust meter, nitro, drop-off arrow (while driving)
+
+    Each module is started in its own protected call — one broken HUD can't
+    stop the others from mounting.
 --]]
 
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
-local CashHud       = require(script.CashHud)
-local Notifications = require(script.Notifications)
-local HeistHud      = require(script.HeistHud)
-local CrewHud       = require(script.CrewHud)
-
 print("══════════════════════════════════════════")
 print(string.format("[HEIST CREW] Client online ✅ — playing as %s", localPlayer.Name))
 print("══════════════════════════════════════════")
 
--- Mount the cash HUD (top-right green counter)
-CashHud:start()
+local ORDER = {
+    "CashHud", "Notifications", "HeistHud", "CrewHud",
+    "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",
+}
 
--- Mount the toast notifications system (top-center sliding messages)
-Notifications:start()
-
--- Mount the heist HUD (vault progress + alarm border + state banner)
-HeistHud:start()
-
--- Role card + objective pill + title card (v0.7.0)
-CrewHud:start()
+for _, name in ipairs(ORDER) do
+    local mod = script:FindFirstChild(name)
+    if not mod then
+        warn("[HEIST CREW] UI module missing: " .. name)
+    else
+        task.spawn(function()
+            local ok, err = pcall(function()
+                require(mod):start()
+            end)
+            if not ok then warn("[HEIST CREW] " .. name .. " failed: " .. tostring(err)) end
+        end)
+    end
+end

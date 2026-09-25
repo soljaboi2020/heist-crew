@@ -1,0 +1,371 @@
+--[[
+    HEIST CREW — SecurityService
+    ────────────────────────────────────────────────
+    v1.0. Runs every security system of the ARMED job (JobRefs, V1_SPEC §4):
+
+      CAMERAS   sweep side to side; a player in the cone with line of sight for
+                CAMERA_DETECT_TIME trips the alarm (Signal Jammer gear doubles it).
+                Cut them all at the BREAKER (hold 3s; Hacker 1s).
+      KEYCARD   spawns at a random keycardSpot each run. Take it (HasKeycard).
+                If the holder is caught or leaves, it respawns somewhere else.
+      DOORS     keycard doors: "Swipe keycard" (needs HasKeycard) or, for the
+                Hacker only, "Hack keypad" (hold 4s, no card needed).
+      LASERS    rows blink on/off on a rhythm; touching a lit row trips the alarm.
+
+    Role-specific prompts carry a "RoleOnly" attribute; the client hides them
+    for everyone else (CrewHud prompt filter). The server re-checks the role
+    anyway — the client only decides what's SHOWN.
+
+    Callbacks (from JobService):
+        onEvent(kind, player)  -- "keycard", "cameras", "door", ...
+        onAlarm(reason, player)
+    PUBLIC API:
+        SecurityService:init(callbacks, ShopService)
+        SecurityService:arm(jobRefs) / :disarm()
+        SecurityService:reset()                  -- back to fully armed, new keycard spot
+        SecurityService:dropKeycard(player)      -- holder got caught/left
+        SecurityService:camerasCut() -> bool
+        SecurityService:doorsOpen() -> bool      -- every keycard door open
+--]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
+
+local Constants = require(ReplicatedStorage.Shared.Constants)
+
+local SecurityService = {}
+local S = Constants.SECURITY
+
+local cb = { onEvent = function() end, onAlarm = function() end }
+local Shop = nil
+
+local refs = nil
+local conns = {}
+local prompts = {}
+local state = {
+    camerasCut = false,
+    doorOpen = {},        -- [i] = true
+    keycardPart = nil,
+    seen = {},            -- [player] = { [camIndex] = seconds }
+    camBase = {},         -- [camIndex] = CFrame
+}
+
+local RED = Color3.fromRGB(255, 45, 70)
+local GREEN = Color3.fromRGB(60, 240, 140)
+local CYAN = Color3.fromRGB(40, 230, 255)
+
+local function track(c) table.insert(conns, c) return c end
+
+local function prompt(parent, name, action, object, hold, extra)
+    local p = Instance.new("ProximityPrompt")
+    p.Name = name
+    p.ActionText = action
+    p.ObjectText = object or ""
+    p.HoldDuration = hold or 0
+    p.MaxActivationDistance = 9
+    p.RequiresLineOfSight = false
+    p.KeyboardKeyCode = Enum.KeyCode.E
+    for k, v in pairs(extra or {}) do p:SetAttribute(k, v) end
+    p.Parent = parent
+    table.insert(prompts, p)
+    return p
+end
+
+local function roleOf(player) return player:GetAttribute("Role") end
+
+local function aliveRoot(player)
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return nil end
+    if hum.SeatPart then return nil end        -- in the getaway car: not "in the building"
+    return char:FindFirstChild("HumanoidRootPart"), char
+end
+
+-- ── cameras ──────────────────────────────────────────────────────────
+local function setCameraLive(cam, live)
+    if cam.light then cam.light.Enabled = live end
+    if cam.led then
+        cam.led.Material = live and Enum.Material.Neon or Enum.Material.SmoothPlastic
+        cam.led.Color = live and RED or Color3.fromRGB(40, 40, 44)
+    end
+end
+
+local function cutCameras(player)
+    if state.camerasCut or not refs then return end
+    state.camerasCut = true
+    for _, cam in ipairs(refs.cameras or {}) do setCameraLive(cam, false) end
+    cb.onEvent("cameras", player)
+end
+
+local function tickCameras(dt)
+    if not refs or state.camerasCut then return end
+    local t = os.clock()
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    local exclude = {}
+    for _, cam in ipairs(refs.cameras or {}) do table.insert(exclude, cam.model) end
+    for _, g in ipairs(CollectionService:GetTagged("Guard")) do table.insert(exclude, g) end
+    rayParams.FilterDescendantsInstances = exclude
+
+    local cosHalf = math.cos(math.rad(S.CAMERA_HALF_ANGLE))
+    for i, cam in ipairs(refs.cameras or {}) do
+        local base = state.camBase[i]
+        if base and cam.head then
+            local range = math.rad(cam.yawRange or 70) / 2
+            local yaw = math.sin(t * 2 * math.pi / (cam.period or 7)) * range
+            cam.head.CFrame = base * CFrame.Angles(0, yaw, 0)
+        end
+        local head = cam.head
+        if head then
+            local look = head.CFrame.LookVector
+            for _, player in ipairs(Players:GetPlayers()) do
+                local hrp, char = aliveRoot(player)
+                local seen = state.seen[player] or {}
+                state.seen[player] = seen
+                local inView = false
+                if hrp then
+                    local to = hrp.Position - head.Position
+                    local dist = to.Magnitude
+                    if dist < S.CAMERA_RANGE and dist > 0.1 and look:Dot(to.Unit) > cosHalf then
+                        local hit = workspace:Raycast(head.Position, to, rayParams)
+                        inView = hit ~= nil and hit.Instance:IsDescendantOf(char)
+                    end
+                end
+                if inView then
+                    local rate = (Shop and Shop:hasGear(player, "Jammer")) and 0.5 or 1
+                    seen[i] = (seen[i] or 0) + dt * rate
+                    if cam.led then cam.led.Color = (math.floor(t * 8) % 2 == 0) and RED or Color3.fromRGB(255, 200, 60) end
+                    if seen[i] >= S.CAMERA_DETECT_TIME then
+                        seen[i] = 0
+                        cb.onAlarm("camera", player)
+                    end
+                else
+                    seen[i] = math.max(0, (seen[i] or 0) - dt * 0.5)
+                end
+            end
+        end
+    end
+end
+
+-- ── keycard ──────────────────────────────────────────────────────────
+local function spawnKeycard()
+    if state.keycardPart then state.keycardPart:Destroy() state.keycardPart = nil end
+    if not refs or not refs.keycardSpots or #refs.keycardSpots == 0 then return end
+    local spot = refs.keycardSpots[math.random(1, #refs.keycardSpots)]
+
+    local card = Instance.new("Part")
+    card.Name = "Keycard"
+    card.Size = Vector3.new(0.9, 0.06, 0.6)
+    card.CFrame = spot * CFrame.new(0, 0.05, 0) * CFrame.Angles(0, math.rad(math.random(0, 359)), 0)
+    card.Anchored = true
+    card.CanCollide = false
+    card.Material = Enum.Material.SmoothPlastic
+    card.Color = Color3.fromRGB(235, 240, 245)
+    local stripe = Instance.new("Part")
+    stripe.Name = "Stripe"
+    stripe.Size = Vector3.new(0.9, 0.07, 0.14)
+    stripe.CFrame = card.CFrame * CFrame.new(0, 0, -0.16)
+    stripe.Anchored = true
+    stripe.CanCollide = false
+    stripe.Material = Enum.Material.Neon
+    stripe.Color = CYAN
+    stripe.Parent = card
+    local glow = Instance.new("PointLight")
+    glow.Color = CYAN
+    glow.Brightness = 1.2
+    glow.Range = 5
+    glow.Parent = card
+    card.Parent = refs.root
+
+    local p = prompt(card, "TakeKeycard", "Take", "Keycard", 0.4)
+    p.MaxActivationDistance = 7
+    track(p.Triggered:Connect(function(player)
+        if player:GetAttribute("HasKeycard") then return end
+        player:SetAttribute("HasKeycard", true)
+        card:Destroy()
+        state.keycardPart = nil
+        cb.onEvent("keycard", player)
+    end))
+    state.keycardPart = card
+end
+
+function SecurityService:dropKeycard(player)
+    if player and player:GetAttribute("HasKeycard") then
+        player:SetAttribute("HasKeycard", false)
+        if not self:doorsOpen() then spawnKeycard() end
+    end
+end
+
+-- ── doors ────────────────────────────────────────────────────────────
+local function setStatus(door, open)
+    if door.status then
+        door.status.Material = Enum.Material.Neon
+        door.status.Color = open and GREEN or RED
+    end
+end
+
+local function openDoor(i, player)
+    if state.doorOpen[i] or not refs then return end
+    local door = refs.keycardDoors[i]
+    state.doorOpen[i] = true
+    door._closed = door._closed or door.door.CFrame
+    TweenService:Create(door.door, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { CFrame = door._closed + (door.openOffset or Vector3.new(6, 0, 0)) }):Play()
+    door.door.CanCollide = false
+    setStatus(door, true)
+    for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("HasKeycard", false) end
+    if state.keycardPart then state.keycardPart:Destroy() state.keycardPart = nil end
+    cb.onEvent("door", player)
+end
+
+local function closeDoors()
+    for i, door in ipairs(refs and refs.keycardDoors or {}) do
+        if door._closed then door.door.CFrame = door._closed end
+        door.door.CanCollide = true
+        setStatus(door, false)
+        state.doorOpen[i] = nil
+    end
+end
+
+function SecurityService:doorsOpen()
+    if not refs or not refs.keycardDoors then return true end
+    for i = 1, #refs.keycardDoors do
+        if not state.doorOpen[i] then return false end
+    end
+    return true
+end
+
+-- ── lasers ───────────────────────────────────────────────────────────
+local laserAcc = 0
+local function tickLasers(dt)
+    if not refs or not refs.laserRows then return end
+    laserAcc = laserAcc + dt
+    if laserAcc < S.LASER_CHECK_RATE then return end
+    laserAcc = 0
+    local t = os.clock()
+    local chars = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character then table.insert(chars, p.Character) end
+    end
+    local params = OverlapParams.new()
+    params.FilterType = Enum.RaycastFilterType.Include
+    params.FilterDescendantsInstances = chars
+    for _, row in ipairs(refs.laserRows) do
+        local cycle = (row.onTime or 1.4) + (row.offTime or 1.1)
+        local on = ((t + (row.phase or 0)) % cycle) < (row.onTime or 1.4)
+        if row._on ~= on then
+            row._on = on
+            for _, beam in ipairs(row.beams or {}) do beam.Transparency = on and 0 or 1 end
+        end
+        if on and #chars > 0 and row.zoneCFrame then
+            local hits = workspace:GetPartBoundsInBox(row.zoneCFrame, row.zoneSize or Vector3.new(8, 5, 0.6), params)
+            for _, part in ipairs(hits) do
+                local model = part:FindFirstAncestorOfClass("Model")
+                local player = model and Players:GetPlayerFromCharacter(model)
+                if player then
+                    cb.onAlarm("laser", player)
+                    break
+                end
+            end
+        end
+    end
+end
+
+-- ── arm / disarm / reset ─────────────────────────────────────────────
+function SecurityService:disarm()
+    for _, c in ipairs(conns) do c:Disconnect() end
+    conns = {}
+    for _, p in ipairs(prompts) do if p.Parent then p:Destroy() end end
+    prompts = {}
+    if refs then
+        closeDoors()
+        for i, cam in ipairs(refs.cameras or {}) do
+            if state.camBase[i] and cam.head then cam.head.CFrame = state.camBase[i] end
+            setCameraLive(cam, false)
+        end
+        for _, row in ipairs(refs.laserRows or {}) do
+            for _, beam in ipairs(row.beams or {}) do beam.Transparency = 1 end
+            row._on = false
+        end
+    end
+    if state.keycardPart then state.keycardPart:Destroy() state.keycardPart = nil end
+    for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("HasKeycard", false) end
+    refs = nil
+end
+
+function SecurityService:arm(jobRefs)
+    self:disarm()
+    refs = jobRefs
+    state.camBase = {}
+    for i, cam in ipairs(refs.cameras or {}) do
+        if cam.head then state.camBase[i] = cam.head.CFrame end
+        if cam.model then CollectionService:AddTag(cam.model, "SecurityCamera") end
+    end
+
+    -- breaker: everyone 3s, Hacker 1s (two prompts, the client shows the right one)
+    if refs.breaker then
+        local slow = prompt(refs.breaker, "Breaker", "Cut the cameras", "Security panel", S.BREAKER_HOLD, { RoleHide = "Hacker" })
+        local fast = prompt(refs.breaker, "BreakerHacker", "Cut the cameras", "Security panel", 1, { RoleOnly = "Hacker" })
+        track(slow.Triggered:Connect(function(player) cutCameras(player) end))
+        track(fast.Triggered:Connect(function(player)
+            if roleOf(player) == "Hacker" then cutCameras(player) end
+        end))
+    end
+
+    for i, door in ipairs(refs.keycardDoors or {}) do
+        door._closed = door.door.CFrame
+        local swipe = prompt(door.panel, "Swipe", "Swipe keycard", "Keypad", 0.3)
+        track(swipe.Triggered:Connect(function(player)
+            if state.doorOpen[i] then return end
+            if player:GetAttribute("HasKeycard") then
+                openDoor(i, player)
+            else
+                cb.onEvent("needKeycard", player)
+            end
+        end))
+        local hack = prompt(door.panel, "HackKeypad", "Hack keypad", "Keypad", S.HACK_DOOR_HOLD, { RoleOnly = "Hacker" })
+        track(hack.Triggered:Connect(function(player)
+            if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
+        end))
+    end
+
+    track(RunService.Heartbeat:Connect(function(dt)
+        local ok, err = pcall(function()
+            tickCameras(dt)
+            tickLasers(dt)
+        end)
+        if not ok then warn("[SecurityService] tick failed:", err) end
+    end))
+    track(Players.PlayerRemoving:Connect(function(p)
+        state.seen[p] = nil
+        if p:GetAttribute("HasKeycard") then self:dropKeycard(p) end
+    end))
+
+    self:reset()
+end
+
+function SecurityService:reset()
+    if not refs then return end
+    state.camerasCut = false
+    state.seen = {}
+    for i, cam in ipairs(refs.cameras or {}) do
+        setCameraLive(cam, true)
+        if state.camBase[i] and cam.head then cam.head.CFrame = state.camBase[i] end
+    end
+    closeDoors()
+    for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("HasKeycard", false) end
+    spawnKeycard()
+end
+
+function SecurityService:camerasCut() return state.camerasCut end
+
+function SecurityService:init(callbacks, shopService)
+    cb.onEvent = callbacks.onEvent or cb.onEvent
+    cb.onAlarm = callbacks.onAlarm or cb.onAlarm
+    Shop = shopService
+end
+
+return SecurityService

@@ -19,6 +19,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local Constants = require(ReplicatedStorage.Shared.Constants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local EconomyService = {}
@@ -54,8 +55,13 @@ function EconomyService:fireCashUpdate(player)
     end
 end
 
-function EconomyService:addCash(player, amount, reason)
+-- v1.0: payouts (anything with opts.payout) get the VIP multiplier. Shop refunds,
+-- codes and daily rewards don't.
+function EconomyService:addCash(player, amount, reason, opts)
     if amount <= 0 then return end
+    if opts and opts.payout and player:GetAttribute("VIP") then
+        amount = math.floor(amount * Constants.VIP_MULTIPLIER + 0.5)
+    end
 
     local newBalance = PlayerDataService:addCash(player, amount)
     self:fireCashUpdate(player)
@@ -63,6 +69,16 @@ function EconomyService:addCash(player, amount, reason)
     print(string.format("[EconomyService] %s +$%d (%s) → $%d",
         player.Name, amount, reason or "unspecified", newBalance))
     return newBalance
+end
+
+-- Spend cash. Returns true only if the player could afford it (nothing changes otherwise).
+function EconomyService:spend(player, amount, reason)
+    local data = PlayerDataService:getData(player)
+    if not data or amount < 0 or data.cash < amount then return false end
+    PlayerDataService:addCash(player, -amount)
+    self:fireCashUpdate(player)
+    print(string.format("[EconomyService] %s -$%d (%s) → $%d", player.Name, amount, reason or "spend", data.cash))
+    return true
 end
 
 return EconomyService
