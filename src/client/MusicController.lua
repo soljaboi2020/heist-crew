@@ -220,7 +220,15 @@ function MusicController:_buildButton()
     b.MouseLeave:Connect(function() TweenService:Create(sc, TweenInfo.new(0.15), { Scale = 1 }):Play() end)
     b.Activated:Connect(function() self:setMuted(not muted) end)
     self._btn = { button = b, badge = badge, label = label, stroke = stroke }
-    b.Parent = UITheme.slot("rightEdge")
+    -- (v3.1) own corner (bottom-right): in the rightEdge slot it overlapped THE JOB card mid-heist
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "MusicButton"
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 12
+    sg.Parent = localPlayer:WaitForChild("PlayerGui")
+    b.AnchorPoint = Vector2.new(1, 1)
+    b.Position = UDim2.new(1, -14, 1, -14)
+    b.Parent = sg
     self:_paintButton()
 end
 

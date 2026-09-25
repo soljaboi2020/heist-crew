@@ -506,8 +506,11 @@ function BotService:spawnFor(players, refs)
         if bot then
             table.insert(names, name)
             table.insert(made, bot.model)
-            notify(owner, string.format("%s the crew bot is with you! Hold E on %s to give them your bag.", name, name), "gold", 5)
         end
+    end
+    -- (v3.1) one toast for the whole bot crew (drop-in used to stack 2-3 toasts + banners)
+    if #names > 0 and owner then
+        notify(owner, string.format("Bot crew: %s. Hold E on a bot to hand it your bag.", table.concat(names, " & ")), "gold", 4)
     end
     if #names > 0 and Job and Job.noteBots then Job:noteBots(names) end
     return made

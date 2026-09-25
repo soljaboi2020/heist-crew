@@ -169,7 +169,7 @@ function MaskService:activate(player)
     end
     setPower(player, id)
     local a = id and ABILITY[id]
-    if announce and a then
+    if announce and a and mysteryRoll[player] then   -- (v3.1) role card shows the power; toast only for SURPRISE!
         notify(player, string.format("Mask power: %s (%s)", a.name, a.desc), "gold", 5)
     end
 end

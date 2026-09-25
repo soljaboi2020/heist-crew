@@ -52,8 +52,8 @@ local localPlayer = Players.LocalPlayer
 -- ── tuning ─────────────────────────────────────────────────────────────
 local GUARD_SEGMENTS = 10          -- fan slices per guard cone
 local CAM_SEGMENTS = 14            -- outline points per camera footprint
-local FILL_ALPHA = 0.8             -- calm fill transparency (spec ~0.75, a touch softer)
-local FILL_ALPHA_HOT = 0.6         -- fill transparency at full suspicion
+local FILL_ALPHA = 0.66             -- calm fill transparency (spec ~0.75, a touch softer)
+local FILL_ALPHA_HOT = 0.45         -- fill transparency at full suspicion
 local RIM_ALPHA = 0.5              -- the brighter arc at the far edge
 local RIM_WIDTH = 0.18
 local LIFT = 0.07                  -- studs above the floor (no z-fighting)
