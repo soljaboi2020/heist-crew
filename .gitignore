@@ -42,3 +42,6 @@ desktop.ini
 
 # Downloaded CC0 art packs — 68MB / 2485 files, re-fetch with tools/fetch_packs.py
 src/assets/_kenney/
+
+# Playtest screen recordings (big video files, read straight off D:)
+_recordings/
