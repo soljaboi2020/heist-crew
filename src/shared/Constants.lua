@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "0.7.1"
+Constants.VERSION      = "1.0.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Dev switches ─────
@@ -57,55 +57,185 @@ Constants.HEIST_PAYOUT_STEALTH_BONUS = 500  -- bonus if no guard ever spotted th
 Constants.HEIST_PAYOUT_CRACKER_BONUS = 750  -- to the player who cracked the vault
 
 -- ───── World layout (Vector3-friendly tables — convert with Vector3.new) ─────
--- v0.7.0 (2026-09-25): the open marble plaza is gone. Players spawn INSIDE the
--- crew safehouse (a warehouse south of the street), walk out through a roll-up
--- garage door, cross a real street, and hit the mansion on the far side.
---   +Z = south (safehouse side)     -Z = north (mansion side)
+-- v1.0 "NEON MIAMI" (2026-09-25). Full map in docs/V1_SPEC.md.
+--   +Z = south (safehouse / jewelry side)   -Z = north (villa / beach side)
+--   Ground top = y 0. Building floors top = y 0.5 (FLOOR).
 Constants.WORLD = {
+    FLOOR                  = 0.5,
+
     -- Spawn — inside the safehouse, facing north toward the planning table
     SPAWN_POSITION         = {x = 0,  y = 0.6,  z = 27},
 
-    -- The safehouse (warehouse). Garage door is in the NORTH wall.
+    -- The safehouse (warehouse / "Riverside Auto Body"). Garage in the NORTH wall.
     SAFEHOUSE_CENTER       = {x = 0,  y = 0,    z = 22},
     SAFEHOUSE_HALF_WIDTH   = 24,
     SAFEHOUSE_HALF_DEPTH   = 18,
     SAFEHOUSE_HEIGHT       = 16,
     GARAGE_WIDTH           = 18,
     GARAGE_HEIGHT          = 12,
-
-    -- Boss stands at the planning table
     BOSS_NPC_POS           = {x = 8,  y = 0,    z = 19},
 
-    -- Street between the safehouse and the mansion (runs east-west)
+    -- Ocean Drive: the street (runs east-west)
     STREET_Z               = -14,
     STREET_HALF_WIDTH      = 8,
+    STREET_LENGTH          = 300,     -- x -150..150
 
-    -- Mansion
-    MANSION_DOOR           = {x = 0,  y = 0,    z = -35},
-    MANSION_CENTER         = {x = 0,  y = 0,    z = -55},
-    MANSION_VAULT          = {x = 0,  y = 5,    z = -73},
-    MANSION_HALF_WIDTH     = 22,
-    MANSION_HALF_DEPTH     = 18,
-    MANSION_WALL_HEIGHT    = 18,
+    -- Villa Rosa (job 1) — beachfront art-deco villa, north of the street
+    MANSION_CENTER         = {x = 0,  y = 0,    z = -60},
+    MANSION_HALF_WIDTH     = 30,
+    MANSION_HALF_DEPTH     = 22,      -- z -82..-38, front door at z -38
+    MANSION_WALL_HEIGHT    = 16,
     MANSION_DOOR_WIDTH     = 10,
 
-    -- Getaway car (parked in the alley east of the safehouse)
-    GETAWAY_POSITION       = {x = 38, y = 2.5,  z = 8},
+    -- Diamond Dolls Jewelers (job 2) — storefront on the south side of the street
+    JEWELRY_CENTER         = {x = -58, y = 0,   z = 11},
+    JEWELRY_HALF_WIDTH     = 12,      -- x -70..-46
+    JEWELRY_HALF_DEPTH     = 12,      -- z -1..23, shopfront faces north (z -1)
 
-    -- Test pad (still around for quick economy testing)
+    -- Beach + ocean (Terrain)
+    BEACH_Z0               = -88,     -- sand from here north...
+    BEACH_Z1               = -108,    -- ...to here, then water
+    OCEAN_SURFACE_Y        = -0.6,
+
+    -- The marina drop-off: drive the loaded getaway car here to cash out
+    DROPOFF                = {x = 106, y = 0,   z = -96},
+    DROPOFF_RADIUS         = 14,
+
+    -- Default getaway parking (jobs override this with their own spot)
+    GETAWAY_POSITION       = {x = -40, y = 0,   z = -18},
+
+    -- Police cruisers enter from the street ends
+    POLICE_SPAWNS          = { {x = -145, y = 0, z = -10}, {x = 145, y = 0, z = -18} },
+
+    -- Test pad (dev only — see DEV_TEST_PAD)
     TEST_PAD_POSITION      = {x = -38, y = 0.5, z = 4},
+}
+
+-- ───── Neon Miami palette (world art) ─────
+Constants.MIAMI = {
+    PASTELS = {
+        {242, 160, 190}, -- flamingo pink
+        {150, 225, 200}, -- mint
+        {190, 170, 235}, -- lilac
+        {250, 200, 160}, -- peach
+        {150, 205, 240}, -- sky
+        {245, 230, 150}, -- lemon
+    },
+    NEONS = {
+        {255, 70, 180},  -- hot pink
+        {40, 230, 255},  -- cyan
+        {180, 90, 255},  -- purple
+        {255, 140, 60},  -- sunset orange
+    },
+    STUCCO = {240, 232, 222},
 }
 
 -- ───── Crew roles (v0.7.0) ─────
 -- Picked by standing on a pad in the safehouse. One player per role.
--- ⚠️ Roles are COSMETIC for now (badge + roster). Abilities come later and get
--- approved first (Rule #12).
+-- v1.0: roles have real perks (AbilityService). Malachi approved "do everything".
 Constants.ROLES = {
-    { id = "Hacker",  color = {56, 189, 248},  blurb = "Cameras, keypads, alarms" },
-    { id = "Muscle",  color = {248, 113, 113}, blurb = "Heavy loot, doors, crowds" },
-    { id = "Driver",  color = {251, 191, 36},  blurb = "Getaway car, cop chases" },
-    { id = "Lookout", color = {74, 222, 128},  blurb = "Spots guards through walls" },
+    { id = "Hacker",  color = {56, 189, 248},  blurb = "Cameras, keypads, alarms",
+      perks = "Hacks keycard doors without a card · cuts cameras 3x faster" },
+    { id = "Muscle",  color = {248, 113, 113}, blurb = "Heavy loot, doors, crowds",
+      perks = "Full speed with any bag · takes down guards from behind (E)" },
+    { id = "Driver",  color = {251, 191, 36},  blurb = "Getaway car, cop chases",
+      perks = "+20% car speed · nitro boost (Shift)" },
+    { id = "Lookout", color = {74, 222, 128},  blurb = "Spots guards through walls",
+      perks = "Sees guards + cameras through walls · Q marks them for the crew" },
 }
+
+
+-- ───── Jobs (v1.0) ─────
+-- Each job has a builder (geometry → JobRefs, see docs/V1_SPEC.md) and is run
+-- by JobService. Only the SELECTED job is armed; the other shows CLOSED.
+Constants.JOBS = {
+    {
+        id = "villa", name = "VILLA ROSA", tagline = "Beachfront villa. Stealth pays.",
+        difficulty = 2, unlockLevel = 1, guards = 3,
+        alarmTimer = 90,           -- seconds to get the loaded car to the marina once the alarm trips
+        stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
+    },
+    {
+        id = "jewelry", name = "DIAMOND DOLLS", tagline = "Smash, grab, go. Silent alarm.",
+        difficulty = 3, unlockLevel = 3, guards = 2,
+        alarmTimer = 75,
+        stealthBonus = 0.15,
+        silentAlarmDelay = 45,     -- first smashed case starts a hidden clock; police roll after this
+    },
+}
+
+-- Loot kinds. value = cash added to the crew's take when the bag is secured.
+-- speed = WalkSpeed while carrying (Muscle ignores it). Default WalkSpeed is 16.
+Constants.LOOT = {
+    Cash     = { value = 1000, speed = 13, color = {74, 222, 128} },
+    Gold     = { value = 1500, speed = 10, color = {251, 191, 36} },
+    Diamonds = { value = 2500, speed = 12, color = {125, 211, 252} },
+    Jewels   = { value = 900,  speed = 14, color = {244, 114, 182} },
+    Art      = { value = 2000, speed = 11, color = {196, 181, 253} },
+}
+
+-- Security tuning (SecurityService)
+Constants.SECURITY = {
+    CAMERA_RANGE        = 32,
+    CAMERA_HALF_ANGLE   = 24,     -- degrees
+    CAMERA_DETECT_TIME  = 0.7,    -- seconds in view before the alarm trips
+    BREAKER_HOLD        = 3,      -- seconds to cut the cameras (Hacker: 1)
+    HACK_DOOR_HOLD      = 4,      -- Hacker opens keycard doors without a card
+    LASER_CHECK_RATE    = 0.08,
+}
+
+-- Heist flow
+Constants.HEIST_RUN_LIMIT     = 480   -- a quiet run can take this long before the owner calls it
+Constants.JOB_RESET_COOLDOWN  = 15
+Constants.BAG_THROW_SPEED     = 55
+
+-- ───── Progression ─────
+Constants.XP = {
+    PER_HEIST   = 250,     -- finishing a run in the car
+    PER_BAG     = 60,      -- each secured bag (whole crew gets it)
+    STEALTH     = 150,
+    LEVEL_BASE  = 400,     -- XP to go from level L to L+1 = LEVEL_BASE * L
+}
+
+-- ───── Shop: gear (passive perks, bought once, kept forever) ─────
+Constants.GEAR = {
+    { id = "Sneakers",  name = "Silent Sneakers", price = 1500, blurb = "+2 walk speed" },
+    { id = "Lockpick",  name = "Pro Lockpick",    price = 2500, blurb = "Crack vaults 30% faster" },
+    { id = "Duffel",    name = "Tactical Duffel", price = 4000, blurb = "Half the bag slowdown" },
+    { id = "Jammer",    name = "Signal Jammer",   price = 6000, blurb = "Cameras take twice as long to spot you" },
+    { id = "Thermal",   name = "Thermal Goggles", price = 9000, blurb = "See guards through walls" },
+}
+
+-- ───── Shop: masks (worn automatically when a job starts) ─────
+-- All are Roblox-made catalog accessories (InsertService can load them).
+Constants.MASKS = {
+    { id = "Bandit",    assetId = 93050572,   name = "Bandit",          price = 0 },
+    { id = "Goalie",    assetId = 22151737,   name = "Goalie",          price = 1500 },
+    { id = "Owl",       assetId = 28944404,   name = "Night Owl",       price = 3000 },
+    { id = "Kitsune",   assetId = 3210207381, name = "Kitsune",         price = 5000 },
+    { id = "Pixel",     assetId = 1744163817, name = "8-Bit Skull",     price = 7500 },
+    { id = "Catrina",   assetId = 2528067691, name = "Catrina",         price = 10000 },
+    { id = "Mystery",   assetId = 125377979,  name = "Mystery",         price = 15000 },
+    { id = "Cyber",     assetId = 7466060125, name = "Cyber",           price = 25000 },
+}
+
+-- ───── Codes (promo codes → cash, once per player) ─────
+Constants.CODES = {
+    HEISTCREW = 2500,
+    NEONMIAMI = 5000,
+    VILLAROSA = 1500,
+}
+
+-- ───── Daily reward: day N of a streak pays DAILY_BASE * N (caps at 7) ─────
+Constants.DAILY_BASE = 500
+
+-- ───── Monetization ─────
+-- ⚠️ 0 = NOT CREATED YET. Malachi creates these in the Creator Dashboard
+-- (Monetization → Passes), then pastes the id here. Code is inert until then.
+Constants.GAMEPASSES = {
+    VIP = 0,          -- +10% on every payout, gold name on the TV
+}
+Constants.VIP_MULTIPLIER = 1.10
 
 -- ───── Theme colors (RGB tables — convert with Color3.fromRGB) ─────
 Constants.COLORS = {

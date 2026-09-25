@@ -95,6 +95,10 @@
     "assetId": 125116735505234,
     "moderation": "Approved"
   },
+  "factory/conveyor": {
+    "assetId": 105596434258584,
+    "moderation": "Approved"
+  },
   "factory/conveyor-bars": {
     "assetId": 73631986752021,
     "moderation": "Approved"
@@ -207,6 +211,10 @@
     "assetId": 113634875352661,
     "moderation": "Approved"
   },
+  "factory/conveyor-stripe": {
+    "assetId": 85212142853080,
+    "moderation": "Approved"
+  },
   "factory/conveyor-stripe-corner": {
     "assetId": 117028721288422,
     "moderation": "Approved"
@@ -227,12 +235,220 @@
     "assetId": 91932285619806,
     "moderation": "Approved"
   },
+  "factory/conveyor-stripe-sides": {
+    "assetId": 108623772047351,
+    "moderation": "Approved"
+  },
   "factory/conveyor-stripe-sides-cross": {
     "assetId": 102795048863117,
     "moderation": "Approved"
   },
   "factory/conveyor-stripe-sides-junction-t": {
     "assetId": 108653924342993,
+    "moderation": "Approved"
+  },
+  "factory/crane": {
+    "assetId": 98386900221351,
+    "moderation": "Approved"
+  },
+  "factory/crane-lift": {
+    "assetId": 136270069412817,
+    "moderation": "Approved"
+  },
+  "factory/crane-magnet": {
+    "assetId": 96046998130641,
+    "moderation": "Approved"
+  },
+  "factory/door": {
+    "assetId": 70932753045107,
+    "moderation": "Approved"
+  },
+  "factory/door-wide-closed": {
+    "assetId": 131315402045847,
+    "moderation": "Approved"
+  },
+  "factory/door-wide-half": {
+    "assetId": 75442239295058,
+    "moderation": "Approved"
+  },
+  "factory/door-wide-open": {
+    "assetId": 73653578838276,
+    "moderation": "Approved"
+  },
+  "factory/floor": {
+    "assetId": 109183338677602,
+    "moderation": "Approved"
+  },
+  "factory/floor-large": {
+    "assetId": 132520022049243,
+    "moderation": "Approved"
+  },
+  "factory/hopper-high-round": {
+    "assetId": 109154688737378,
+    "moderation": "Approved"
+  },
+  "factory/hopper-high-square": {
+    "assetId": 104059383360647,
+    "moderation": "Approved"
+  },
+  "factory/hopper-round": {
+    "assetId": 71243912761609,
+    "moderation": "Approved"
+  },
+  "factory/hopper-square": {
+    "assetId": 76509383857177,
+    "moderation": "Approved"
+  },
+  "factory/indicator-special-area": {
+    "assetId": 110720732177682,
+    "moderation": "Approved"
+  },
+  "factory/indicator-special-arrow": {
+    "assetId": 124090574971384,
+    "moderation": "Approved"
+  },
+  "factory/indicator-special-cross": {
+    "assetId": 112960948266046,
+    "moderation": "Approved"
+  },
+  "factory/indicator-special-lines": {
+    "assetId": 99009856598898,
+    "moderation": "Approved"
+  },
+  "factory/lever-double": {
+    "assetId": 77054972003957,
+    "moderation": "Approved"
+  },
+  "factory/lever-single": {
+    "assetId": 113588381327172,
+    "moderation": "Approved"
+  },
+  "factory/machine": {
+    "assetId": 105613519238114,
+    "moderation": "Approved"
+  },
+  "factory/machine-bed": {
+    "assetId": 117560415975012,
+    "moderation": "Approved"
+  },
+  "factory/machine-connection-hole": {
+    "assetId": 124708081856019,
+    "moderation": "Approved"
+  },
+  "factory/machine-connection-pipe": {
+    "assetId": 99822038546172,
+    "moderation": "Approved"
+  },
+  "factory/machine-fortified": {
+    "assetId": 101281431052484,
+    "moderation": "Approved"
+  },
+  "factory/machine-window": {
+    "assetId": 121982567062065,
+    "moderation": "Approved"
+  },
+  "factory/machine-window-bar": {
+    "assetId": 128117599732488,
+    "moderation": "Approved"
+  },
+  "factory/oopi": {
+    "assetId": 139091383607081,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large": {
+    "assetId": 113061344490112,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-bend": {
+    "assetId": 111348233446591,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-bump": {
+    "assetId": 105519088008265,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-cross": {
+    "assetId": 115241834182523,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-curve": {
+    "assetId": 114938091548210,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-junction": {
+    "assetId": 137513768047291,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-long": {
+    "assetId": 80232974966137,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-side": {
+    "assetId": 81849485394788,
+    "moderation": "Approved"
+  },
+  "factory/pipe-glass-large-valve": {
+    "assetId": 135503698562304,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large": {
+    "assetId": 113962545439759,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-bend": {
+    "assetId": 73675197200243,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-bump": {
+    "assetId": 88764329317538,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-cross": {
+    "assetId": 121424508477359,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-curve": {
+    "assetId": 87971885282258,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-junction": {
+    "assetId": 83880829918328,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-long": {
+    "assetId": 76526136679460,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-side": {
+    "assetId": 119978343068509,
+    "moderation": "Approved"
+  },
+  "factory/pipe-large-valve": {
+    "assetId": 128195612014352,
+    "moderation": "Approved"
+  },
+  "factory/piston-round": {
+    "assetId": 83946843462163,
+    "moderation": "Approved"
+  },
+  "factory/piston-square": {
+    "assetId": 71909096527156,
+    "moderation": "Approved"
+  },
+  "factory/piston-thin-round": {
+    "assetId": 135595968017480,
+    "moderation": "Approved"
+  },
+  "factory/piston-thin-square": {
+    "assetId": 137959881959411,
+    "moderation": "Approved"
+  },
+  "factory/robot-arm-a": {
+    "assetId": 104514657010617,
+    "moderation": "Approved"
+  },
+  "factory/robot-arm-b": {
+    "assetId": 94698463247475,
     "moderation": "Approved"
   },
   "furniture/bathroomCabinet": {

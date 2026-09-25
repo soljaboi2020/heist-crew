@@ -21,6 +21,13 @@ Remotes.NAMES = {
     AlarmTriggered  = "AlarmTriggered",    -- (active:boolean)
     Notify          = "Notify",            -- ({text:string, color:string, duration:number})
 
+    -- v1.0 (docs/V1_SPEC.md §3)
+    JobInfo         = "JobInfo",           -- server→client (info:table)  see spec §5
+    ThrowBag        = "ThrowBag",          -- client→server (dir:Vector3)
+    UseAbility      = "UseAbility",        -- client→server ()  Lookout mark
+    Nitro           = "Nitro",             -- client→server ()  Driver boost
+    ShopAction      = "ShopAction",        -- RemoteFunction (action:string, payload:table) -> {ok,msg,state}
+
     -- Client → Server (none yet — using ProximityPrompt for vault interaction)
 }
 
