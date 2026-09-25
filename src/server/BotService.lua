@@ -209,7 +209,8 @@ end
 
 local function setPrompt(bot)
     if bot.prompt then
-        bot.prompt.Enabled = bot.state == "follow"
+        -- (v2.0.1) only show "Give bag" when the owner actually has a bag (it was clutter)
+        bot.prompt.Enabled = bot.state == "follow" and bot.owner ~= nil and bot.owner:GetAttribute("CarryingLoot") ~= nil
     end
 end
 
@@ -306,6 +307,11 @@ local function brain(bot, gen)
                 end
                 if d > (B.FOLLOW_DIST or 6) + 2 then
                     local goal = behind(bot.owner, B.FOLLOW_DIST or 6)
+                    -- (v2.0.1) side-by-side, not stacked on each other
+                    if goal and bot.side then
+                        local hrp = rootOf(bot.owner)
+                        if hrp then goal = goal + hrp.CFrame.RightVector * bot.side end
+                    end
                     bot.humanoid.WalkSpeed = d > 20 and 22 or 16
                     if goal then walk(bot, goal) end
                     if stuckFor(bot, STUCK_TIME) then teleportBehind(bot) end
@@ -375,6 +381,9 @@ local function makeBot(owner, name, pos, faceTo, gen)
         state = "follow", prompt = prompt, alive = true,
     }
     prompt.Triggered:Connect(function(player) giveBag(bot, player) end)
+    bot.side = (#bots % 2 == 0) and -3 or 3
+    owner:GetAttributeChangedSignal("CarryingLoot"):Connect(function() setPrompt(bot) end)
+    setPrompt(bot)
     place(bot, pos, faceTo)
     table.insert(bots, bot)
     brain(bot, gen)

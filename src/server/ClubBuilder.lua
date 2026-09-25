@@ -1412,8 +1412,8 @@ function ClubBuilder:_portal(f, id, index, c)
         needed = tonumber(needed)
         launchIn = tonumber(launchIn)
         if locked then
-            local lvl = (type(locked) == "number") and locked or cfg.unlockLevel or 1
-            status.Text = string.format("LOCKED — level %d", lvl)
+            -- (v2.0.1) locked == true just means a heist is already running
+            status.Text = (type(locked) == "number") and string.format("LOCKED — level %d", locked) or "Heist in progress…"
             status.TextColor3 = T.danger
             glow:SetAttribute("State", "locked")
             pad.Transparency = 0.85
@@ -1423,7 +1423,8 @@ function ClubBuilder:_portal(f, id, index, c)
             status.TextColor3 = T.money
             glow:SetAttribute("State", "launch")
             pad.Transparency = 0.2
-            setDoors(true)
+            -- (v2.0.1) Malachi: "don't open the door till it's leaving"
+            setDoors(launchIn <= 1.2)
         elseif count > 0 then
             if needed and needed > 0 then
                 status.Text = string.format("%d / %d players", count, needed)

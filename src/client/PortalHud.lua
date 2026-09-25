@@ -134,9 +134,9 @@ function PortalHud:_render(jobId)
     local left = (tonumber(d.launchAt) or 0) > 0 and math.ceil(d.launchAt - now) or 0
 
     if d.locked then
-        local lvl = (type(d.locked) == "number") and d.locked or jobLevel(jobId) or 2
         u.count.Visible, u.sep1.Visible = false, false
-        u.status.Text = string.format("LOCKED — reach level %d", lvl)
+        -- (v2.0.1) true = a heist is running; a number = level lock
+        u.status.Text = (type(d.locked) == "number") and string.format("LOCKED — reach level %d", d.locked) or "Heist in progress…"
         u.status.TextColor3 = T.danger
         return
     end
