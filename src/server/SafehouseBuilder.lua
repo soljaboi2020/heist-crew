@@ -306,8 +306,22 @@ function SafehouseBuilder:_planningTable(f, refs)
         p.MaxActivationDistance = 9
         p.RequiresLineOfSight = false
         p.Parent = tableTop
+        p.KeyboardKeyCode = Enum.KeyCode.R
+        p.GamepadKeyCode = Enum.KeyCode.ButtonY
         p.Triggered:Connect(function(player)
             if SafehouseBuilder.onNextJob then SafehouseBuilder.onNextJob(player) end
+        end)
+        -- v1.1: ready up for the drop-in (everyone ready → countdown → launch)
+        local r = Instance.new("ProximityPrompt")
+        r.Name = "ReadyUp"
+        r.ActionText = "Ready up"
+        r.ObjectText = "Planning table"
+        r.HoldDuration = 0.3
+        r.MaxActivationDistance = 9
+        r.RequiresLineOfSight = false
+        r.Parent = tableTop
+        r.Triggered:Connect(function(player)
+            if SafehouseBuilder.onReadyUp then SafehouseBuilder.onReadyUp(player) end
         end)
     end
 

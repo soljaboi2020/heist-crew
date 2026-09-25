@@ -34,6 +34,8 @@ function ProgressService:sync(player)
     player:SetAttribute("Level", d.level or 1)
     player:SetAttribute("XP", d.xp or 0)
     player:SetAttribute("XPNext", need(d.level or 1))
+    -- v1.1: first-timers get coaching tips until they finish a heist
+    player:SetAttribute("Rookie", (d.heistsCompleted or 0) == 0)
 end
 
 function ProgressService:addXP(player, amount, reason)

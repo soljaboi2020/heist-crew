@@ -182,6 +182,14 @@ function HeistBuilder:_buildBoss(folder)
     bossModel:PivotTo(CFrame.lookAt(standAt, Vector3.new(spawnPos.X, standAt.Y, spawnPos.Z)))
     bossModel.Parent = folder
     NpcFactory.animate(humanoid)
+    -- v1.1: talk to him for the briefing (client BriefingUI plays it)
+    local bp = Instance.new("ProximityPrompt")
+    bp.Name = "Briefing"
+    bp.ActionText = "Get the briefing"
+    bp.ObjectText = "The Boss"
+    bp.MaxActivationDistance = 10
+    bp.RequiresLineOfSight = false
+    bp.Parent = root
     local head = bossModel:FindFirstChild("Head") or root
 
     -- Speech bubble above his head

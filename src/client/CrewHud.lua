@@ -152,18 +152,27 @@ function CrewHud:_refresh()
         return
     end
     if info.stage == "ACTIVE" then
+        -- v1.1: caption shows the mode + heist clock ("STEALTH · 2:31")
+        local elapsed = math.max(0, math.floor(workspace:GetServerTimeNow() - (info.startedAt or workspace:GetServerTimeNow())))
+        local mode = info.silentAlarm and "Hurry" or string.format("Stealth · %d:%02d", math.floor(elapsed / 60), elapsed % 60)
         for _, step in ipairs(info.steps or {}) do
             if not step.done and not step.optional then
-                self:_setObjective(info.silentAlarm and "Hurry" or "Objective", step.label, false)
+                self:_setObjective(mode, step.label, false)
                 return
             end
         end
-        self:_setObjective("Objective", "Load the car and drive to the marina")
+        self:_setObjective(mode, "Load the car and drive to the marina")
+    elseif (info.launchAt or 0) > 0 then
+        local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))
+        self:_setObjective("Rolling out", string.format("Everyone's ready — drop-in in %d", left))
     elseif not localPlayer:GetAttribute("Role") then
-        self:_setObjective("Objective", "Step on a crew pad to pick your role")
+        self:_setObjective("Step 1 of 3", "Pick a role — stand on a crew pad by the west wall")
+    elseif (info.readyCount or 0) > 0 then
+        self:_setObjective("Step 3 of 3", string.format("Ready up at the planning table  (%d/%d ready)",
+            info.readyCount or 0, info.playerCount or 1))
     else
         local name = info.jobName or "the job"
-        self:_setObjective("Objective", "Cross Ocean Drive and hit " .. name)
+        self:_setObjective("Step 2 of 3", "Talk to the Boss for the plan, then ready up · " .. name)
     end
 end
 
@@ -241,6 +250,14 @@ function CrewHud:start()
         self:_filterAll()
     end)
     self:_filterAll()
+    -- keep the heist clock / launch countdown ticking between JobInfo pushes
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            local i = self._info or {}
+            if (i.stage == "ACTIVE" and not i.alarm) or (i.launchAt or 0) > 0 then self:_refresh() end
+        end
+    end)
     workspace.DescendantAdded:Connect(function(d)
         if d:IsA("ProximityPrompt") then task.defer(function() self:_filterPrompt(d) end) end
     end)

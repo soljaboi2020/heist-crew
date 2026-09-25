@@ -27,6 +27,8 @@ Remotes.NAMES = {
     UseAbility      = "UseAbility",        -- client→server ()  Lookout mark
     CarInput        = "CarInput",          -- client→server (throttle, steer) while driving
     Nitro           = "Nitro",             -- client→server ()  Driver boost
+    ReadyUp         = "ReadyUp",           -- client→server ()  toggle ready for the next job
+    LaunchJob       = "LaunchJob",         -- server→client ({phase="fade"|"title", jobName, tagline})
     ShopAction      = "ShopAction",        -- RemoteFunction (action:string, payload:table) -> {ok,msg,state}
 
     -- Client → Server (none yet — using ProximityPrompt for vault interaction)

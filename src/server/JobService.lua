@@ -51,6 +51,12 @@ local progressRemote = Remotes.getRemote(Remotes.NAMES.VaultProgress, "RemoteEve
 local alarmRemote    = Remotes.getRemote(Remotes.NAMES.AlarmTriggered, "RemoteEvent")
 local notifyRemote   = Remotes.getRemote(Remotes.NAMES.Notify, "RemoteEvent")
 local infoRemote     = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")
+local launchRemote   = Remotes.getRemote(Remotes.NAMES.LaunchJob, "RemoteEvent")
+
+-- v1.1 ready-up → countdown → drop-in
+local ready = {}          -- [player] = true
+local launchAt = 0        -- server time the drop-in happens (0 = no countdown)
+local launchToken = nil
 
 -- ── small helpers ────────────────────────────────────────────────────
 local function notify(player, text, color, duration)
@@ -127,6 +133,70 @@ local function drillLabel(noun)
     return string.format("Drilling… %d%%", math.floor(d.progress * 100))
 end
 
+-- v1.1: waypoints — where the NEXT thing to do is (the client draws markers)
+local function buildTargets(j, c)
+    local t = {}
+    local function add(pos, label, kind) if pos then table.insert(t, { pos = pos, label = label, kind = kind }) end end
+    local refs = j.refs
+    if not run then
+        local b = Constants.WORLD.BOSS_NPC_POS
+        add(Vector3.new(b.x, 6, b.z), "BRIEFING", "boss")
+        add(Vector3.new(0, 5, 18), "READY UP", "ready")
+        return t
+    end
+    local carPos = car and car.model and car.model.Parent and car.model:GetPivot().Position
+    local d = Constants.WORLD.DROPOFF
+    local marina = Vector3.new(d.x, 3, d.z)
+    if run.alarm then
+        add(carPos and carPos + Vector3.new(0, 4, 0), "CAR", "car")
+        add(marina, "MARINA", "marina")
+        return t
+    end
+    if refs.breaker and not S.security:camerasCut() then add(refs.breaker.Position, "BREAKER", "optional") end
+    local rem = S.loot:remaining()
+    if j.cfg.id == "jewelry" then
+        local n = 0
+        for _, r in ipairs(rem) do
+            if r.isCase and n < 3 then add(r.pos, "SMASH", "loot") n = n + 1 end
+        end
+    end
+    if not S.security:doorsOpen() then
+        local held = false
+        for _, p in ipairs(Players:GetPlayers()) do if p:GetAttribute("HasKeycard") then held = true end end
+        local door = refs.keycardDoors and refs.keycardDoors[1]
+        if held and door then
+            add(door.panel.Position, "KEYPAD", "door")
+        else
+            for _, spot in ipairs(refs.keycardSpots or {}) do add(spot.Position + Vector3.new(0, 1.5, 0), "SEARCH", "search") end
+            if door then add(door.panel.Position, "KEYPAD", "optional") end
+        end
+    elseif not run.vaultOpen and refs.vault then
+        local label = "DRILL"
+        if run.drill then label = run.drill.jammed and "FIX DRILL" or "DRILLING" end
+        add(refs.vault.door.Position, label, "vault")
+    else
+        local n = 0
+        for _, r in ipairs(rem) do
+            if not r.isCase and not r.locked and n < 2 then add(r.pos, "LOOT", "loot") n = n + 1 end
+        end
+    end
+    add(carPos and carPos + Vector3.new(0, 4, 0), "CAR", "car")
+    if c.loaded > 0 then add(marina, "MARINA", "marina") end
+    return t
+end
+
+local function readyCounts()
+    local n, total, names = 0, 0, {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        total = total + 1
+        if ready[p] then
+            n = n + 1
+            table.insert(names, p.DisplayName)
+        end
+    end
+    return n, total, names
+end
+
 local function buildInfo()
     local j = job()
     if not j then return { stage = "IDLE", steps = {} } end
@@ -153,6 +223,10 @@ local function buildInfo()
         steps = steps, take = c.take, bagsSecured = c.loaded, bagsTotal = c.total,
         alarm = run ~= nil and run.alarm == true, alarmEndsAt = run and run.alarmEndsAt or 0,
         silentAlarm = run ~= nil and run.silent == true and not run.alarm,
+        targets = buildTargets(j, c),
+        startedAt = run and run.startedAtServer or 0,
+        readyCount = (select(1, readyCounts())), playerCount = (select(2, readyCounts())),
+        readyNames = (select(3, readyCounts())), launchAt = launchAt,
     }
 end
 
@@ -334,13 +408,24 @@ startRun = function(player, why)
     local j = job()
     if not j then return nil end
     run = {
-        jobId = j.cfg.id, startedAt = os.clock(), crew = {}, alarm = false, alarmEndsAt = 0,
+        jobId = j.cfg.id, startedAt = os.clock(), startedAtServer = now(), crew = {}, alarm = false, alarmEndsAt = 0,
         silent = false, vaultOpen = false, keycardFound = false, drill = nil,
     }
     for _, p in ipairs(Players:GetPlayers()) do addToCrew(p) end
-    notifyAll(string.format("The %s job is ON — masks up", j.cfg.name), "gold", 4)
+    ready = {}
+    launchAt = 0
+    launchToken = nil
+    if why ~= "launch" then
+        notifyAll(string.format("The %s job is ON — masks up", j.cfg.name), "gold", 4)
+    end
     broadcastState("ACTIVE", { jobId = j.cfg.id })
     local thisRun = run
+    task.spawn(function()
+        while run == thisRun do
+            pushInfo()
+            task.wait(1)
+        end
+    end)
     task.delay(Constants.HEIST_RUN_LIMIT, function()
         if run == thisRun then
             notifyAll("Took too long — the Boss called it off", "red", 4)
@@ -423,6 +508,8 @@ finish = function(result)
     progressRemote:FireAllClients(0)
 
     local c = S.loot:counts()
+    local bags = (result == "dropoff") and S.loot:getLoaded() or {}
+    local elapsed = os.clock() - r.startedAt
     local escapees = {}
     for p, e in pairs(r.crew) do
         if e.escaped and p.Parent then table.insert(escapees, p) end
@@ -436,17 +523,19 @@ finish = function(result)
     if #escapees > 0 and take > 0 then
         each = math.floor(take * (1 + (stealth and j.cfg.stealthBonus or 0)) + 0.5)
     end
+    local xpEach = Constants.XP.PER_HEIST + Constants.XP.PER_BAG * #bags + (stealth and Constants.XP.STEALTH or 0)
+    local escapeeIds = {}
+    for _, p in ipairs(escapees) do table.insert(escapeeIds, p.UserId) end
     for _, p in ipairs(escapees) do
         if each > 0 then
             S.economy:addCash(p, each, "Heist payout " .. r.jobId, { payout = true })
         end
-        local xp = Constants.XP.PER_HEIST + Constants.XP.PER_BAG * c.loaded + (stealth and Constants.XP.STEALTH or 0)
-        S.progress:addXP(p, xp, "heist")
         local d = S.data:getData(p)
         if d then
             d.heistsCompleted = (d.heistsCompleted or 0) + 1
-            d.bagsSecured = (d.bagsSecured or 0) + c.loaded
+            d.bagsSecured = (d.bagsSecured or 0) + #bags
         end
+        S.progress:addXP(p, xpEach, "heist")
         if each > 0 then
             notify(p, string.format("You got %s%s", UITheme.money(each), stealth and "  (+stealth bonus)" or ""), "green", 6)
         else
@@ -461,8 +550,17 @@ finish = function(result)
     else
         playOneShot(Constants.SOUNDS.HEIST_FAIL, 0.7)
     end
+    local grade = "F"
+    if success then
+        if take == 0 then grade = "C"
+        elseif stealth and elapsed < 240 then grade = "S"
+        elseif stealth then grade = "A"
+        else grade = "B" end
+    end
     broadcastState(success and "COMPLETE" or "FAILED", {
         escaped = #escapees, crewSize = total, take = take, each = each, result = result,
+        bags = bags, stealth = stealth, stealthBonus = math.max(0, each - take), grade = grade,
+        xp = xpEach, time = math.floor(elapsed), escapees = escapeeIds, jobName = j.cfg.name,
     })
 
     for p in pairs(r.crew) do
@@ -504,6 +602,86 @@ finish = function(result)
         notifyAll(string.format("%s has reset — ready for the next job", j.cfg.name), "gold", 3)
         pushInfo()
     end)
+end
+
+-- ── ready-up → countdown → drop-in (v1.1) ─────────────────────────────
+local function allReady()
+    local n, total = readyCounts()
+    return total > 0 and n == total
+end
+
+local function dropPoints(j)
+    -- line the crew up on the sidewalk next to the getaway car
+    local cf = j.refs.getawayCFrame or CFrame.new(-40, 0, -18)
+    local p = cf.Position
+    local W = Constants.WORLD
+    local walkZ = (p.Z < W.STREET_Z) and (W.STREET_Z - W.STREET_HALF_WIDTH - 2.6) or (W.STREET_Z + W.STREET_HALF_WIDTH + 2.6)
+    local pts = {}
+    for i = 1, 8 do
+        table.insert(pts, Vector3.new(p.X - 6 + i * 3, 3.5, walkZ))
+    end
+    return pts
+end
+
+local function launch()
+    local j = job()
+    if not j or run then return end
+    launchAt = 0
+    launchToken = nil
+    launchRemote:FireAllClients({ phase = "fade", jobName = j.cfg.name, tagline = j.cfg.tagline })
+    task.wait(1.1)
+    local pts = dropPoints(j)
+    for i, p in ipairs(Players:GetPlayers()) do
+        local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+        local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.Sit = false end
+        local pos = pts[(i - 1) % #pts + 1]
+        if hrp then
+            local faceTarget = j.refs.entryPoint or (pos + Vector3.new(0, 0, -1))
+            hrp.CFrame = CFrame.lookAt(pos, Vector3.new(faceTarget.X, pos.Y, faceTarget.Z))
+        end
+    end
+    startRun(nil, "launch")
+    launchRemote:FireAllClients({ phase = "title", jobName = j.cfg.name, tagline = j.cfg.tagline })
+end
+
+local function checkLaunch()
+    if run or os.clock() < resettingUntil then return end
+    if allReady() then
+        if launchAt == 0 then
+            launchAt = now() + Constants.LAUNCH_COUNTDOWN
+            local token = {}
+            launchToken = token
+            notifyAll(string.format("Everyone's ready — rolling out in %d", Constants.LAUNCH_COUNTDOWN), "gold", 3)
+            task.delay(Constants.LAUNCH_COUNTDOWN, function()
+                if launchToken == token and allReady() then launch() end
+            end)
+        end
+    elseif launchAt ~= 0 then
+        launchAt = 0
+        launchToken = nil
+        notifyAll("Launch cancelled — someone isn't ready", "white", 2)
+    end
+    pushInfo()
+end
+
+function JobService:toggleReady(player)
+    if run then
+        notify(player, "The job's already running", "white", 2)
+        return
+    end
+    if os.clock() < resettingUntil then
+        notify(player, "The job is resetting — give it a few seconds", "white", 2)
+        return
+    end
+    ready[player] = (not ready[player]) or nil
+    local n, total = readyCounts()
+    if ready[player] then
+        notifyAll(string.format("%s is ready  (%d/%d)", player.DisplayName, n, total), "gold", 2)
+    else
+        notifyAll(string.format("%s isn't ready  (%d/%d)", player.DisplayName, n, total), "white", 2)
+    end
+    checkLaunch()
 end
 
 -- ── selecting / arming a job ─────────────────────────────────────────
@@ -702,7 +880,12 @@ function JobService:init(deps)
         end,
     })
 
+    Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent").OnServerEvent:Connect(function(player)
+        JobService:toggleReady(player)
+    end)
+
     Players.PlayerAdded:Connect(function(p)
+        if launchAt ~= 0 then checkLaunch() end   -- a new player isn't ready yet
         task.delay(2, function()
             if p.Parent then
                 local ok, info = pcall(buildInfo)
@@ -711,6 +894,8 @@ function JobService:init(deps)
         end)
     end)
     Players.PlayerRemoving:Connect(function(p)
+        ready[p] = nil
+        task.defer(checkLaunch)
         if run and run.crew[p] then
             run.crew[p] = nil
             if next(run.crew) == nil or #activeCrew() == 0 then

@@ -121,6 +121,9 @@ end
 SafehouseBuilder.onNextJob = function(player)
     JobService:cycleJob(player)
 end
+SafehouseBuilder.onReadyUp = function(player)
+    JobService:toggleReady(player)
+end
 
 JobService:init({
     jobs = world.jobs,

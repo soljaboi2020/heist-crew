@@ -216,11 +216,9 @@ function HeistHud:showResult(win, payload)
 end
 
 function HeistHud:setHeistState(stateName, payload)
-    if stateName == "COMPLETE" then
-        self:showResult(true, payload)
-    elseif stateName == "FAILED" then
-        self:showResult(false, payload)
-    end
+    -- v1.1: the end-of-heist card is PayoutScreen now (full breakdown).
+    -- showResult() is kept but no longer called.
+    local _ = stateName and payload
 end
 
 function HeistHud:start()

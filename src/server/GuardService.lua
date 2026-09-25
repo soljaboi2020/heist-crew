@@ -199,48 +199,56 @@ end
 -- ──────────────────────────────────────────────
 -- Vision check: cast a ray forward, see if a player is in cone
 -- ──────────────────────────────────────────────
-local function checkVision(guard)
-    if guard.alarmActive then return end  -- already chasing, no need to "spot"
-    if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
+-- v1.1: seeing a player fills that guard's meter for them instead of an
+-- instant alarm. Up close it fills in GUARD_NEAR_TIME, at the edge of vision in
+-- GUARD_FAR_TIME. Out of sight it drains. Full meter = spotted (alarm).
+-- The highest meter on each player is mirrored to the player attributes
+-- "GuardSuspicion" (0..1) and "SuspicionFrom" (Vector3) for the HUD.
+local D = Constants.DETECTION
+local frameMax = {}   -- [player] = { value, from }  rebuilt every scan
 
+local function checkVision(guard, dt)
+    guard.sus = guard.sus or {}
+    local stunned = guard.stunnedUntil and os.clock() < guard.stunnedUntil
     local headPos = guard.head.Position
     local lookVector = guard.root.CFrame.LookVector
-
-    local closestPlayer = nil
-    local closestDist = math.huge
+    local cosFovHalf = math.cos(math.rad(Constants.GUARD_VISION_FOV_DEGREES / 2))
+    local rayParams = RaycastParams.new()
+    rayParams.FilterDescendantsInstances = { guard.model }
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
     for _, player in ipairs(Players:GetPlayers()) do
+        local seen = false
+        local dist = math.huge
         local char = player.Character
-        if not char then continue end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then continue end
-
-        local toPlayer = (hrp.Position - headPos)
-        local dist = toPlayer.Magnitude
-        if dist > Constants.GUARD_VISION_RANGE then continue end
-
-        -- Cone check: dot(lookVector, normalize(toPlayer)) > cos(FOV/2)
-        local normalized = toPlayer.Unit
-        local cosAngle = lookVector:Dot(normalized)
-        local cosFovHalf = math.cos(math.rad(Constants.GUARD_VISION_FOV_DEGREES / 2))
-        if cosAngle < cosFovHalf then continue end
-
-        -- Line of sight: raycast from head to player, ignore guard model
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {guard.model}
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        local result = Workspace:Raycast(headPos, toPlayer, rayParams)
-        if result and result.Instance:IsDescendantOf(char) then
-            -- Saw the player!
-            if dist < closestDist then
-                closestDist = dist
-                closestPlayer = player
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hrp and hum and hum.Health > 0 and not hum.SeatPart and not stunned and not guard.alarmActive then
+            local toPlayer = hrp.Position - headPos
+            dist = toPlayer.Magnitude
+            if dist <= Constants.GUARD_VISION_RANGE and dist > 0.1 and lookVector:Dot(toPlayer.Unit) >= cosFovHalf then
+                local result = Workspace:Raycast(headPos, toPlayer, rayParams)
+                seen = result ~= nil and result.Instance:IsDescendantOf(char)
             end
         end
-    end
-
-    if closestPlayer then
-        callbacks.onPlayerSpotted(closestPlayer, guard)
+        local v = guard.sus[player] or 0
+        if seen then
+            local t = math.clamp(dist / Constants.GUARD_VISION_RANGE, 0, 1)
+            local fillTime = D.GUARD_NEAR_TIME + (D.GUARD_FAR_TIME - D.GUARD_NEAR_TIME) * t
+            v = v + dt / fillTime
+        else
+            v = v - dt * D.DECAY
+        end
+        v = math.clamp(v, 0, 1)
+        guard.sus[player] = v
+        if v >= 1 then
+            guard.sus[player] = 0
+            callbacks.onPlayerSpotted(player, guard)
+        end
+        local cur = frameMax[player]
+        if v > 0 and (not cur or v > cur.value) then
+            frameMax[player] = { value = v, from = headPos }
+        end
     end
 end
 
@@ -337,10 +345,21 @@ function GuardService:spawnPatrols(cb, routes)
             end
             self._scanAccumulator = (self._scanAccumulator or 0) + dt
             if self._scanAccumulator > 0.1 then
+                local step = self._scanAccumulator
                 self._scanAccumulator = 0
+                frameMax = {}
                 for _, guard in pairs(guards) do
-                    local ok, err = pcall(checkVision, guard)
+                    local ok, err = pcall(checkVision, guard, step)
                     if not ok then warn("[GuardService] vision:", err) end
+                end
+                for _, p in ipairs(Players:GetPlayers()) do
+                    local m = frameMax[p]
+                    local v = m and m.value or 0
+                    local old = p:GetAttribute("GuardSuspicion") or 0
+                    if math.abs(v - old) > 0.02 or (v == 0 and old ~= 0) then
+                        p:SetAttribute("GuardSuspicion", v)
+                    end
+                    if m then p:SetAttribute("SuspicionFrom", m.from) end
                 end
             end
         end)

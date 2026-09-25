@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "1.0.0"
+Constants.VERSION      = "1.1.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Dev switches ─────
@@ -154,6 +154,13 @@ Constants.JOBS = {
         difficulty = 2, unlockLevel = 1, guards = 3,
         alarmTimer = 90,           -- seconds to get the loaded car to the marina once the alarm trips
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
+        briefing = {
+            "Villa Rosa. Beachfront. Owner's in Monaco — the vault isn't.",
+            "Three guards with flashlights, three cameras. Cut the cameras at the breaker in the security room.",
+            "The vault wing needs a keycard. It moves around — search the office, bedroom, kitchen and gallery.",
+            "Lasers blink. Time it. Drill the vault, and if the drill jams, fix it.",
+            "Bag everything, load the car, drive it to the marina. Quiet pays extra.",
+        },
     },
     {
         id = "jewelry", name = "DIAMOND DOLLS", tagline = "Smash, grab, go. Silent alarm.",
@@ -161,6 +168,12 @@ Constants.JOBS = {
         alarmTimer = 75,
         stealthBonus = 0.15,
         silentAlarmDelay = 45,     -- first smashed case starts a hidden clock; police roll after this
+        briefing = {
+            "Diamond Dolls. Eight glass cases, and every one of them is wired.",
+            "The first case you smash trips a silent alarm. Cops are on their way — you just won't hear them.",
+            "Grab what you can, then the back room: keycard door, one laser, a safe.",
+            "Load the car and get to the marina before the block goes red.",
+        },
     },
 }
 
@@ -184,7 +197,16 @@ Constants.SECURITY = {
     LASER_CHECK_RATE    = 0.08,
 }
 
+-- Detection: guards/cameras fill a meter before the alarm (v1.1) — seeing you
+-- up close fills it fast, at the edge of their vision it fills slowly.
+Constants.DETECTION = {
+    GUARD_NEAR_TIME = 0.4,    -- seconds to spot you at point-blank
+    GUARD_FAR_TIME  = 1.4,    -- seconds to spot you at the edge of vision
+    DECAY           = 0.6,    -- meter drains this much per second once you're out of sight
+}
+
 -- Heist flow
+Constants.LAUNCH_COUNTDOWN    = 5     -- seconds between "everyone ready" and the drop-in
 Constants.HEIST_RUN_LIMIT     = 480   -- a quiet run can take this long before the owner calls it
 Constants.JOB_RESET_COOLDOWN  = 15
 Constants.BAG_THROW_SPEED     = 55

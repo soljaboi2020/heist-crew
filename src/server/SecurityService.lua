@@ -100,6 +100,28 @@ local function cutCameras(player)
     cb.onEvent("cameras", player)
 end
 
+local function publishCameraSuspicion()
+    -- v1.1: the fullest camera meter on each player → "CameraSuspicion" (0..1)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local best, from = 0, nil
+        if refs and not state.camerasCut then
+            for i, v in pairs(state.seen[player] or {}) do
+                local frac = math.clamp(v / S.CAMERA_DETECT_TIME, 0, 1)
+                if frac > best then
+                    best = frac
+                    local cam = refs.cameras[i]
+                    from = cam and cam.head and cam.head.Position
+                end
+            end
+        end
+        local old = player:GetAttribute("CameraSuspicion") or 0
+        if math.abs(best - old) > 0.02 or (best == 0 and old ~= 0) then
+            player:SetAttribute("CameraSuspicion", best)
+        end
+        if from then player:SetAttribute("CameraFrom", from) end
+    end
+end
+
 local function tickCameras(dt)
     if not refs or state.camerasCut then return end
     local t = os.clock()
@@ -336,6 +358,7 @@ function SecurityService:arm(jobRefs)
         local ok, err = pcall(function()
             tickCameras(dt)
             tickLasers(dt)
+            publishCameraSuspicion()
         end)
         if not ok then warn("[SecurityService] tick failed:", err) end
     end))

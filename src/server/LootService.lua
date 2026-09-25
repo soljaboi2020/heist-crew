@@ -280,6 +280,28 @@ function LootService:counts()
     return { total = #piles, loaded = #loaded, take = take, taken = taken, cases = cases, casesTaken = casesTaken }
 end
 
+-- v1.1: for the payout breakdown
+function LootService:getLoaded()
+    local out = {}
+    for _, l in ipairs(loaded) do table.insert(out, { kind = l.kind, value = l.value }) end
+    return out
+end
+
+-- v1.1: where untaken loot still is (for waypoints)
+function LootService:remaining()
+    local out = {}
+    for _, p in ipairs(piles) do
+        if not p.taken and p.anchor then
+            table.insert(out, { pos = p.anchor.Position, kind = p.kind, isCase = p.isCase, locked = p.isVault and not vaultOpen })
+        end
+    end
+    return out
+end
+
+function LootService:isCarrying(player)
+    return carriers[player] ~= nil
+end
+
 function LootService:clearLoaded()
     loaded = {}
 end

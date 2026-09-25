@@ -12,6 +12,11 @@
       AbilityHud     role perks, Lookout mark (Q), guard/camera highlights
       ShopUI         gear / masks / codes / VIP (opens at the gear wall)
       CarHud         speed, bust meter, nitro, drop-off arrow (while driving)
+      BriefingUI     Boss briefing cut-scene, READY UP, drop-in fade + title  (v1.1)
+      WaypointHud    on-screen markers to the next goal                       (v1.1)
+      DetectionHud   "being spotted" meter + direction arrow                  (v1.1)
+      PayoutScreen   end-of-heist breakdown, grade, XP, PLAY AGAIN            (v1.1)
+      TipHud         first-run coaching from the Boss                         (v1.1)
 
     Each module is started in its own protected call — one broken HUD can't
     stop the others from mounting.
@@ -27,6 +32,7 @@ print("════════════════════════�
 local ORDER = {
     "CashHud", "Notifications", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",
+    "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud",
 }
 
 for _, name in ipairs(ORDER) do
