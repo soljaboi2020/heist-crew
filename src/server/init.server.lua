@@ -119,6 +119,23 @@ end
 -- ── build the world (this yields: NPC outfits + Kenney models load) ─────
 local world = HeistBuilder:build()
 
+-- (fix v1.2.1) Roblox loads your character while the world is still building,
+-- before the spawn pad has moved down into The Vault -- so the FIRST spawn landed
+-- you out on the street by the auto shop. Anyone already in the game gets moved
+-- down to the club spawn now that it exists. (Respawns already use the new pad.)
+do
+    local sp = Constants.WORLD.SPAWN_POSITION
+    local spawnAt = Vector3.new(sp.x, sp.y + 3.5, sp.z)
+    local faceTo  = Vector3.new(Constants.WORLD.HUB_TABLE.x, sp.y + 3.5, Constants.WORLD.HUB_TABLE.z)
+    for _, player in ipairs(Players:GetPlayers()) do
+        local char = player.Character
+        if char and char.PrimaryPart then
+            char:PivotTo(CFrame.lookAt(spawnAt, faceTo))
+            print("[HEIST CREW] moved early joiner into The Vault:", player.Name)
+        end
+    end
+end
+
 -- v1.2: the crew pads, TV and blueprint live in The Vault (the club HQ)
 local hub = world.hub or {}
 CrewService:init(hub, PlayerDataService)
