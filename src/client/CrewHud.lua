@@ -16,7 +16,7 @@
             countdown    Heist starting in 4!
         then during a run:
             active       → the first unfinished step of the job (JobInfo), "STEALTH · 1:32"
-            alarm        → Get the car to the marina   0:42   (bar turns red)
+            alarm        → Load the car and hit GO!   0:42   (bar turns red)
             jail         → You're in jail — wait for a friend
             after a run  → Back to The Vault — pick your next heist
         Reads local attributes HeardPlan (BriefingUI) and InPortal (PortalHud).
@@ -321,7 +321,7 @@ function CrewHud:_refresh()
             self:_setObjective(mode, current.label, STEP_ICON[current.id] or I.target, info.silentAlarm == true,
                 { done = done, total = total })
         else
-            self:_setObjective(mode, "Load the car and drive to the marina", I.car, false, { done = done, total = total })
+            self:_setObjective(mode, "Load the car, get everyone in and pick your escape", I.car, false, { done = done, total = total })
         end
     elseif (info.launchAt or 0) > 0 then
         local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))
@@ -341,7 +341,7 @@ end
 function CrewHud:_startEscape(endsAt)
     if self._escapeUntil == endsAt then return end
     self._escapeUntil = endsAt
-    self:_setObjective("Escape!", "Get the car to the marina", I.alarm, true)
+    self:_setObjective("Escape!", "Load the car and hit GO!", I.alarm, true)
     local o = self._obj
     o.timer.Visible = true
     task.spawn(function()

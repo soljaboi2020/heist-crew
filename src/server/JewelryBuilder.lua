@@ -41,6 +41,26 @@
         room, painted skirting instead of stripy wood), printed decals take the
         room light, and Kenney props are repainted after they load.
 
+    v3.0 "THE SCORE" (2026-09-25, docs/V3_SPEC.md §2 — lootSpots v3):
+      • SHOWROOM  4 necklaces on velvet busts in the shop windows, each under a
+        screwed-down glass hood (Necklace, "unscrew"). The 8 smash cases keep
+        Jewels but now hold real-looking pieces: ring trays, a necklace easel,
+        earring cards + a ring cone, bracelets on a T-bar.
+      • THE TARGET  the PINK DIAMOND, a big round-cut stone on a marble column
+        in the middle of the showroom, under the chandelier, on a brass
+        TURNTABLE (attribute Spin = deg/sec, tag "Spin" — the stone + prongs +
+        cushion are welded to it, so spinning the turntable spins them), inside
+        its OWN laser cage (refs.laserRows[3], same shape as the other rows).
+      • OFFICE  the owner's watch collection in a glass-top cabinet (Watch) +
+        a jeweller's appraisal tray of loose stones on the desk (Jewels).
+      • BACK HALL  a courier case of ring repairs on the stock boxes (Jewels) +
+        the SECRET STASH under a loose floor tile in the closet (hidden).
+      • SAFE ROOM  "the Duchess" ruby necklace on a bust facing the laser
+        doorway (Necklace, "unscrew"); in the safe: loose diamonds on a velvet
+        tray + ring boxes and diamond parcel papers (Diamonds ×2). The old gold,
+        painting and pedestal diamond are gone.
+      Pools: showroom / office / backhall / saferoom (refs.poolNames).
+
     Geometry + props + refs ONLY. No gameplay logic, no Scripts, no prompts —
     JobService / SecurityService / LootService / GuardService / HideService
     wire the refs. Tags set here (V2_SPEC §2): HideSpot (+Label), ShadowZone,
@@ -126,6 +146,15 @@ local CAR_X, CAR_Z = -42.4, 13
 -- showroom cases: 4.4 long x 2.2 deep, glass top at y ~4.8
 local CASE_HX, CASE_HZ = 2.2, 1.1
 local LANE_A_Z = 11.5                                 -- guard A walks here, x -76 .. -51.5
+
+-- (v3.0) the pink diamond's laser cage, centre of the showroom under the
+-- chandelier. Posts at x -66.6/-61.4, z 4.0/9.2 → 2.15 studs clear of guard A's
+-- lane (z 11.5), 5 studs clear of both case islands, and it starts just past
+-- the swung-open glass doors (z 4.1) so the front door stays open.
+local CAGE_Z = 6.6
+local CAGE_H = 2.6                                    -- half-size (the cage is 5.2 x 5.2)
+local CAGE_TOP = FLOOR + 7.4
+local SPIN_DEG_PER_SEC = 24                           -- the turntable's Spin attribute
 
 -- the safe (against the safe room's south wall, door facing north)
 local SAFE_X = -74.5
@@ -221,6 +250,76 @@ local function gem(parent, pos, size, color, neon)
         Color = color, Material = neon and M.Neon or M.Glass, Reflectance = neon and 0 or 0.45,
         Transparency = neon and 0 or 0.15, CanCollide = false, CastShadow = false,
     }, parent)
+end
+
+-- ── (v3.0) jewellery kit ──
+local PLATINUM = rgb(222, 226, 234)
+local ROSE     = rgb(226, 160, 138)
+local PEARL    = rgb(240, 234, 222)
+local BLACK_VELVET = rgb(22, 18, 28)
+local STONE = {
+    diamond  = rgb(236, 246, 255),
+    ruby     = rgb(208, 18, 56),
+    sapphire = rgb(34, 80, 212),
+    emerald  = rgb(16, 164, 92),
+    pink     = rgb(255, 128, 198),
+    amethyst = rgb(150, 70, 220),
+}
+
+-- a princess-cut stone: a squat glass block turned 45°, catches the case light
+local function stone(parent, pos, size, color)
+    return part({ Name = "Stone", Size = Vector3.new(size, size * 0.62, size),
+        CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(45), 0),
+        Color = color, Material = M.Glass, Reflectance = 0.45, Transparency = 0.08,
+        CanCollide = false, CastShadow = false }, parent)
+end
+
+-- a metal bead / pearl
+local function bead(parent, pos, size, color, material)
+    return part({ Name = "Bead", Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), Position = pos,
+        Color = color, Material = material or M.Metal, Reflectance = (material == nil) and 0.35 or 0.1,
+        CanCollide = false, CastShadow = false }, parent)
+end
+
+-- a cylinder standing upright (Roblox cylinders run along X)
+local function vcyl(name, pos, dia, h, color, material, parent, extra)
+    local props = { Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, dia, dia),
+        CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Material = material }
+    for k, v in pairs(extra or {}) do props[k] = v end
+    return part(props, parent)
+end
+
+-- a finger ring standing on its edge. `cf` = the ring's centre, its LookVector
+-- = the way the hole faces. A velvet disc fills the hole so it reads as a ring,
+-- not a coin; the setting + stone sit on top.
+local function standingRing(parent, cf, dia, metal, gemColor, holeColor)
+    local axis = cf * CFrame.Angles(0, math.rad(90), 0)        -- cylinder X → cf's look
+    part({ Name = "Band", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, dia, dia), CFrame = axis,
+        Color = metal, Material = M.Metal, Reflectance = 0.4, CanCollide = false, CastShadow = false }, parent)
+    part({ Name = "Hole", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.08, dia * 0.72, dia * 0.72), CFrame = axis,
+        Color = holeColor or BLACK_VELVET, Material = M.Fabric, CanCollide = false, CastShadow = false }, parent)
+    local top = cf.Position + cf.UpVector * (dia / 2)
+    part({ Name = "Setting", Size = Vector3.new(0.1, 0.07, 0.1), CFrame = CFrame.new(top + cf.UpVector * 0.02),
+        Color = metal, Material = M.Metal, Reflectance = 0.4, CanCollide = false, CastShadow = false }, parent)
+    if gemColor then stone(parent, top + cf.UpVector * 0.09, dia * 0.42, gemColor) end
+end
+
+-- a closed loop of short bars (bangles, ring bands seen side-on). `cf` =
+-- centre, the loop lies in cf's Right/Up plane.
+local function hoop(parent, cf, radius, n, thick, color)
+    local pts = {}
+    for i = 0, n do
+        local a = (i / n) * math.pi * 2
+        table.insert(pts, cf.Position + cf.RightVector * (radius * math.cos(a)) + cf.UpVector * (radius * math.sin(a)))
+    end
+    for i = 1, n do
+        local a, b = pts[i], pts[i + 1]
+        local mid = (a + b) / 2
+        part({ Name = "Link", Size = Vector3.new(thick, thick, (b - a).Magnitude + thick * 0.6),
+            CFrame = CFrame.lookAt(mid, b), Color = color, Material = M.Metal, Reflectance = 0.4,
+            CanCollide = false, CastShadow = false }, parent)
+    end
+    return pts
 end
 
 -- weld an UNanchored decoration to an anchored part, so it follows when a
@@ -530,22 +629,12 @@ function JewelryBuilder:_facade(f)
         end
         box("Transom", b0, 10.4, -0.8, b1, 10.6, -0.3, BRASS, M.Metal, fa)
         box("WindowHead", b0, WIN_TOP - 0.2, -0.8, b1, WIN_TOP, -0.3, BRASS, M.Metal, fa)
-        -- window display plinths just inside the glass (necklace busts)
+        -- window display plinths just inside the glass. (v3.0) The necklace
+        -- busts + glass hoods on top are loot, built in _windowNecklaces.
         for k = 1, 2 do
             local px = b0 + (b1 - b0) * (k == 1 and 0.28 or 0.72)
             box("WindowPlinth", px - 0.9, FLOOR, 0.3, px + 0.9, FLOOR + 2.4, 1.5, rgb(236, 226, 230), M.Marble, fa)
             box("PlinthCap", px - 1.0, FLOOR + 2.4, 0.2, px + 1.0, FLOOR + 2.55, 1.6, BRASS, M.Metal, fa)
-            box("Bust", px - 0.4, FLOOR + 2.55, 0.65, px + 0.4, FLOOR + 4.2, 1.15, VELVET_2, M.Fabric, fa)
-            part({ Name = "BustNeck", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.7, 0.42, 0.42),
-                CFrame = CFrame.new(px, FLOOR + 4.55, 0.9) * CFrame.Angles(0, 0, math.rad(90)),
-                Color = VELVET_2, Material = M.Fabric }, fa)
-            for b = 0, 8 do
-                local a = math.rad(200 + b * 17.5)
-                part({ Name = "Bead", Shape = Enum.PartType.Ball, Size = Vector3.new(0.14, 0.14, 0.14),
-                    Position = Vector3.new(px + 0.42 * math.cos(a), FLOOR + 3.9 + 0.12 * math.sin(a), 0.6),
-                    Color = GOLD, Material = M.Metal, Reflectance = 0.35, CanCollide = false, CastShadow = false }, fa)
-            end
-            gem(fa, Vector3.new(px, FLOOR + 3.55, 0.58), 0.26, GEM_COLORS[k], true)
             spot(lightAnchor("PlinthLight", Vector3.new(px, WIN_TOP - 0.5, 0.9), fa), Enum.NormalId.Bottom,
                 WARM, 1.6, 14, 30)
         end
@@ -768,7 +857,7 @@ function JewelryBuilder:_walls(f)
     box("Cornice", IX0, CEIL - 0.3, IZ0, IX0 + 0.2, CEIL, SHOW_Z1, BRASS, M.Metal, f, nc())
     box("Cornice", IX1 - 0.2, CEIL - 0.3, IZ0, IX1, CEIL, SHOW_Z1, BRASS, M.Metal, f, nc())
     part({ Name = "CeilingMedallion", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.1, 5.4, 5.4),
-        CFrame = CFrame.new(CX, CEIL - 0.05, 8) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame = CFrame.new(CX, CEIL - 0.05, CAGE_Z) * CFrame.Angles(0, 0, math.rad(90)),
         Color = STUCCO, Material = M.Plaster, CanCollide = false }, f)
 
     -- archway to the back hall: brass frame + STAFF ONLY plaque
@@ -963,54 +1052,120 @@ function JewelryBuilder:_case(f, i, centre, faceDir)
         end
     end
 
-    -- the jewels (this is what LootService hides when the case is taken)
+    -- the jewels (this is what LootService hides when the case is taken).
+    -- (v3.0) real pieces on real display furniture; the stands stay behind.
     local v = Instance.new("Model")
     v.Name = "Jewels"
     v.Parent = c
+    local METALS = { GOLD, PLATINUM, ROSE }
     local variant = (i - 1) % 4
     if variant == 0 then
-        -- rings standing in a row, each with a stone
-        for k = 0, 5 do
-            local x = -1.5 + k * 0.6
-            part({ Name = "Ring", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.09, 0.52, 0.52),
-                CFrame = cf * CFrame.new(x, padTop + 0.24, 0) * CFrame.Angles(0, math.rad(90), 0),
-                Color = GOLD, Material = M.Metal, Reflectance = 0.35, CanCollide = false, CastShadow = false }, v)
-            gem(v, lp(x, padTop + 0.56, 0), 0.2, GEM_COLORS[(k % 3) + 1], k % 2 == 0)
+        -- a ring tray: black velvet with two slotted rows, twelve rings on edge
+        lb("RingTray", -1.85, padTop, -0.8, 1.85, padTop + 0.1, 0.8, BLACK_VELVET, M.Fabric, c, nc())
+        lb("TrayEdge", -1.9, padTop, -0.85, 1.9, padTop + 0.13, -0.8, BRASS, M.Metal, c, nc())
+        local gems = { STONE.diamond, STONE.ruby, STONE.sapphire, STONE.emerald, STONE.diamond, STONE.pink }
+        for r, rz in ipairs({ -0.38, 0.32 }) do
+            lb("RingSlot", -1.75, padTop + 0.1, rz - 0.04, 1.75, padTop + 0.12, rz + 0.04, rgb(8, 6, 12), M.Fabric, c, nc())
+            for k = 0, 5 do
+                local dia = (r == 1) and 0.34 or 0.4
+                local ringCF = cf * CFrame.new(-1.5 + k * 0.6, padTop + 0.06 + dia / 2, rz)
+                standingRing(v, ringCF, dia, METALS[(k + r) % 3 + 1], gems[(k + r * 2) % 6 + 1])
+            end
         end
     elseif variant == 1 then
-        -- a necklace laid out on the velvet, pendant toward the shoppers
-        for k = 0, 13 do
-            local a = (k / 14) * math.pi * 2
-            part({ Name = "Bead", Shape = Enum.PartType.Ball, Size = Vector3.new(0.16, 0.16, 0.16),
-                Position = lp(1.2 * math.cos(a), padTop + 0.07, 0.4 * math.sin(a)),
-                Color = GOLD, Material = M.Metal, Reflectance = 0.35, CanCollide = false, CastShadow = false }, v)
+        -- a necklace easel: a tilted velvet board with a diamond necklace
+        -- draped on it, a sapphire pendant in a halo, drop earrings in front
+        local boardCF = cf * CFrame.new(0, padTop + 0.62, 0.25) * CFrame.Angles(math.rad(25), 0, 0)
+        part({ Name = "NecklaceEasel", Size = Vector3.new(2.7, 1.2, 0.08), CFrame = boardCF,
+            Color = (i <= 4) and VELVET or BLACK_VELVET, Material = M.Fabric, CanCollide = false }, c)
+        part({ Name = "EaselLeg", Size = Vector3.new(0.12, 0.9, 0.12),
+            CFrame = cf * CFrame.new(0, padTop + 0.45, 0.55) * CFrame.Angles(math.rad(-20), 0, 0),
+            Color = BRASS, Material = M.Metal, CanCollide = false }, c)
+        local function onBoard(x, y) return (boardCF * CFrame.new(x, y, -0.07)).Position end
+        local n = 21
+        for k = 0, n - 1 do
+            local t = -1 + 2 * k / (n - 1)
+            local p = onBoard(0.95 * t, 0.42 - 0.62 * (1 - t * t))
+            if k % 2 == 0 then
+                stone(v, p, 0.13, STONE.diamond)
+            else
+                bead(v, p, 0.08, PLATINUM)
+            end
         end
-        gem(v, lp(0, padTop + 0.2, -0.48), 0.36, GEM_COLORS[1], true)
-        gem(v, lp(-1.6, padTop + 0.12, -0.3), 0.18, GEM_COLORS[2], true)
-        gem(v, lp(1.6, padTop + 0.12, -0.3), 0.18, GEM_COLORS[2], true)
+        local pend = onBoard(0, -0.36)
+        stone(v, pend, 0.3, STONE.sapphire)
+        for k = 0, 7 do
+            local a = k * math.pi / 4
+            bead(v, onBoard(0.2 * math.cos(a), -0.36 + 0.2 * math.sin(a)), 0.07, STONE.diamond, M.Glass)
+        end
+        for _, ex in ipairs({ -1.45, 1.45 }) do
+            for _, dx in ipairs({ -0.14, 0.14 }) do
+                bead(v, lp(ex + dx, padTop + 0.34, -0.55), 0.07, GOLD)
+                bar("EarDrop", lp(ex + dx, padTop + 0.3, -0.55), lp(ex + dx, padTop + 0.18, -0.55), 0.025, GOLD, M.Metal, v, nc())
+                stone(v, lp(ex + dx, padTop + 0.12, -0.55), 0.12, STONE.emerald)
+            end
+            lb("EarStand", ex - 0.3, padTop, -0.62, ex + 0.3, padTop + 0.36, -0.52, BLACK_VELVET, M.Fabric, c, nc())
+        end
     elseif variant == 2 then
-        -- three loose stones on little gold stands, a few chips scattered
-        for k = -1, 1 do
-            local x = k * 1.1
-            part({ Name = "Stand", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.38, 0.32, 0.32),
-                CFrame = cf * CFrame.new(x, padTop + 0.19, 0) * CFrame.Angles(0, 0, math.rad(90)),
-                Color = GOLD, Material = M.Metal, Reflectance = 0.3, CanCollide = false, CastShadow = false }, v)
-            gem(v, lp(x, padTop + 0.6, 0), 0.38, GEM_COLORS[k + 2], k ~= 0)
+        -- two earring cards and a ring cone with a big solitaire
+        for side, ex in ipairs({ -1.25, 1.25 }) do
+            local cardCF = cf * CFrame.new(ex, padTop + 0.45, 0) * CFrame.Angles(math.rad(12), 0, 0)
+            part({ Name = "EarringCard", Size = Vector3.new(0.8, 0.9, 0.05), CFrame = cardCF,
+                Color = BLACK_VELVET, Material = M.Fabric, CanCollide = false }, c)
+            part({ Name = "CardClip", Size = Vector3.new(0.82, 0.06, 0.07), CFrame = cardCF * CFrame.new(0, 0.44, 0),
+                Color = BRASS, Material = M.Metal, CanCollide = false }, c)
+            local drop = side == 1 and STONE.diamond or STONE.ruby
+            for _, dx in ipairs({ -0.2, 0.2 }) do
+                local s0 = (cardCF * CFrame.new(dx, 0.2, -0.05)).Position
+                local s1 = (cardCF * CFrame.new(dx, -0.12, -0.05)).Position
+                bead(v, s0, 0.09, side == 1 and PLATINUM or GOLD)
+                bar("EarDrop", s0, s1, 0.025, side == 1 and PLATINUM or GOLD, M.Metal, v, nc())
+                stone(v, (cardCF * CFrame.new(dx, -0.2, -0.06)).Position, 0.17, drop)
+            end
         end
-        for k = 0, 3 do
-            gem(v, lp(-1.45 + k * 0.95, padTop + 0.08, -0.35), 0.15, GEM_COLORS[(k % 3) + 1], true)
+        -- the ring cone: a stepped brass cone, the solitaire round it
+        for k, d in ipairs({ 0.42, 0.34, 0.26, 0.18 }) do
+            vcyl("RingCone", lp(0, padTop + 0.1 + (k - 1) * 0.18, 0), d, 0.18, BRASS, M.Metal, c, nc({ Reflectance = 0.2 }))
         end
+        local ringY = padTop + 0.42
+        vcyl("Band", lp(0, ringY, 0), 0.4, 0.07, PLATINUM, M.Metal, v, nc({ Reflectance = 0.4, CastShadow = false }))
+        stone(v, lp(0, ringY + 0.05, -0.22), 0.26, STONE.diamond)
+        bead(v, lp(-0.12, ringY + 0.04, -0.19), 0.07, STONE.diamond, M.Glass)
+        bead(v, lp(0.12, ringY + 0.04, -0.19), 0.07, STONE.diamond, M.Glass)
     else
-        -- bracelets lying flat, studded
-        for k = -1, 1 do
-            local x = k * 1.2
-            part({ Name = "Bracelet", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 0.8, 0.8),
-                CFrame = cf * CFrame.new(x, padTop + 0.06, 0) * CFrame.Angles(0, 0, math.rad(90)),
-                Color = GOLD, Material = M.Metal, Reflectance = 0.35, CanCollide = false, CastShadow = false }, v)
-            gem(v, lp(x - 0.24, padTop + 0.2, 0), 0.15, GEM_COLORS[1], true)
-            gem(v, lp(x + 0.24, padTop + 0.2, 0), 0.15, GEM_COLORS[2], true)
+        -- bracelets hanging on a velvet T-bar: a diamond tennis bracelet, a rose
+        -- gold bangle, a sapphire cuff
+        local barY = padTop + 0.85
+        for _, px in ipairs({ -1.15, 1.15 }) do
+            bar("TBarPost", lp(px, padTop, 0.1), lp(px, barY, 0.1), 0.1, BRASS, M.Metal, c, nc())
+            lb("TBarFoot", px - 0.2, padTop, -0.1, px + 0.2, padTop + 0.05, 0.3, BRASS, M.Metal, c, nc())
+        end
+        part({ Name = "TBar", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2.5, 0.3, 0.3),
+            CFrame = cf * CFrame.new(0, barY, 0.1), Color = BLACK_VELVET, Material = M.Fabric, CanCollide = false }, c)
+        local looks = { { GOLD, STONE.diamond }, { ROSE, nil }, { PLATINUM, STONE.sapphire } }
+        for k, bx in ipairs({ -0.75, 0, 0.75 }) do
+            -- the hoop's plane is across the bar; it hangs from the bar's top
+            local hcf = cf * CFrame.new(bx, barY - 0.15, 0.1) * CFrame.Angles(0, math.rad(90), 0)
+            local pts = hoop(v, hcf, 0.3, 14, 0.07, looks[k][1])
+            if looks[k][2] then
+                -- stones round the front of the hoop (the side facing the shoppers)
+                for s = 1, #pts - 1 do
+                    if (pts[s] - hcf.Position):Dot(cf.LookVector) > 0.05 then
+                        stone(v, pts[s], 0.1, looks[k][2])
+                    end
+                end
+            end
         end
     end
+    -- a tiny price tag on the front of every case (it stays when the case is emptied)
+    local tagCF = cf * CFrame.new(-HX + 0.4, padTop + ((variant == 0) and 0.12 or 0.02), -HZ + 0.24)
+        * CFrame.Angles(0, math.rad(-20), 0)
+    local tagP = part({ Name = "PriceTag", Size = Vector3.new(0.42, 0.02, 0.24), CFrame = tagCF,
+        Color = rgb(250, 246, 236), Material = M.Fabric, CanCollide = false, CastShadow = false }, c)
+    local tg = lit(surface(tagP, Enum.NormalId.Top, 120, 1))
+    text({ Text = ({ "$4,800", "$12,500", "$7,200", "$9,900" })[variant + 1], Size = UDim2.fromScale(0.9, 0.8),
+        Position = UDim2.fromScale(0.05, 0.1), TextScaled = true, FontFace = UITheme.F.bold,
+        TextColor3 = rgb(60, 36, 14) }, tg)
 
     -- (v2.0.2) glam spotlighting: a tight, bright pool on every case (the four
     -- island faces cast shadows) + a cool glow inside the glass so the stones sparkle
@@ -1026,12 +1181,254 @@ function JewelryBuilder:_case(f, i, centre, faceDir)
     }
 end
 
-function JewelryBuilder:_showroom(f, refs)
+-- ──────────────────────────────────────────────
+-- 💍 (v3.0) NECKLACE BUSTS + THE PINK DIAMOND
+-- ──────────────────────────────────────────────
+-- A velvet jewellery bust under a screwed-down glass hood, standing on a
+-- plinth whose top is at p0. `face` = the way the necklace faces, `toPlayer` =
+-- the side the thief works from (the 4 hood screws are on that side).
+-- Returns the necklace Model (the loot visual; bust + hood stay behind).
+local NECKLACE_STYLES = {
+    -- { chain metal, chain material, stone on every other link, pendant stone, pendant size }
+    { PLATINUM, M.Metal,  STONE.diamond,  STONE.diamond,  0.26 },  -- a diamond rivière
+    { PEARL,    M.Marble, nil,            STONE.pink,     0.24 },  -- pearls + a pink drop
+    { GOLD,     M.Metal,  STONE.emerald,  STONE.emerald,  0.28 },  -- emerald + gold
+    { PLATINUM, M.Metal,  STONE.sapphire, STONE.sapphire, 0.28 },  -- sapphire + white gold
+    { GOLD,     M.Metal,  STONE.diamond,  STONE.ruby,     0.36 },  -- "the Duchess": rubies + diamonds
+}
+
+function JewelryBuilder:_necklaceBust(f, name, p0, face, toPlayer, style)
+    local m = Instance.new("Model")
+    m.Name = name
+    m.Parent = f
+    local cf = CFrame.lookAt(p0, p0 + face)            -- local -Z = the necklace side
+    local function lb(n, x0, y0, z0, x1, y1, z1, color, material, parent, extra)
+        local props = { Name = n, Size = Vector3.new(math.abs(x1 - x0), math.abs(y1 - y0), math.abs(z1 - z0)),
+            CFrame = cf * CFrame.new((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), Color = color, Material = material }
+        for k, v in pairs(extra or {}) do props[k] = v end
+        return part(props, parent)
+    end
+    local function lp(x, y, z) return cf:PointToWorldSpace(Vector3.new(x, y, z)) end
+    local S = NECKLACE_STYLES[style] or NECKLACE_STYLES[1]
+    local skin = (style % 2 == 0) and BLACK_VELVET or VELVET_2
+
+    -- the bust: brass foot + stem, velvet torso, round shoulders, neck
+    vcyl("BustFoot", lp(0, 0.06, 0), 0.8, 0.12, BRASS, M.Metal, m, { Reflectance = 0.2 })
+    bar("BustStem", lp(0, 0.12, 0), lp(0, 0.5, 0), 0.14, BRASS, M.Metal, m)
+    lb("BustTorso", -0.5, 0.5, -0.22, 0.5, 1.42, 0.22, skin, M.Fabric, m)
+    part({ Name = "BustShoulders", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.0, 0.44, 0.44),
+        CFrame = cf * CFrame.new(0, 1.42, 0), Color = skin, Material = M.Fabric }, m)
+    vcyl("BustNeck", lp(0, 1.85, 0), 0.4, 0.8, skin, M.Fabric, m)
+    vcyl("BustCap", lp(0, 2.27, 0), 0.44, 0.05, BRASS, M.Metal, m, { CanCollide = false })
+
+    -- the necklace (the loot)
+    local nk = Instance.new("Model")
+    nk.Name = "Necklace"
+    nk.Parent = f
+    local n = 17
+    for k = 0, n - 1 do
+        local t = -1 + 2 * k / (n - 1)
+        local p = lp(0.3 * t, 1.66 - 0.4 * (1 - t * t), -0.25 - 0.02 * (1 - t * t))
+        if S[3] and k % 2 == 0 then
+            stone(nk, p, (style == 5) and 0.14 or 0.11, (style == 5 and k % 4 == 0) and STONE.ruby or S[3])
+        else
+            bead(nk, p, (S[2] == M.Marble) and 0.12 or 0.08, S[1], S[2] ~= M.Metal and S[2] or nil)
+        end
+    end
+    -- the chain goes on round the back of the neck, with a clasp
+    for k = 0, 6 do
+        local a = math.rad(200 + k * 23.3)
+        bead(nk, lp(0.23 * math.cos(a), 1.68, -0.23 * math.sin(a)), 0.06, S[1], S[2] ~= M.Metal and S[2] or nil)
+    end
+    bead(nk, lp(0, 1.68, 0.23), 0.08, GOLD)
+    -- the pendant: a bezel, a bail and the big stone
+    local pend = lp(0, 1.02, -0.29)
+    bar("Bail", lp(0, 1.26, -0.27), lp(0, 1.16, -0.29), 0.04, S[1], M.Metal, nk, nc({ CastShadow = false }))
+    part({ Name = "Bezel", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.04, S[5] + 0.08, S[5] + 0.08),
+        CFrame = cf * CFrame.new(0, 1.02, -0.26) * CFrame.Angles(0, math.rad(90), 0),
+        Color = S[1], Material = M.Metal, Reflectance = 0.4, CanCollide = false, CastShadow = false }, nk)
+    gem(nk, pend, S[5], S[4], false)
+    if style == 5 then
+        -- the Duchess: a second row of little diamonds under the collar
+        for k = -3, 3 do
+            stone(nk, lp(k * 0.08, 1.2 - 0.02 * math.abs(k), -0.27), 0.07, STONE.diamond)
+        end
+    end
+    -- a glint inside the hood (goes dark with the necklace)
+    point(lightAnchor("NecklaceGlint", lp(0, 1.2, -0.6), nk), rgb(255, 240, 250), 0.6, 4, false)
+
+    -- the glass hood with a brass frame; 4 screws on the thief's side
+    local hx, hz, top = 0.8, 0.6, 2.5
+    lb("HoodGlass", -hx, 0, -hz, hx, top, hz, rgb(214, 236, 246), M.Glass, m,
+        { Transparency = 0.72, Reflectance = 0.28, CastShadow = false })
+    lb("HoodBase", -hx - 0.04, 0, -hz - 0.04, hx + 0.04, 0.16, hz + 0.04, BRASS, M.Metal, m, { Reflectance = 0.2 })
+    lb("HoodCap", -hx - 0.04, top - 0.1, -hz - 0.04, hx + 0.04, top, hz + 0.04, BRASS, M.Metal, m, { Reflectance = 0.2 })
+    for _, sx in ipairs({ -1, 1 }) do
+        for _, sz in ipairs({ -1, 1 }) do
+            lb("HoodPost", sx * hx - 0.035, 0.16, sz * hz - 0.035, sx * hx + 0.035, top - 0.1, sz * hz + 0.035,
+                BRASS, M.Metal, m, nc())
+        end
+    end
+    local side = Vector3.new(toPlayer.X, 0, toPlayer.Z).Unit
+    local sideRight = Vector3.new(0, 1, 0):Cross(side).Unit
+    local faceDist = math.abs(side:Dot(cf.LookVector)) > 0.5 and hz or hx
+    local halfW = math.abs(side:Dot(cf.LookVector)) > 0.5 and hx or hz
+    for _, sy in ipairs({ 0.08, top - 0.05 }) do
+        for _, sr in ipairs({ -1, 1 }) do
+            local p = p0 + Vector3.new(0, sy, 0) + side * (faceDist + 0.05) + sideRight * (sr * (halfW - 0.12))
+            part({ Name = "Screw", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.05, 0.12, 0.12),
+                CFrame = CFrame.lookAt(p, p + side) * CFrame.Angles(0, math.rad(90), 0),
+                Color = STEEL_LT, Material = M.Metal, Reflectance = 0.3, CanCollide = false, CastShadow = false }, m)
+        end
+    end
+    return nk
+end
+
+-- the 4 window busts (on the window plinths built in _facade), facing the street
+function JewelryBuilder:_windowNecklaces(f, loot)
+    local fo = Instance.new("Folder")
+    fo.Name = "WindowNecklaces"
+    fo.Parent = f
+    local style = 0
+    for _, bay in ipairs({ { X0 + 1.5, ENT_X0 - 0.8 }, { ENT_X1 + 0.8, X1 - 1.5 } }) do
+        local b0, b1 = bay[1], bay[2]
+        for k = 1, 2 do
+            style = style + 1
+            local px = b0 + (b1 - b0) * (k == 1 and 0.28 or 0.72)
+            local nk = self:_necklaceBust(fo, "WindowBust" .. style, Vector3.new(px, FLOOR + 2.55, 0.9),
+                Vector3.new(0, 0, -1), Vector3.new(0, 0, 1), style)
+            local stand = Vector3.new(px, FLOOR + 3, 2.7)
+            table.insert(loot, { kind = "Necklace", cframe = CFrame.lookAt(stand, Vector3.new(px, stand.Y, 0.9)),
+                visual = nk, interact = "unscrew", pool = "showroom", inVault = false })
+        end
+    end
+end
+
+-- 💖 THE TARGET: the pink diamond, spinning on a marble column inside its own
+-- laser cage in the middle of the showroom, right under the chandelier.
+-- Returns the laser row for the cage (same shape as _lasers' rows).
+function JewelryBuilder:_pinkDiamond(f, loot)
+    local g = Instance.new("Folder")
+    g.Name = "PinkDiamond"
+    g.Parent = f
+    local x, z, H = CX, CAGE_Z, CAGE_H
+
+    -- the floor: a black marble square with a brass border under the cage
+    box("CageInlay", x - H, FLOOR, z - H, x + H, FLOOR + 0.03, z + H, rgb(16, 12, 20), M.Marble, g,
+        nc({ Reflectance = 0.14 }))
+    box("CageBorder", x - H - 0.2, FLOOR, z - H - 0.2, x + H + 0.2, FLOOR + 0.025, z + H + 0.2, BRASS, M.Metal, g, nc())
+
+    -- the column
+    local base = box("PedestalBase", x - 0.95, FLOOR, z - 0.95, x + 0.95, FLOOR + 0.4, z + 0.95, rgb(24, 18, 28), M.Marble, g,
+        { Reflectance = 0.1 })
+    vcyl("PedestalCollar", Vector3.new(x, FLOOR + 0.45, z), 1.45, 0.1, BRASS, M.Metal, g, { Reflectance = 0.2 })
+    vcyl("PedestalColumn", Vector3.new(x, FLOOR + 1.75, z), 1.25, 2.6, rgb(238, 230, 234), M.Marble, g)
+    vcyl("PedestalTop", Vector3.new(x, FLOOR + 3.0, z), 1.6, 0.14, BRASS, M.Metal, g, { Reflectance = 0.25 })
+    local plaque = box("PedestalPlaque", x - 0.7, FLOOR + 0.07, z - 0.97, x + 0.7, FLOOR + 0.33, z - 0.95, BRASS, M.Metal, g, nc())
+    lit(printOn(plaque, Enum.NormalId.Front, "THE PINK DOLL  ·  42 CARATS", rgb(60, 36, 14), UITheme.F.display, 90, 1).Parent)
+    lit(printOn(box("PedestalPlaque", x - 0.7, FLOOR + 0.07, z + 0.95, x + 0.7, FLOOR + 0.33, z + 0.97, BRASS, M.Metal, g, nc()),
+        Enum.NormalId.Back, "PLEASE DO NOT TOUCH", rgb(60, 36, 14), UITheme.F.display, 90, 1).Parent)
+    local _ = base
+
+    -- the turntable: THIS is what spins (attribute Spin = degrees/second). The
+    -- cushion, the prongs and the stone are welded to it.
+    local turn = vcyl("Turntable", Vector3.new(x, FLOOR + 3.13, z), 1.3, 0.12, BRASS, M.Metal, g, { Reflectance = 0.3 })
+    turn:SetAttribute("Spin", SPIN_DEG_PER_SEC)
+    CollectionService:AddTag(turn, "Spin")
+    local cushion = vcyl("Cushion", Vector3.new(x, FLOOR + 3.27, z), 0.9, 0.16, VELVET, M.Fabric, g)
+    weldTo(turn, cushion)
+
+    -- the stone: a round brilliant built from stepped glass discs (crown up to
+    -- the table, pavilion down to the point), pink, with a glowing heart
+    local dm = Instance.new("Model")
+    dm.Name = "PinkDiamond"
+    dm.Parent = g
+    local gy = FLOOR + 4.05                         -- the girdle (widest ring)
+    local PINK_STONE = rgb(255, 120, 196)
+    local tiers = {
+        -- { dy (centre, from the girdle), diameter, height }
+        { 0.05, 1.26, 0.1 }, { 0.15, 1.08, 0.1 }, { 0.24, 0.86, 0.08 },            -- crown + table
+        { -0.08, 1.16, 0.12 }, { -0.2, 0.96, 0.12 }, { -0.32, 0.74, 0.12 },         -- pavilion
+        { -0.44, 0.5, 0.12 }, { -0.55, 0.28, 0.1 }, { -0.62, 0.1, 0.06 },
+    }
+    for k, t in ipairs(tiers) do
+        weldTo(turn, vcyl("Facet", Vector3.new(x, gy + t[1], z), t[2], t[3], PINK_STONE, M.Glass, dm,
+            { Transparency = (k <= 3) and 0.18 or 0.1, Reflectance = 0.45, CastShadow = false }))
+    end
+    local heart = part({ Name = "Heart", Shape = Enum.PartType.Ball, Size = Vector3.new(0.34, 0.34, 0.34),
+        Position = Vector3.new(x, gy - 0.1, z), Color = HOT_PINK, Material = M.Neon, CastShadow = false }, dm)
+    weldTo(turn, heart)
+    point(heart, rgb(255, 120, 200), 1.3, 9, false)
+    -- four gold prongs from the cushion up to the girdle
+    for k = 0, 3 do
+        local a = k * math.pi / 2 + math.pi / 4
+        local p0 = Vector3.new(x + 0.22 * math.cos(a), FLOOR + 3.35, z + 0.22 * math.sin(a))
+        local p1 = Vector3.new(x + 0.6 * math.cos(a), gy + 0.08, z + 0.6 * math.sin(a))
+        weldTo(turn, bar("Prong", p0, p1, 0.06, GOLD, M.Metal, dm, { Reflectance = 0.4, CastShadow = false }))
+    end
+    -- a tight pink-white spot from the ceiling (the chandelier hangs just above)
+    canLight(g, x, z, rgb(255, 236, 246), 4, 22, true)
+
+    -- stand at the column's north face (inside the cage: you have to go in)
+    local stand = Vector3.new(x, FLOOR + 3, z - 1.95)
+    table.insert(loot, { kind = "PinkDiamond", target = "PinkDiamond", cframe = CFrame.lookAt(stand, Vector3.new(x, stand.Y, z)),
+        visual = dm, pool = "showroom", inVault = false,
+        -- (for LOOT-CORE) the prompt should only reach from inside the cage
+        promptRange = 2.5 })
+
+    -- ── the laser cage ──
+    local corners = {
+        Vector3.new(x - H, 0, z - H), Vector3.new(x + H, 0, z - H),
+        Vector3.new(x + H, 0, z + H), Vector3.new(x - H, 0, z + H),
+    }
+    for _, c in ipairs(corners) do
+        box("CagePost", c.X - 0.16, FLOOR, c.Z - 0.16, c.X + 0.16, CAGE_TOP, c.Z + 0.16, rgb(20, 20, 26), M.Metal, g,
+            { Reflectance = 0.15 })
+        box("CagePostCap", c.X - 0.22, CAGE_TOP, c.Z - 0.22, c.X + 0.22, CAGE_TOP + 0.14, c.Z + 0.22, BRASS, M.Metal, g)
+        box("CagePostFoot", c.X - 0.26, FLOOR, c.Z - 0.26, c.X + 0.26, FLOOR + 0.2, c.Z + 0.26, BRASS, M.Metal, g)
+        box("CageLed", c.X - 0.06, CAGE_TOP - 0.4, c.Z - 0.17, c.X + 0.06, CAGE_TOP - 0.28, c.Z + 0.17, LASER_RED, M.Neon, g,
+            nc({ CastShadow = false }))
+    end
+    local beams = {}
+    local function beam(a, b)
+        local d = (b - a).Unit
+        local bm = bar("CageBeam" .. (#beams + 1), a + d * 0.17, b - d * 0.17, 0.08, LASER_RED, M.Neon, g,
+            nc({ CanTouch = false, CanQuery = false, CastShadow = false, Transparency = 1 }))
+        table.insert(beams, bm)
+    end
+    for s = 1, 4 do
+        local a, b = corners[s], corners[s % 4 + 1]
+        for _, h in ipairs({ 1.0, 2.4, 3.8, 5.2, 6.6 }) do
+            beam(a + Vector3.new(0, FLOOR + h, 0), b + Vector3.new(0, FLOOR + h, 0))
+        end
+        -- a big X across every side, like in the movies
+        beam(a + Vector3.new(0, FLOOR + 0.7, 0), b + Vector3.new(0, FLOOR + 6.9, 0))
+        beam(b + Vector3.new(0, FLOOR + 0.7, 0), a + Vector3.new(0, FLOOR + 6.9, 0))
+    end
+    -- a warning plate on the front of the cage
+    -- a low kick panel between the two front posts, with the warning printed on it
+    local warn = box("CageSign", x - H + 0.16, FLOOR + 0.2, z - H - 0.04, x + H - 0.16, FLOOR + 0.62, z - H + 0.04,
+        rgb(24, 20, 28), M.Metal, g, nc())
+    lit(printOn(warn, Enum.NormalId.Front, "LASERS  ·  WAIT FOR THEM TO BLINK OFF", rgb(255, 90, 110), UITheme.F.bold, 60, 1).Parent)
+
+    return {
+        beams = beams,
+        zoneCFrame = CFrame.new(x, FLOOR + 3.75, z),
+        zoneSize = Vector3.new(2 * H, 7.5, 2 * H),
+        -- a longer "off" than the corridor rows: step in, grab, step out
+        onTime = 1.8, offTime = 2.6, phase = 0.4,
+    }
+end
+
+function JewelryBuilder:_showroom(f, refs, loot)
     local s = Instance.new("Folder")
     s.Name = "Showroom"
     s.Parent = f
     self:_walls(s)
-    self:_chandelier(s, CX, 8)
+    -- (v3.0) the chandelier hangs right over the pink diamond
+    self:_chandelier(s, CX, CAGE_Z)
+    self:_windowNecklaces(s, loot)
+    local cageRow = self:_pinkDiamond(s, loot)
     local counterSpot = self:_counter(s)
     local vent = self:_lounge(s, refs)
 
@@ -1056,13 +1453,13 @@ function JewelryBuilder:_showroom(f, refs)
         box("IslandDivider", ix - CASE_HX - 0.05, FLOOR, 7.15, ix + CASE_HX + 0.05, 3.25, 7.25, BRASS, M.Metal, s, nc())
     end
     refs.smashCases = cases
-    return counterSpot, vent
+    return counterSpot, vent, cageRow
 end
 
 -- ──────────────────────────────────────────────
 -- 🔒 BACK OF HOUSE: hall, keycard door, lasers, closet, office, break room, safe room
 -- ──────────────────────────────────────────────
-function JewelryBuilder:_hall(f, refs)
+function JewelryBuilder:_hall(f, refs, loot)
     local h = Instance.new("Folder")
     h.Name = "BackHall"
     h.Parent = f
@@ -1106,7 +1503,40 @@ function JewelryBuilder:_hall(f, refs)
     box("StockShelf", HALL_X0, FLOOR, 26.2, HALL_X0 + 1.4, FLOOR + 0.3, 27.9, STEEL_LT, M.Metal, h)
     box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 26.3, HALL_X0 + 1.3, FLOOR + 1.6, 27.1, rgb(176, 140, 96), M.Cardboard, h)
     box("StockBox", HALL_X0 + 0.1, FLOOR + 0.3, 27.1, HALL_X0 + 1.3, FLOOR + 1.9, 27.8, rgb(186, 150, 104), M.Cardboard, h)
-    box("StockBox", HALL_X0 + 0.2, FLOOR + 1.6, 26.4, HALL_X0 + 1.2, FLOOR + 2.6, 27.0, rgb(250, 196, 220), M.Cardboard, h)
+
+    -- (v3.0) LOOT: an aluminium courier case of ring repairs, lid open, on top
+    -- of the stock boxes — back from the workshop, waiting to go in the safe
+    local cs = Instance.new("Model")
+    cs.Name = "RepairCase"
+    cs.Parent = h
+    local ALU = rgb(196, 200, 208)
+    local cx0, cx1, cz0, cz1 = HALL_X0 + 0.15, HALL_X0 + 1.25, 26.35, 27.05
+    local cy0, cy1 = FLOOR + 1.6, FLOOR + 1.95
+    box("CaseShell", cx0, cy0, cz0, cx1, cy1, cz1, ALU, M.DiamondPlate, cs, nc({ Reflectance = 0.1 }))
+    box("CaseFoam", cx0 + 0.06, cy1, cz0 + 0.06, cx1 - 0.06, cy1 + 0.02, cz1 - 0.06, rgb(40, 40, 46), M.Fabric, cs, nc())
+    box("CaseRim", cx0 - 0.02, cy1 - 0.05, cz0 - 0.02, cx1 + 0.02, cy1, cz1 + 0.02, rgb(90, 94, 102), M.Metal, cs, nc())
+    -- the lid stands open against the wall, a job ticket taped inside it
+    local lid = box("CaseLid", cx0 - 0.08, cy1, cz0, cx0, cy1 + 0.72, cz1, ALU, M.DiamondPlate, cs, nc())
+    local lg = lit(surface(lid, Enum.NormalId.Right, 80, 1))
+    local slip = frame({ Size = UDim2.fromScale(0.8, 0.5), Position = UDim2.fromScale(0.1, 0.15),
+        BackgroundColor3 = rgb(250, 246, 236) }, lg)
+    text({ Text = "RING REPAIRS\nURGENT", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
+        TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
+        TextColor3 = rgb(170, 30, 40) }, slip)
+    -- two rows of rings stood in the foam, each with a paper repair tag
+    local gems = { STONE.diamond, STONE.sapphire, STONE.ruby, STONE.diamond, STONE.emerald, STONE.pink }
+    for r = 0, 1 do
+        for k = 0, 2 do
+            local rx, rz = cx0 + 0.45 + r * 0.42, cz0 + 0.16 + k * 0.19
+            local ringCF = CFrame.lookAt(Vector3.new(rx, cy1 + 0.13, rz), Vector3.new(rx + 1, cy1 + 0.13, rz))
+            standingRing(cs, ringCF, 0.22, ({ GOLD, PLATINUM, ROSE })[(r + k) % 3 + 1], gems[r * 3 + k + 1],
+                rgb(40, 40, 46))
+        end
+    end
+    box("RepairTag", cx1 - 0.2, cy1 + 0.02, cz1 - 0.2, cx1 - 0.05, cy1 + 0.03, cz1 - 0.08, rgb(250, 240, 180), M.Fabric, cs, nc())
+    local cstand = Vector3.new(-64.4, FLOOR + 3, 26.7)
+    table.insert(loot, { kind = "Jewels", cframe = CFrame.lookAt(cstand, Vector3.new(HALL_X0, cstand.Y, 26.7)),
+        visual = cs, pool = "backhall", inVault = false })
 
     -- the key light of the hall casts shadows (the guard walks under it)
     local hallTube = tubeLight(h, -62, 19.5, false, 0.8, 14)
@@ -1201,7 +1631,7 @@ function JewelryBuilder:_lasers(f)
     return rows
 end
 
-function JewelryBuilder:_closet(f, refs)
+function JewelryBuilder:_closet(f, refs, loot)
     -- utility closet x -67..-57, z 29..34: breaker, shelves, janitor cart,
     -- and the ladder up to the roof hatch (inside end of the roof "vent")
     local c = Instance.new("Folder")
@@ -1282,10 +1712,36 @@ function JewelryBuilder:_closet(f, refs)
     box("ClosetBulbLens", -61.2, CEIL - 0.34, 30.8, -60.8, CEIL - 0.3, 31.2, COOL, M.Neon, c, nc())
     point(bulb, COOL, 0.6, 11, false)
 
+    -- (v3.0) 🤫 SECRET STASH (hidden: ~1 run in 20): a loose floor tile just
+    -- inside the closet door is propped up — someone's rainy-day pouch is
+    -- under it. Everything here is the visual, so on a normal run the floor
+    -- just looks like floor.
+    local st = Instance.new("Model")
+    st.Name = "SecretStash"
+    st.Parent = c
+    local tx, tz = -60.4, 30.0
+    box("StashHole", tx - 0.6, FLOOR + 0.004, tz - 0.6, tx + 0.6, FLOOR + 0.02, tz + 0.6, rgb(8, 8, 10), M.Concrete, st, nc())
+    part({ Name = "LooseTile", Size = Vector3.new(1.3, 0.1, 1.3),
+        CFrame = CFrame.new(tx, FLOOR + 0.62, tz - 0.62) * CFrame.Angles(math.rad(70), 0, 0),
+        Color = rgb(132, 128, 124), Material = M.Slate, CanCollide = false }, st)
+    part({ Name = "Pouch", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.36, 0.6),
+        Position = Vector3.new(tx - 0.15, FLOOR + 0.16, tz + 0.1), Color = rgb(70, 20, 60), Material = M.Fabric,
+        CanCollide = false, CastShadow = false }, st)
+    bar("PouchString", Vector3.new(tx - 0.3, FLOOR + 0.3, tz + 0.05), Vector3.new(tx + 0.05, FLOOR + 0.25, tz + 0.3), 0.03,
+        GOLD, M.Fabric, st, nc())
+    box("CashRoll", tx + 0.12, FLOOR + 0.02, tz - 0.3, tx + 0.5, FLOOR + 0.2, tz + 0.1, rgb(118, 160, 108), M.Fabric, st, nc())
+    box("CashBand", tx + 0.28, FLOOR + 0.02, tz - 0.31, tx + 0.34, FLOOR + 0.21, tz + 0.11, rgb(236, 206, 90), M.Fabric, st, nc())
+    stone(st, Vector3.new(tx - 0.3, FLOOR + 0.1, tz + 0.4), 0.16, STONE.diamond)
+    stone(st, Vector3.new(tx + 0.2, FLOOR + 0.08, tz + 0.35), 0.12, STONE.pink)
+    point(lightAnchor("StashGlint", Vector3.new(tx, FLOOR + 0.5, tz), st), rgb(255, 236, 200), 0.5, 3, false)
+    local sstand = Vector3.new(tx, FLOOR + 3, tz - 1.2)
+    table.insert(loot, { kind = "SecretStash", cframe = CFrame.lookAt(sstand, Vector3.new(tx, sstand.Y, tz)),
+        visual = st, hidden = true, pool = "backhall", inVault = false })
+
     return breaker, CFrame.new(-59.8, FLOOR + 2.95, IZ1 - 0.75), inside
 end
 
-function JewelryBuilder:_office(f)
+function JewelryBuilder:_office(f, loot)
     -- back office x -56..-47, z 17..25: desk + CCTV + files. The crew walks
     -- through here from the break room to the hall.
     local o = Instance.new("Folder")
@@ -1362,13 +1818,82 @@ function JewelryBuilder:_office(f)
     local METAL_DK = { rgb(36, 38, 44), M.Metal, 0.05 }
     prop("furniture", "computerScreen", Vector3.new(dx1 - 0.9, topY, 20.4), Vector3.new(-1, 0, 0), o,
         { main = METAL_DK, byName = { screen = { rgb(40, 90, 140), M.Glass, 0.2 } } })
-    prop("furniture", "chairDesk", Vector3.new(dx0 - 1.3, FLOOR, 20.4), Vector3.new(1, 0, 0), o,
+    -- (v3.0) chair slid to the south end of the desk so the watch cabinet has room
+    prop("furniture", "chairDesk", Vector3.new(dx0 - 1.3, FLOOR, 22.0), Vector3.new(1, 0, 0), o,
         { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } })
     prop("furniture", "pottedPlant", Vector3.new(EC_X0 + 0.9, FLOOR, 23.8), Vector3.new(1, 0, 0), o,
         { main = { rgb(52, 120, 70), M.Grass }, accent = { rgb(176, 96, 64), M.Concrete },
           byName = { pot = { rgb(176, 96, 64), M.Concrete }, leaf = { rgb(52, 120, 70), M.Grass }, plant = { rgb(52, 120, 70), M.Grass } } })
     prop("furniture", "trashcan", Vector3.new(EC_X0 + 0.9, FLOOR, 21.2), Vector3.new(1, 0, 0), o,
-        { main = { rgb(60, 64, 72), M.Metal, 0.05 } })
+        { main = { rgb(60, 64, 72), M.Metal, 0.05 } }, { collide = false })   -- (v3.0) it sat in the doorway
+
+    -- (v3.0) LOOT 1: the owner's watch collection — a walnut cabinet with a
+    -- glass top against the north wall, six watches on little velvet pillows
+    local wx0, wx1, wz0, wz1 = -51.95, -49.75, BOH_Z0 + 0.05, BOH_Z0 + 1.15
+    local wTop = FLOOR + 2.9
+    box("WatchCabinet", wx0, FLOOR, wz0, wx1, wTop - 0.1, wz1, WALNUT, M.Wood, o)
+    box("WatchCabinetKick", wx0 + 0.05, FLOOR, wz1, wx1 - 0.05, FLOOR + 0.3, wz1 + 0.03, BRASS, M.Metal, o, nc())
+    box("WatchCabinetRim", wx0 - 0.03, wTop - 0.1, wz0 - 0.03, wx1 + 0.03, wTop, wz1 + 0.03, BRASS, M.Metal, o, { Reflectance = 0.2 })
+    box("WatchPad", wx0 + 0.08, wTop, wz0 + 0.08, wx1 - 0.08, wTop + 0.04, wz1 - 0.08, BLACK_VELVET, M.Fabric, o, nc())
+    box("WatchGlass", wx0, wTop, wz0, wx1, wTop + 0.75, wz1, rgb(214, 236, 246), M.Glass, o,
+        { Transparency = 0.7, Reflectance = 0.25, CastShadow = false })
+    box("WatchLock", -50.95, wTop - 0.08, wz1 + 0.03, -50.75, wTop + 0.12, wz1 + 0.06, BRASS, M.Metal, o, nc())
+    local plaque = box("WatchPlaque", -51.5, FLOOR + 1.8, wz1 + 0.03, -50.2, FLOOR + 2.2, wz1 + 0.05, BRASS, M.Metal, o, nc())
+    lit(printOn(plaque, Enum.NormalId.Back, "PRIVATE COLLECTION", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
+    point(lightAnchor("WatchCaseGlow", Vector3.new(-50.85, wTop + 0.6, (wz0 + wz1) / 2), o), rgb(255, 236, 214), 0.7, 4, false)
+    local wv = Instance.new("Model")
+    wv.Name = "Watches"
+    wv.Parent = o
+    local looks = {
+        -- { case metal, dial colour, strap colour }
+        { GOLD, rgb(250, 246, 236), GOLD },            { PLATINUM, rgb(20, 40, 90), PLATINUM },
+        { ROSE, rgb(30, 26, 30), rgb(70, 40, 26) },    { PLATINUM, rgb(20, 80, 60), PLATINUM },
+        { GOLD, rgb(20, 20, 24), rgb(30, 24, 20) },    { PLATINUM, rgb(236, 238, 242), rgb(20, 30, 70) },
+    }
+    for k, lk in ipairs(looks) do
+        local col, row = (k - 1) % 3, math.floor((k - 1) / 3)
+        local c = Vector3.new(wx0 + 0.42 + col * 0.68, wTop + 0.04, wz0 + 0.33 + row * 0.46)
+        box("WatchPillow", c.X - 0.2, c.Y, c.Z - 0.13, c.X + 0.2, c.Y + 0.16, c.Z + 0.13, rgb(240, 232, 220), M.Fabric, wv, nc())
+        -- strap wrapped round the pillow (two ends), then the case, dial and crown
+        box("Strap", c.X - 0.21, c.Y + 0.02, c.Z - 0.07, c.X + 0.21, c.Y + 0.17, c.Z + 0.07, lk[3],
+            (lk[3] == GOLD or lk[3] == PLATINUM) and M.Metal or M.Fabric, wv, nc({ Reflectance = 0.2 }))
+        vcyl("WatchCase", c + Vector3.new(0, 0.2, 0), 0.3, 0.07, lk[1], M.Metal, wv, nc({ Reflectance = 0.4, CastShadow = false }))
+        vcyl("Dial", c + Vector3.new(0, 0.24, 0), 0.23, 0.02, lk[2], M.Glass, wv, nc({ Reflectance = 0.3, CastShadow = false }))
+        bar("Hand", c + Vector3.new(0, 0.255, 0), c + Vector3.new(0.07, 0.255, -0.04), 0.015, lk[1], M.Metal, wv, nc())
+        bar("Hand", c + Vector3.new(0, 0.255, 0), c + Vector3.new(-0.03, 0.255, -0.09), 0.015, lk[1], M.Metal, wv, nc())
+        box("Crown", c.X + 0.15, c.Y + 0.18, c.Z - 0.02, c.X + 0.19, c.Y + 0.22, c.Z + 0.02, lk[1], M.Metal, wv, nc())
+    end
+    -- (stands clear of the desk chair)
+    local wstand = Vector3.new(-50.9, FLOOR + 3, 19.2)
+    table.insert(loot, { kind = "Watch", cframe = CFrame.lookAt(wstand, Vector3.new(-50.85, wstand.Y, (wz0 + wz1) / 2)),
+        visual = wv, pool = "office", inVault = false })
+
+    -- (v3.0) LOOT 2: the jeweller's appraisal tray on the desk — loose stones,
+    -- a loupe, tweezers and an open diamond paper (clear of the keycard spot)
+    local ax0, ax1, az0, az1 = -49.4, -48.5, 20.4, 21.3
+    box("AppraisalTray", ax0, topY, az0, ax1, topY + 0.05, az1, BLACK_VELVET, M.Fabric, o, nc())
+    box("TrayRim", ax0 - 0.03, topY, az0 - 0.03, ax1 + 0.03, topY + 0.07, az0, BRASS, M.Metal, o, nc())
+    local tv = Instance.new("Model")
+    tv.Name = "LooseStones"
+    tv.Parent = o
+    local cols = { STONE.diamond, STONE.diamond, STONE.sapphire, STONE.diamond, STONE.ruby, STONE.diamond,
+        STONE.emerald, STONE.diamond, STONE.pink }
+    for k = 0, 8 do
+        local gx = ax0 + 0.18 + (k % 3) * 0.27
+        local gz = az0 + 0.18 + math.floor(k / 3) * 0.27
+        stone(tv, Vector3.new(gx, topY + 0.1, gz), (k % 4 == 0) and 0.17 or 0.12, cols[k + 1])
+    end
+    box("DiamondPaper", ax0 - 0.05, topY + 0.03, az1 + 0.05, ax0 + 0.45, topY + 0.05, az1 + 0.47, rgb(250, 250, 246), M.Fabric, tv, nc())
+    box("PaperLining", ax0, topY + 0.05, az1 + 0.1, ax0 + 0.4, topY + 0.055, az1 + 0.42, rgb(120, 170, 230), M.Fabric, tv, nc())
+    stone(tv, Vector3.new(ax0 + 0.2, topY + 0.11, az1 + 0.26), 0.15, STONE.diamond)
+    vcyl("Loupe", Vector3.new(ax0 + 0.15, topY + 0.13, az0 - 0.25), 0.22, 0.2, rgb(20, 20, 24), M.Metal, o, nc())
+    vcyl("LoupeLens", Vector3.new(ax0 + 0.15, topY + 0.24, az0 - 0.25), 0.18, 0.02, rgb(200, 230, 250), M.Glass, o,
+        nc({ Transparency = 0.3, Reflectance = 0.4 }))
+    bar("Tweezers", Vector3.new(ax0 + 0.4, topY + 0.06, az0 - 0.45), Vector3.new(ax1 - 0.05, topY + 0.06, az0 - 0.2), 0.03,
+        STEEL_LT, M.Metal, o, nc())
+    local tstand = Vector3.new(-53.25, FLOOR + 3, 21.0)
+    table.insert(loot, { kind = "Jewels", cframe = CFrame.lookAt(tstand, Vector3.new(ax0, tstand.Y, (az0 + az1) / 2)),
+        visual = tv, pool = "office", inVault = false })
 
     return CFrame.new(dx0 + 0.9, topY, 21.8)
 end
@@ -1662,8 +2187,8 @@ function JewelryBuilder:_roof(f)
     return lid
 end
 
--- The safe room: steel-clad, pedestal diamond, painting, and the safe itself.
-function JewelryBuilder:_safeRoom(f, refs)
+-- The safe room: steel-clad, the Duchess necklace, and the safe itself.
+function JewelryBuilder:_safeRoom(f, refs, loot)
     local s = Instance.new("Folder")
     s.Name = "SafeRoom"
     s.Parent = f
@@ -1765,102 +2290,78 @@ function JewelryBuilder:_safeRoom(f, refs)
         openAngle = math.rad(-100),
     }
 
-    -- ── loot ──
-    local loot = {}
+    -- ── loot (v3.0) ──
     local function stand(x, z, lookZ)
         local p = Vector3.new(x, FLOOR + 3, z)
         return CFrame.lookAt(p, Vector3.new(x, p.Y, lookZ))
     end
     local innerZ = (fz1 + SAFE_Z1 - 0.55) / 2
 
-    -- 1) Diamonds, upper shelf of the safe
+    -- 1) Diamonds, upper shelf: loose stones in rows on a velvet tray, with two
+    --    folded diamond papers (how dealers really carry them)
     box("DiamondTray", SAFE_X - 1.2, SAFE_Y - 0.15, innerZ - 0.5, SAFE_X + 1.2, SAFE_Y - 0.05, innerZ + 0.5, rgb(20, 16, 26), M.Fabric, body)
     local dA = Instance.new("Model")
     dA.Name = "Diamonds"
     dA.Parent = s
-    for k = 0, 7 do
-        local gx = SAFE_X - 0.95 + (k % 4) * 0.63
-        local gz = innerZ - 0.22 + math.floor(k / 4) * 0.44
-        gem(dA, Vector3.new(gx, SAFE_Y + 0.12, gz), 0.3, (k % 3 == 1) and GEM_COLORS[2] or GEM_COLORS[3], k % 3 == 1)
+    for k = 0, 11 do
+        local gx = SAFE_X - 0.95 + (k % 6) * 0.38
+        local gz = innerZ - 0.2 + math.floor(k / 6) * 0.4
+        stone(dA, Vector3.new(gx, SAFE_Y + 0.02, gz), (k % 5 == 0) and 0.26 or 0.19,
+            (k == 4) and STONE.pink or ((k == 9) and STONE.sapphire or STONE.diamond))
     end
-    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X + 0.8, 27.8, SAFE_Z0), visual = dA })
-
-    -- 2) Gold, lower shelf (a stacked pyramid of bars)
-    local gold = Instance.new("Model")
-    gold.Name = "Gold"
-    gold.Parent = s
-    local barSize = Vector3.new(1.0, 0.34, 0.5)
-    local rows = { { -1.05, 0, 1.05 }, { -0.525, 0.525 }, { 0 } }
-    for r, xs in ipairs(rows) do
-        for _, bx in ipairs(xs) do
-            part({ Name = "GoldBar", Size = barSize,
-                Position = Vector3.new(SAFE_X + bx, oy0 + 0.17 + (r - 1) * 0.34, innerZ),
-                Color = GOLD, Material = M.Metal, Reflectance = 0.35, CanCollide = false }, gold)
-        end
+    for _, px in ipairs({ SAFE_X - 0.8, SAFE_X + 0.75 }) do
+        box("DiamondPaper", px - 0.22, SAFE_Y - 0.05, innerZ + 0.12, px + 0.22, SAFE_Y + 0.03, innerZ + 0.42,
+            rgb(250, 250, 246), M.Fabric, dA, nc({ CastShadow = false }))
+        box("PaperFold", px - 0.22, SAFE_Y + 0.03, innerZ + 0.12, px + 0.22, SAFE_Y + 0.035, innerZ + 0.2,
+            rgb(120, 170, 230), M.Fabric, dA, nc({ CastShadow = false }))
     end
-    table.insert(loot, { kind = "Gold", cframe = stand(SAFE_X - 1.2, 27.8, SAFE_Z0), visual = gold })
+    point(lightAnchor("SafeSparkle", Vector3.new(SAFE_X, SAFE_Y + 0.5, innerZ - 0.4), dA), rgb(230, 240, 255), 0.6, 4, false)
+    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X + 0.8, 27.8, SAFE_Z0), visual = dA, pool = "saferoom" })
 
-    -- 3) the big pink diamond on a pedestal under a glass cloche (grab it any time)
-    local px, pz = -78.3, 28.2
-    box("Pedestal", px - 0.8, FLOOR, pz - 0.8, px + 0.8, FLOOR + 3, pz + 0.8, rgb(236, 226, 230), M.Marble, s)
-    box("PedestalCap", px - 0.9, FLOOR + 3, pz - 0.9, px + 0.9, FLOOR + 3.12, pz + 0.9, BRASS, M.Metal, s)
-    box("PedestalCushion", px - 0.45, FLOOR + 3.12, pz - 0.45, px + 0.45, FLOOR + 3.34, pz + 0.45, VELVET, M.Fabric, s)
-    box("Cloche", px - 0.6, FLOOR + 3.12, pz - 0.6, px + 0.6, FLOOR + 4.6, pz + 0.6, rgb(214, 236, 246), M.Glass, s,
-        { Transparency = 0.65, Reflectance = 0.25, CastShadow = false })
+    -- 2) Diamonds, lower shelf: a stack of open ring boxes + a velvet pouch
+    --    spilling stones
     local dB = Instance.new("Model")
-    dB.Name = "PinkDiamond"
+    dB.Name = "RingBoxes"
     dB.Parent = s
-    gem(dB, Vector3.new(px, FLOOR + 3.85, pz), 0.62, rgb(255, 150, 214), false)
-    gem(dB, Vector3.new(px, FLOOR + 3.85, pz), 0.28, HOT_PINK, true)
-    gem(dB, Vector3.new(px - 0.28, FLOOR + 3.45, pz + 0.22), 0.13, CYAN, true)
-    gem(dB, Vector3.new(px + 0.28, FLOOR + 3.45, pz - 0.22), 0.13, CYAN, true)
-    table.insert(loot, { kind = "Diamonds", cframe = stand(px + 2.2, pz, pz), visual = dB, inVault = false })
-    canLight(s, px, pz, rgb(255, 236, 246), 3, 36, true)
-
-    -- 4) Art: a framed Miami sunset on a wooden easel (grab it any time)
-    local ex, ez = -69.8, 29.2
-    bar("EaselLeg", Vector3.new(ex - 1.1, FLOOR, ez - 0.3), Vector3.new(ex - 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.Wood, s)
-    bar("EaselLeg", Vector3.new(ex + 1.1, FLOOR, ez - 0.3), Vector3.new(ex + 0.4, FLOOR + 6.2, ez + 0.1), 0.15, WALNUT, M.Wood, s)
-    bar("EaselLeg", Vector3.new(ex, FLOOR, ez + 1.2), Vector3.new(ex, FLOOR + 6, ez + 0.25), 0.15, WALNUT, M.Wood, s)
-    box("EaselLedge", ex - 1.4, FLOOR + 2.8, ez - 0.35, ex + 1.4, FLOOR + 2.95, ez + 0.05, WALNUT, M.Wood, s)
-    local art = Instance.new("Model")
-    art.Name = "Painting"
-    art.Parent = s
-    local cx0, cx1, cy0, cy1 = ex - 1.3, ex + 1.3, FLOOR + 2.95, FLOOR + 5
-    local canvas = box("Canvas", cx0, cy0, ez - 0.2, cx1, cy1, ez - 0.1, rgb(250, 180, 120), M.Fabric, art, nc())
-    box("ArtFrame", cx0 - 0.12, cy1, ez - 0.25, cx1 + 0.12, cy1 + 0.12, ez - 0.05, GOLD, M.Metal, art, nc())
-    box("ArtFrame", cx0 - 0.12, cy0 - 0.12, ez - 0.25, cx1 + 0.12, cy0, ez - 0.05, GOLD, M.Metal, art, nc())
-    box("ArtFrame", cx0 - 0.12, cy0, ez - 0.25, cx0, cy1, ez - 0.05, GOLD, M.Metal, art, nc())
-    box("ArtFrame", cx1, cy0, ez - 0.25, cx1 + 0.12, cy1, ez - 0.05, GOLD, M.Metal, art, nc())
-    local ag = surface(canvas, Enum.NormalId.Front, 60, 1)
-    ag.LightInfluence = 0.6
-    local sky = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1) }, ag)
-    local grad = Instance.new("UIGradient")
-    grad.Rotation = 90
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, rgb(70, 30, 120)),
-        ColorSequenceKeypoint.new(0.55, rgb(255, 90, 150)),
-        ColorSequenceKeypoint.new(1, rgb(255, 180, 90)),
-    })
-    grad.Parent = sky
-    local sun = frame({ Size = UDim2.fromOffset(60, 60), Position = UDim2.new(0.5, -30, 0.4, 0),
-        BackgroundColor3 = rgb(255, 214, 110) }, ag)
-    UITheme.corner(sun, 30)
-    for k = 0, 3 do
-        frame({ Size = UDim2.new(1, 0, 0, 3 + k), Position = UDim2.fromScale(0, 0.58 + k * 0.07),
-            BackgroundColor3 = rgb(70, 30, 120) }, ag)
+    local ly = oy0
+    local boxes = {
+        { SAFE_X - 1.1, 0, STONE.diamond, GOLD }, { SAFE_X - 0.55, 0, STONE.ruby, PLATINUM },
+        { SAFE_X, 0, STONE.sapphire, GOLD },
+    }
+    for _, b in ipairs(boxes) do
+        local bx, by = b[1], ly + b[2]
+        box("RingBox", bx - 0.22, by, innerZ - 0.2, bx + 0.22, by + 0.3, innerZ + 0.2, VELVET, M.Fabric, dB, nc())
+        box("RingBoxLid", bx - 0.22, by + 0.3, innerZ + 0.16, bx + 0.22, by + 0.62, innerZ + 0.22, VELVET, M.Fabric, dB, nc())
+        box("RingBoxSatin", bx - 0.19, by + 0.3, innerZ + 0.15, bx + 0.19, by + 0.58, innerZ + 0.16, rgb(245, 240, 236), M.Fabric, dB, nc())
+        standingRing(dB, CFrame.lookAt(Vector3.new(bx, by + 0.42, innerZ - 0.02), Vector3.new(bx, by + 0.42, innerZ - 1)),
+            0.2, b[4], b[3], VELVET)
     end
-    frame({ Size = UDim2.fromScale(1, 0.18), Position = UDim2.fromScale(0, 0.82), BackgroundColor3 = rgb(40, 120, 160) }, ag)
-    table.insert(loot, { kind = "Art", cframe = stand(ex, 26.9, ez), visual = art, inVault = false })
-    canLight(s, ex, ez - 0.9, rgb(255, 232, 210), 2.6, 40)
+    part({ Name = "Pouch", Shape = Enum.PartType.Ball, Size = Vector3.new(0.7, 0.45, 0.55),
+        Position = Vector3.new(SAFE_X + 0.9, ly + 0.2, innerZ + 0.15), Color = rgb(40, 24, 70), Material = M.Fabric,
+        CanCollide = false }, dB)
+    for k = 0, 4 do
+        stone(dB, Vector3.new(SAFE_X + 0.45 + k * 0.14, ly + 0.07, innerZ - 0.4 + (k % 2) * 0.12), 0.13, STONE.diamond)
+    end
+    table.insert(loot, { kind = "Diamonds", cframe = stand(SAFE_X - 1.2, 27.8, SAFE_Z0), visual = dB, pool = "saferoom" })
+
+    -- 3) "the Duchess": a ruby + diamond collar on a bust on a tall plinth,
+    --    facing the laser doorway so you see it through the beams (grab it any time)
+    local px, pz = -78.3, 28.2
+    box("DuchessPlinth", px - 0.85, FLOOR, pz - 0.85, px + 0.85, FLOOR + 2.4, pz + 0.85, rgb(236, 226, 230), M.Marble, s)
+    box("DuchessCap", px - 0.95, FLOOR + 2.4, pz - 0.95, px + 0.95, FLOOR + 2.55, pz + 0.95, BRASS, M.Metal, s)
+    local dplq = box("DuchessPlaque", px - 0.6, FLOOR + 1.7, pz - 0.87, px + 0.6, FLOOR + 2.1, pz - 0.85, BRASS, M.Metal, s, nc())
+    lit(printOn(dplq, Enum.NormalId.Front, "THE DUCHESS", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
+    local duchess = self:_necklaceBust(s, "DuchessBust", Vector3.new(px, FLOOR + 2.55, pz), Vector3.new(0, 0, -1),
+        Vector3.new(0, 0, -1), 5)
+    table.insert(loot, { kind = "Necklace", cframe = stand(px, 26.1, pz), visual = duchess, interact = "unscrew",
+        pool = "saferoom", inVault = false })
+    canLight(s, px, pz, rgb(255, 236, 246), 3, 36, true)
 
     -- light over the safe + a caged work lamp
     canLight(s, SAFE_X, 28.6, WARM, 2.8, 55, true)
     local cage = box("CageLamp", -75.4, CEIL - 0.4, 26.2, -74.6, CEIL, 27, STEEL_DK, M.Metal, s, nc())
     box("CageLampBulb", -75.25, CEIL - 0.5, 26.35, -74.75, CEIL - 0.4, 26.85, COOL, M.Neon, s, nc())
     point(cage, rgb(200, 215, 255), 0.45, 12, false)
-
-    refs.lootSpots = loot
 end
 
 -- ──────────────────────────────────────────────
@@ -1922,21 +2423,27 @@ function JewelryBuilder:build(folder)
 
     self:_shell(f)
     refs.openSign = self:_facade(f)
-    local counterSpot, showroomVent = self:_showroom(f, refs)
+    -- (v3.0) lootSpots v3: every room adds its own (see the header for the list)
+    local loot = {}
+    refs.lootSpots = loot
+    refs.poolNames = { showroom = "SHOWROOM", office = "OFFICE", backhall = "BACK HALL", saferoom = "SAFE ROOM" }
+    local counterSpot, showroomVent, cageRow = self:_showroom(f, refs, loot)
 
     local back = Instance.new("Folder")
     back.Name = "BackRooms"
     back.Parent = f
-    self:_hall(back, refs)
+    self:_hall(back, refs, loot)
     refs.keycardDoors = { self:_keycardDoor(back) }
     refs.laserRows = self:_lasers(back)
-    local breaker, shelfSpot, hatchInside = self:_closet(back, refs)
+    -- (v3.0) row 3 = the pink diamond's cage (rows 1-2 stay the corridor + safe door)
+    table.insert(refs.laserRows, cageRow)
+    local breaker, shelfSpot, hatchInside = self:_closet(back, refs, loot)
     refs.breaker = breaker
-    local deskSpot = self:_office(back)
+    local deskSpot = self:_office(back, loot)
     local breakVent = self:_breakRoom(back, refs)
     self:_yard(f, refs)
     local hatchRoof = self:_roof(f)
-    self:_safeRoom(back, refs)
+    self:_safeRoom(back, refs, loot)
     refs.keycardSpots = { counterSpot, deskSpot, shelfSpot }
 
     -- vents: a = the end you start from, b = where it comes out (both directions work)
@@ -1999,10 +2506,9 @@ function JewelryBuilder:build(folder)
     -- soft props (async, never errors) — repainted, they import plain white
     prop("furniture", "rugDoormat", Vector3.new(CX, FLOOR + 0.03, 1.4), Vector3.new(0, 0, -1), f,
         { main = { rgb(30, 26, 32), M.Fabric } }, { collide = false })
-    prop("furniture", "rugRound", Vector3.new(CX, FLOOR + 0.03, 8), Vector3.new(0, 0, -1), f,
-        { main = { rgb(120, 22, 76), M.Fabric }, accent = { BRASS, M.Fabric } }, { collide = false, scale = 1.6 })
+    -- (v3.0) the round rug is gone: the pink diamond's cage stands there now
 
-    print("[JewelryBuilder] Diamond Dolls v2 built 💎")
+    print("[JewelryBuilder] Diamond Dolls v3 built 💎")
     return refs
 end
 

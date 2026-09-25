@@ -22,7 +22,7 @@
     the briefing flies over the ACTUAL building instead of the club: line 1 =
     the wide establishing shot, then every line picks the shot it talks about
     (camera/breaker → breaker, keycard/locked → keycard, laser → lasers,
-    vault/drill/safe → vault, car/marina/boats → car, door/sneak → side door,
+    vault/drill/safe → vault, car/escape/boats → car, door/sneak → side door,
     anything else → the next shot not shown yet). Each shot cuts in with a
     quick dip and glides from→to (Quad InOut). A caption chip names the shot
     ("VILLA ROSA · THE STAFF DOOR"); the other HUD ScreenGuis are hidden for
@@ -91,7 +91,7 @@ local LINE_RULES = {
     { tag = "keycard", words = { "keycard", "locked" } },
     { tag = "lasers",  words = { "laser", "lasers" } },
     { tag = "vault",   words = { "vault", "drill", "safe" } },
-    { tag = "car",     words = { "car", "cars", "marina", "boat", "boats" } },
+    { tag = "car",     words = { "car", "cars", "escape", "boat", "boats" } },
     { tag = "side",    words = { "door", "sneak" } },
 }
 local function lineTag(text)
@@ -352,6 +352,16 @@ function BriefingUI:play()
     local cam = workspace.CurrentCamera
     local cfg = jobCfg()
     local lines = cfg.briefing or { cfg.tagline }
+    -- v3.0: the Boss names this heist's TARGET item as his last line
+    do
+        local okC, C = pcall(require, game:GetService("ReplicatedStorage").Shared.Constants)
+        local t = okC and C.LOOT_V3 and C.LOOT_V3.TARGETS and cfg.id and C.LOOT_V3.TARGETS[cfg.id]
+        if t and t.line then
+            local copy = table.clone(lines)
+            table.insert(copy, t.line)
+            lines = copy
+        end
+    end
     local skipped = false
     local function doSkip() skipped = true end
 

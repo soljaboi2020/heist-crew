@@ -667,9 +667,9 @@ end
 -- ──────────────────────────────────────────────
 local NOTES = {
     villa = { "1  CUT THE CAMERAS", "2  FIND THE KEYCARD", "3  TIME THE LASERS", "4  DRILL THE VAULT",
-              "5  LOAD THE CAR", "6  DRIVE TO THE MARINA" },
+              "5  LOAD THE CAR", "6  GO! PICK YOUR ESCAPE" },
     jewelry = { "1  SMASH THE CASES", "2  SILENT ALARM — MOVE", "3  BACK-ROOM KEYCARD", "4  DRILL THE SAFE",
-                "5  LOAD THE CAR", "6  DRIVE TO THE MARINA" },
+                "5  LOAD THE CAR", "6  GO! PICK YOUR ESCAPE" },
 }
 
 function SafehouseBuilder:showJob(refs, cfg, jobRefs)

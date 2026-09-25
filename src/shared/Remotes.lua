@@ -25,8 +25,8 @@ Remotes.NAMES = {
     JobInfo         = "JobInfo",           -- server→client (info:table)  see spec §5
     ThrowBag        = "ThrowBag",          -- client→server (dir:Vector3)
     UseAbility      = "UseAbility",        -- client→server ()  Lookout mark
-    CarInput        = "CarInput",          -- client→server (throttle, steer) while driving
-    Nitro           = "Nitro",             -- client→server ()  Driver boost
+    CarInput        = "CarInput",          -- client→server (throttle, steer) — v3.0: unused, nobody drives (kept harmless)
+    Nitro           = "Nitro",             -- client→server ()  v3.0: unused (no driving); server ignores it
     ReadyUp         = "ReadyUp",           -- client→server ()  toggle ready for the next job
     LaunchJob       = "LaunchJob",         -- server→client ({phase="fade"|"title", jobName, tagline})
     ShopAction      = "ShopAction",        -- RemoteFunction (action:string, payload:table) -> {ok,msg,state}
@@ -40,6 +40,7 @@ Remotes.NAMES = {
     DailyReward     = "DailyReward",       -- RemoteFunction ("status"|"claim") -> {ok, day, amount, nextAt, msg}
     Jail            = "Jail",              -- server→client ({jailed:boolean, freeAt:number?})
     Leaderboard     = "Leaderboard",       -- server→client ({rows = {{name, cash, heists}}})
+    Getaway         = "Getaway",           -- v3.0 server↔client ({phase="vote"|"scene"|..., scene, crew, carModel}; votes/GO)
 
     -- Client → Server (none yet — using ProximityPrompt for vault interaction)
 }

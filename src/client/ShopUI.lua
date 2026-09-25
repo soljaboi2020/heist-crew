@@ -24,8 +24,8 @@
         trails → a gradient streak in the trail's colours (rainbow for VIP)
     v2.2 — GEAR THAT DOES STUFF: bag / car / trail cards show their power
     like masks do (a coloured pill + one line, from catalog item.power):
-    green pill = more cash (bags), blue = speed (trails / fast cars), gold =
-    bust slower (tough cars). Car cards preview the REAL car type — a clone of
+    green pill = more cash (bags, and v3.0 cars: "+8% ESCAPE CASH" + the stunt
+    the car does in the getaway movie), blue = speed (trails). Car cards preview the REAL car type — a clone of
     ReplicatedStorage.HC_CarPreviews[<id>] (VehicleService publishes one model
     per type), falling back to the simple drawn car. Bag cards draw the bag at
     its tier's size (item.scale) with a SIZE tag.
@@ -81,7 +81,7 @@ local TABS = {
     { id = "gear",  label = "GEAR",   sub = "tools that make the job easier" },
     { id = "masks", label = "MASKS",  sub = "every mask = a different power" },
     { id = "bag",   label = "BAGS",   sub = "bigger bag = more cash per bag" },      -- v2.0 cosmetics (page id = category)
-    { id = "car",   label = "CARS",   sub = "the crew drives the best car anyone has on" },
+    { id = "car",   label = "CARS",   sub = "the crew escapes in the best car anyone has on" },
     { id = "trail", label = "TRAILS", sub = "every trail makes you faster" },
     { id = "cash",  label = "CASH",   sub = "cash packs for Robux" },
     { id = "codes", label = "CODES",  sub = "got a promo code?" },

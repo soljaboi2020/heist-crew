@@ -765,6 +765,122 @@ function ClubBuilder:_trophyRoom(f, refs)
         end
     end
     refs.setTrophies(0)
+    -- v3.0: the Boss's target trophies along the north wall of the same room
+    local ok, err = pcall(function() ClubBuilder:_targetWall(f, refs) end)
+    if not ok then warn("[ClubBuilder] target wall failed: " .. tostring(err)) end
+end
+
+-- ──────────────────────────────────────────────
+-- 🎯 BOSS TARGETS WALL (v3.0, LOOT-CORE) — inside the trophy room, along its
+-- north partition (x 27..38.6, z 46..49.2). One plinth per job target
+-- (Constants.LOOT_V3.TARGETS, easy → hard). Each plinth Model is tagged
+-- "TargetTrophy" with attribute TargetKind; TargetService sets its attribute
+-- Owned = true while ANYONE in the server owns that trophy → the model shows,
+-- the spotlight + glow come on and the plate reads its name. Otherwise a dark
+-- "???" plinth. refs.setTargetTrophies({ [kind] = true }) does the same by hand.
+-- ──────────────────────────────────────────────
+local function targetModel(kind, cf, parent)
+    local m = Instance.new("Model")
+    m.Name = "Target_" .. kind
+    m.Parent = parent
+    local gold = Color3.fromRGB(240, 190, 60)
+    local function p(props) return part(props, m) end
+    if kind == "GoldFlamingo" then
+        p({ Name = "Leg", Size = Vector3.new(0.15, 1.3, 0.15), CFrame = cf * CFrame.new(0, 0.65, 0), Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        p({ Name = "Body", Shape = Enum.PartType.Ball, Size = Vector3.new(1.1, 0.8, 0.8), CFrame = cf * CFrame.new(0, 1.55, 0), Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        p({ Name = "Neck", Size = Vector3.new(0.14, 0.9, 0.14), CFrame = cf * CFrame.new(0.4, 2.05, 0) * CFrame.Angles(0, 0, math.rad(-15)), Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        p({ Name = "Head", Shape = Enum.PartType.Ball, Size = Vector3.new(0.35, 0.35, 0.35), CFrame = cf * CFrame.new(0.5, 2.5, 0), Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        p({ Name = "Beak", Size = Vector3.new(0.3, 0.1, 0.1), CFrame = cf * CFrame.new(0.72, 2.45, 0) * CFrame.Angles(0, 0, math.rad(-30)), Color = Color3.fromRGB(40, 30, 30), Material = Enum.Material.SmoothPlastic })
+    elseif kind == "PinkDiamond" then
+        p({ Name = "Stand", Size = Vector3.new(0.5, 0.5, 0.5), CFrame = cf * CFrame.new(0, 0.25, 0), Color = Color3.fromRGB(40, 36, 44), Material = Enum.Material.Marble })
+        p({ Name = "Gem", Size = Vector3.new(0.9, 0.9, 0.9), CFrame = cf * CFrame.new(0, 1.2, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+            Color = Color3.fromRGB(255, 120, 200), Material = Enum.Material.Glass, Transparency = 0.15, Reflectance = 0.4 })
+    elseif kind == "GoldenTicket" then
+        local t = p({ Name = "Ticket", Size = Vector3.new(1.6, 0.9, 0.06), CFrame = cf * CFrame.new(0, 1.1, 0) * CFrame.Angles(math.rad(-15), 0, 0),
+            Color = Color3.fromRGB(252, 211, 77), Material = Enum.Material.Foil })
+        local g = surface(t, Enum.NormalId.Back, 50)
+        text({ Text = "GOLDEN TICKET", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+            FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(120, 70, 10) }, g)
+    elseif kind == "CrownJewel" then
+        p({ Name = "Band", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 1.2, 1.2), CFrame = cf * CFrame.new(0, 0.55, 0) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        for k = 0, 4 do
+            local a = math.rad(k * 72)
+            p({ Name = "Point", Size = Vector3.new(0.18, 0.5, 0.18), CFrame = cf * CFrame.new(math.cos(a) * 0.5, 1.0, math.sin(a) * 0.5),
+                Color = gold, Material = Enum.Material.Metal, Reflectance = 0.3 })
+        end
+        p({ Name = "Jewel", Shape = Enum.PartType.Ball, Size = Vector3.new(0.45, 0.45, 0.45), CFrame = cf * CFrame.new(0, 1.05, 0),
+            Color = Color3.fromRGB(192, 132, 252), Material = Enum.Material.Glass, Reflectance = 0.3 })
+    else
+        p({ Name = "Mystery", Size = Vector3.new(0.9, 0.9, 0.9), CFrame = cf * CFrame.new(0, 0.9, 0), Color = gold, Material = Enum.Material.Metal })
+    end
+    for _, d in ipairs(m:GetDescendants()) do
+        if d:IsA("BasePart") then d.CanCollide = false end
+    end
+    return m
+end
+
+function ClubBuilder:_targetWall(f, refs)
+    local V3 = Constants.LOOT_V3 or {}
+    local targets = V3.TARGETS or {}
+    local list = {}
+    for _, job in ipairs(Constants.JOBS) do
+        local t = targets[job.id]
+        if t then table.insert(list, { kind = t.kind, name = t.name, job = job.name }) end
+    end
+    if #list == 0 then return end
+    -- sign on the room side of the north partition (the wall's south face is z 46)
+    local sign = box("TargetSign", 27, F + 6.3, 46, 38.6, F + 8.2, 46.2, Color3.fromRGB(10, 10, 14), Enum.Material.Metal, f)
+    local sg = surface(sign, Enum.NormalId.Back, 30)
+    sg.Brightness = 2.2
+    text({ Text = "BOSS TARGETS", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(255, 225, 150),
+        TextStrokeColor3 = Color3.fromRGB(200, 120, 30), TextStrokeTransparency = 0.2 }, sg)
+
+    refs.targetTrophies = {}
+    local x0, step = 28.6, 3.1
+    local z = 48.1
+    for i, t in ipairs(list) do
+        local x = x0 + (i - 1) * step
+        local holder = Instance.new("Model")
+        holder.Name = "TargetTrophy_" .. t.kind
+        holder:SetAttribute("TargetKind", t.kind)
+        holder:SetAttribute("Owned", false)
+        holder.Parent = f
+        box("Plinth", x - 1.1, F, z - 1.1, x + 1.1, F + 2.6, z + 1.1, Color3.fromRGB(34, 30, 38), Enum.Material.Marble, holder)
+        box("PlinthCap", x - 1.2, F + 2.6, z - 1.2, x + 1.2, F + 2.75, z + 1.2, GOLD, Enum.Material.Metal, holder)
+        local glow = box("PlinthGlow", x - 1.12, F + 0.3, z + 1.1, x + 1.12, F + 0.42, z + 1.14, T.gold, Enum.Material.Neon, holder, { CanCollide = false })
+        box("CaseGlass", x - 1.05, F + 2.75, z - 1.05, x + 1.05, F + 5.6, z + 1.05, Color3.fromRGB(200, 220, 255), Enum.Material.Glass, holder,
+            { Transparency = 0.8, CanCollide = false })
+        -- name plate on the plinth's front (facing into the room, +Z)
+        local plate = box("Plate", x - 0.95, F + 1.1, z + 1.1, x + 0.95, F + 2.3, z + 1.16, Color3.fromRGB(12, 12, 16), Enum.Material.Metal, holder)
+        local pg = surface(plate, Enum.NormalId.Back, 60)
+        local name = text({ Size = UDim2.fromScale(1, 0.58), TextXAlignment = Enum.TextXAlignment.Center,
+            FontFace = UITheme.F.display, TextScaled = true, TextColor3 = T.gold, Text = "???" }, pg)
+        local sub_ = text({ Position = UDim2.fromScale(0, 0.58), Size = UDim2.fromScale(1, 0.42), TextXAlignment = Enum.TextXAlignment.Center,
+            FontFace = UITheme.F.bold, TextScaled = true, TextColor3 = T.muted, Text = t.job }, pg)
+        local spot = box("TargetSpot", x - 0.2, F + 8.6, z - 0.2, x + 0.2, F + 8.9, z + 0.2, STEEL, Enum.Material.Metal, holder, { CanCollide = false })
+        local sl = light("SpotLight", spot, { Face = Enum.NormalId.Bottom, Angle = 40, Brightness = 3, Range = 9, Color = Color3.fromRGB(255, 225, 170) })
+        local vis = targetModel(t.kind, CFrame.new(x, F + 2.75, z), holder)
+        local entry = { kind = t.kind, name = t.name, holder = holder, visual = vis, label = name, sub = sub_, light = sl, glow = glow }
+        refs.targetTrophies[t.kind] = entry
+        local function apply()
+            local owned = holder:GetAttribute("Owned") == true
+            setModelVisible(vis, owned)
+            sl.Enabled = owned
+            glow.Transparency = owned and 0 or 0.85
+            name.Text = owned and string.upper(t.name) or "???"
+            name.TextColor3 = owned and T.gold or T.faint
+            sub_.Text = owned and t.job or ("steal it at " .. t.job)
+        end
+        holder:GetAttributeChangedSignal("Owned"):Connect(apply)
+        apply()
+        CollectionService:AddTag(holder, "TargetTrophy")
+    end
+    refs.setTargetTrophies = function(owned)
+        owned = type(owned) == "table" and owned or {}
+        for kind, e in pairs(refs.targetTrophies) do e.holder:SetAttribute("Owned", owned[kind] == true) end
+    end
 end
 
 -- ──────────────────────────────────────────────

@@ -17,7 +17,8 @@
       • Procedural palms along Ocean Drive, at the villa garden, the safehouse
         driveway, on the beach and the lawn
       • Beach: 2 lifeguard towers, striped umbrellas + loungers
-      • Marina: pier on posts, an 80s speedboat, the DROP-OFF ring + sign
+      • Marina: pier on posts, an 80s speedboat, MARINA sign (v3.0: decor — the
+        Boat escape is a cut-scene; the old DROP-OFF ring is gone)
       • 4 parked pastel 80s cars along the kerbs
       • skinSafehouse(): pastel stucco + deco fins/bands/parapet over the brick
         warehouse, big "RIVERSIDE AUTO" neon sign, two neon wall lamps
@@ -1081,7 +1082,7 @@ function MiamiBuilder:_beach(f)
 end
 
 -- ──────────────────────────────────────────────
--- ⚓ MARINA: pier, speedboat, drop-off ring + sign
+-- ⚓ MARINA: pier, speedboat, sign (v3.0: decor for the Boat escape)
 -- ──────────────────────────────────────────────
 function MiamiBuilder:_speedboat(parent, cf)
     local m = Instance.new("Model")
@@ -1176,48 +1177,45 @@ function MiamiBuilder:_marina(f)
         Color3.fromRGB(220, 210, 180), Enum.Material.Fabric, pier, DECO)
     self:_speedboat(pier, boatCF)
 
-    -- ── DROP-OFF ring: dashed neon outline on the sand (not a disc) ──
-    local ring = folder(f, "DropoffRing")
-    local c = Vector3.new(W.DROPOFF.x, W.DROPOFF.y, W.DROPOFF.z)
-    local R = W.DROPOFF_RADIUS
-    local N = 40
-    for i = 0, N - 1 do
-        local a = i * (math.pi * 2 / N)
-        local pos = c + Vector3.new(math.cos(a) * R, 0.06, math.sin(a) * R)
-        local tangent = Vector3.new(-math.sin(a), 0, math.cos(a))
-        local seg = part({
-            Name = "RingSegment", Size = Vector3.new(0.35, 0.12, 1.5),
-            CFrame = CFrame.lookAt(pos, pos + tangent),
-            Color = CYAN, Material = Enum.Material.Neon,
-            CanCollide = false, CastShadow = false, CanTouch = false, CanQuery = false,
-        }, ring)
-        if i % 10 == 0 then pointLight(seg, CYAN, 0.9, 10) end
-    end
-    -- soft cyan pool inside the ring from an invisible panel overhead
-    local glow = box("DropoffGlow", c.X - 12, 9, c.Z - 12, c.X + 12, 9.2, c.Z + 12, CYAN, Enum.Material.SmoothPlastic, ring,
-        { Transparency = 1, CanCollide = false, CastShadow = false, CanTouch = false, CanQuery = false })
-    local sl = Instance.new("SurfaceLight")
-    sl.Face = Enum.NormalId.Bottom
-    sl.Color = CYAN
-    sl.Brightness = 0.6
-    sl.Range = 12
-    sl.Angle = 70
-    sl.Parent = glow
+    -- (v3.0) The DROP-OFF ring is gone: nobody drives here any more — the Boat
+    -- escape is a cut-scene (GetawayService / GetawayCinematic uses the pier +
+    -- this speedboat). What's left is a real little marina: a sign + a
+    -- life-ring post + two rope bollards at the pier head.
 
-    -- ── DROP-OFF sign, post-mounted, facing south toward the street.
-    --    Sits just east of the marina route (x 94..122 stays clear). ──
-    local signF = folder(f, "DropoffSign")
+    -- ── MARINA sign, post-mounted, facing south toward the street.
+    --    Sits just east of the old drive route (x 94..122 stays clear). ──
+    local signF = folder(f, "MarinaSign")
     local sz = -94
     for _, x in ipairs({ 124.6, 129.4 }) do
         box("SignPost", x - 0.15, 0, sz - 0.15, x + 0.15, 4.6, sz + 0.15, METAL_DARK, Enum.Material.Metal, signF)
     end
     local board = box("SignBoard", 124, 4.4, sz - 0.3, 130, 7.3, sz + 0.15, SIGN_DARK, Enum.Material.Metal, signF)
     local g = gui(board, Enum.NormalId.Back, 40, 2.5, 0)
-    neonLabel(g, "DROP-OFF", CYAN, { Size = UDim2.fromScale(0.9, 0.55), Position = UDim2.fromScale(0.05, 0.08) }, 4)
-    neonLabel(g, "DRIVE IN  ·  CASH OUT", PINK, { Size = UDim2.fromScale(0.8, 0.22), Position = UDim2.fromScale(0.1, 0.68),
+    neonLabel(g, "MARINA", CYAN, { Size = UDim2.fromScale(0.9, 0.55), Position = UDim2.fromScale(0.05, 0.08) }, 4)
+    neonLabel(g, "SPEEDBOATS  ·  OPEN ALL NIGHT", PINK, { Size = UDim2.fromScale(0.84, 0.22), Position = UDim2.fromScale(0.08, 0.68),
         FontFace = UITheme.F.bold }, 2)
     box("SignTube", 124.2, 4.15, sz + 0.15, 129.8, 4.3, sz + 0.3, CYAN, Enum.Material.Neon, signF, GLOW)
-    pointLight(board, CYAN, 1.2, 12)
+    pointLight(board, CYAN, 0.9, 10)
+
+    -- ── pier head: a life-ring on a post + two rope bollards (on the sand,
+    --    beside the ramp, clear of the deck the cinematic's boat track uses) ──
+    local head = folder(f, "PierHead")
+    local PZ = -112.6
+    cyl("LifeRingPost", Vector3.new(98.6, 0, PZ), Vector3.new(98.6, 4.2, PZ), 0.35, woodDark, Enum.Material.Wood, head)
+    local ringBoard = box("LifeRingBoard", 98.2, 1.6, PZ - 0.9, 98.4, 3.8, PZ + 0.9, WHITE, Enum.Material.SmoothPlastic, head, DECO)
+    for i = 0, 7 do   -- red/white ring, 8 chunky segments
+        local a = i * math.pi / 4
+        local pos = Vector3.new(98.1, 2.7 + math.sin(a) * 0.75, PZ + math.cos(a) * 0.75)
+        part({ Name = "LifeRing", Size = Vector3.new(0.3, 0.34, 0.62),
+            CFrame = CFrame.lookAt(pos, pos + Vector3.new(0, math.cos(a), -math.sin(a)), Vector3.new(1, 0, 0)),
+            Color = (i % 2 == 0) and Color3.fromRGB(230, 50, 50) or WHITE, Material = Enum.Material.SmoothPlastic,
+            CanCollide = false, CastShadow = false }, head)
+    end
+    local _ = ringBoard
+    for _, x in ipairs({ 99.2, 106.8 }) do
+        cyl("Bollard", Vector3.new(x, 0, -113.4), Vector3.new(x, 1.3, -113.4), 0.9, METAL_DARK, Enum.Material.Metal, head)
+        box("BollardCap", x - 0.55, 1.3, -113.95, x + 0.55, 1.5, -112.85, CHROME, Enum.Material.Metal, head, DECO)
+    end
 end
 
 -- ──────────────────────────────────────────────
@@ -1956,7 +1954,7 @@ function MiamiBuilder:_cityLife(f)
     wayfinder(signs, Vector3.new(-19.6, 10, -3.6), Vector3.new(1, 0, 0), 4.6, 4.2, {
         { "jewelry", "←" }, { "police", "→" }, { "villa", "→" },
     })
-    -- D) the MARINA gantry over the drive route (poles just outside x 94..122)
+    -- D) the MARINA gantry over the old drive route (poles just outside x 94..122)
     for _, x in ipairs({ 93.2, 122.8 }) do
         cyl("GantryPole", Vector3.new(x, 0, -27.5), Vector3.new(x, 16, -27.5), 0.6, METAL_DARK, Enum.Material.Metal, signs)
     end
@@ -1965,7 +1963,7 @@ function MiamiBuilder:_cityLife(f)
     do
         local g = gui(gb, Enum.NormalId.Back, 40, 2.5, 0)
         neonLabel(g, "MARINA  ↑", CYAN, { Size = UDim2.fromScale(0.9, 0.58), Position = UDim2.fromScale(0.05, 0.06) }, 4)
-        neonLabel(g, "DROP-OFF  ·  CASH OUT", PINK, { Size = UDim2.fromScale(0.7, 0.24), Position = UDim2.fromScale(0.15, 0.7),
+        neonLabel(g, "BOATS  ·  BEACH", PINK, { Size = UDim2.fromScale(0.7, 0.24), Position = UDim2.fromScale(0.15, 0.7),
             FontFace = UITheme.F.bold }, 2)
     end
     box("MarinaSignTube", 101.2, 11.15, -27.3, 114.8, 11.3, -27.15, CYAN, Enum.Material.Neon, signs, GLOW)

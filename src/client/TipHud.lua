@@ -15,7 +15,7 @@
 
     Triggers: joining (after the IntroCam fly-over, if it plays) · first time
     standing in a heist door · first run starting · first time being spotted ·
-    first bag · near the car with a bag · first alarm · first time driving ·
+    first bag · near the car with a bag · first alarm · first time in the car ·
     reaching the vault · lasers ahead · first time in jail.
 --]]
 
@@ -43,8 +43,8 @@ local TIPS = {
     spotted = { "They see you!", "Hide! If the meter fills up, you go back to the door.", I.eye },
     bag     = { "Heavy bag!", "Take it to the car. G throws it to a friend.", I.bag },
     trunk   = { "Load it up", "Hold E at the back of the car.", I.car },
-    alarm   = { "Alarm!", "Jump in the car and drive to the marina. Fast!", I.alarm },
-    drive   = { "You're driving", "Follow the marker to the boats.", I.car },
+    alarm   = { "Alarm!", "Load the car, jump in and hit GO! Fast!", I.alarm },
+    drive   = { "In the car!", "Wait for your crew or hit GO!, then vote how you escape.", I.car },
     vault   = { "The vault", "Put the drill on it and stay close. Stuck? Hold E.", I.drill },
     lasers  = { "Lasers!", "They blink. Walk through when they're off.", I.alarm },
 }
@@ -218,7 +218,13 @@ function TipHud:start()
             task.wait(0.5)
             local char = localPlayer.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
-            if hum and hum.SeatPart and hum.SeatPart:IsA("VehicleSeat") then self:show("drive") end
+            -- (v3.0) nobody drives: any seat in the getaway car (model with CarId)
+            local seat = hum and hum.SeatPart
+            local carModel = seat and seat:FindFirstAncestorWhichIsA("Model")
+            while carModel and carModel:GetAttribute("CarId") == nil do
+                carModel = carModel:FindFirstAncestorWhichIsA("Model")
+            end
+            if carModel then self:show("drive") end
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root and not self._seen.lasers then
                 -- (fix v1.1) beams are CanQuery=false, so find them by the "Laser" tag

@@ -120,7 +120,8 @@ Constants.WORLD = {
     BEACH_Z1               = -122,    -- ...to here, then water (v2.0: was -108)
     OCEAN_SURFACE_Y        = -0.6,
 
-    -- The marina drop-off: drive the loaded getaway car here to cash out
+    -- The old marina drop-off (v3.0: nobody drives there any more — the getaway is a
+    -- cut-scene; MiamiBuilder keeps the pier + boat here as decor for the Boat escape)
     DROPOFF                = {x = 106, y = 0,   z = -110},   -- v2.0: was z -96 (beach moved north)
     DROPOFF_RADIUS         = 14,
 
@@ -161,8 +162,8 @@ Constants.ROLES = {
       perks = "Hacks keycard doors without a card · cuts cameras 3x faster" },
     { id = "Muscle",  color = {248, 113, 113}, blurb = "Heavy loot, doors, crowds",
       perks = "Full speed with any bag · takes down guards from behind (E)" },
-    { id = "Driver",  color = {251, 191, 36},  blurb = "Getaway car, cop chases",
-      perks = "+20% car speed · nitro boost (Shift)" },
+    { id = "Driver",  color = {251, 191, 36},  blurb = "Getaway pro: picks the escape",
+      perks = "Getaway pro: your escape vote counts x2 · +5% getaway cash for the crew" },
     { id = "Lookout", color = {74, 222, 128},  blurb = "Spots guards through walls",
       perks = "Sees guards + cameras through walls · Q marks them for the crew" },
 }
@@ -190,13 +191,13 @@ Constants.JOBS = {
             "There is 1 camera. If the camera sees you, the alarm goes off and the police come!",
             "Press C to crouch. Dark spots make you harder to see. Hold E on a closet or a big box to hide inside.",
             "Grab the cash from the registers. Then put the drill on the safe in the back office.",
-            "Put the money bags in the car and drive to the boats (the marina). If nobody sees you, you get extra cash!",
+            "Put the money bags in the car. Get everyone in the car (or press GO!) and pick your escape. If nobody sees you, you get extra cash!",
         },
     },
     {
         id = "villa", name = "VILLA ROSA", tagline = "Beachfront villa. Stealth pays.",
         difficulty = 2, unlockLevel = 1, guards = 3,
-        alarmTimer = 90,           -- seconds to get the loaded car to the marina once the alarm trips
+        alarmTimer = 90,           -- seconds to load the car and escape (GO!) once the alarm trips
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
         vaultNoun = "Vault", doorLabel = "Open the locked vault door", drillTime = 24,
         briefing = {
@@ -208,7 +209,7 @@ Constants.JOBS = {
             "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
             "Red lasers blink on and off. Walk through when they turn off.",
             "Put the drill on the vault. If the drill gets stuck, hold E to fix it.",
-            "Put the money bags in the car and drive to the boats (the marina). If nobody sees you, you get extra cash!",
+            "Put the money bags in the car. Get everyone in the car (or press GO!) and pick your escape. If nobody sees you, you get extra cash!",
         },
     },
     {
@@ -224,7 +225,7 @@ Constants.JOBS = {
             "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
             "Press C to crouch. Dark spots and hiding spots (hold E) help you sneak.",
             "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
-            "Put the bags in the car and drive to the boats (the marina) before the timer runs out!",
+            "Put the bags in the car. Get everyone in the car (or press GO!) and pick your escape before the timer runs out!",
         },
     },
     {
@@ -241,7 +242,7 @@ Constants.JOBS = {
             "Find the breaker box to turn the cameras off. Find the keycard to open the vault hallway.",
             "Red lasers blink on and off. Walk through when they turn off.",
             "Put the drill on the big round vault. If it gets stuck, hold E to fix it.",
-            "If the police catch you, you go to jail! A friend can break you out. Then load the car and drive to the marina!",
+            "If the police catch you, you go to jail! A friend can break you out. Then load the car, get everyone in (or press GO!) and pick your escape!",
         },
     },
 }
@@ -269,20 +270,113 @@ Constants.BOTS = {
 
 -- Loot kinds. value = cash added to the crew's take when the bag is secured.
 -- speed = WalkSpeed while carrying (Muscle ignores it). Default WalkSpeed is 16.
+-- v3.0 "THE SCORE" (LOOT-CORE, docs/V3_SPEC.md §2.2): every kind also has
+--   name      what the HUD / prompts / pops call it (kid words)
+--   heavy     needs TWO people to carry ("Lift together"), or the Muscle alone
+--   fragile   loses value when bumped (running > 2 s, grabbed, thrown, falling)
+--   interact  default mini-game before it bags ("cut"|"dial"|"stuff"|"unscrew"|"drill").
+--             A builder's lootSpot.interact wins; lootSpot.interact = false = plain hold E.
+--   deposit   contents are rolled when you open it (Constants.LOOT_V3.DEPOSIT_BOX)
+--   heavy/fragile on the lootSpot win over the kind's flag too.
 Constants.LOOT = {
-    Cash     = { value = 1000, speed = 13, color = {74, 222, 128} },
-    Gold     = { value = 1500, speed = 10, color = {251, 191, 36} },
-    Diamonds = { value = 2500, speed = 12, color = {125, 211, 252} },
-    Jewels   = { value = 900,  speed = 14, color = {244, 114, 182} },
-    Art      = { value = 2000, speed = 11, color = {196, 181, 253} },
+    Cash     = { value = 1000, speed = 13, color = {74, 222, 128},  name = "Cash" },
+    Gold     = { value = 1500, speed = 10, color = {251, 191, 36},  name = "Gold" },
+    Diamonds = { value = 2500, speed = 12, color = {125, 211, 252}, name = "Diamonds" },
+    Jewels   = { value = 900,  speed = 14, color = {244, 114, 182}, name = "Jewels" },
+    Art      = { value = 2000, speed = 11, color = {196, 181, 253}, name = "Painting" },
     -- v2.0 new jobs
-    Register = { value = 400,  speed = 15, color = {134, 239, 172} },   -- mart cash register
-    Lottery  = { value = 300,  speed = 15, color = {253, 186, 116} },   -- mart scratch tickets
-    Bonds    = { value = 3000, speed = 12, color = {165, 243, 252} },   -- bank bearer bonds
-    GoldBars = { value = 4000, speed = 9,  color = {250, 204, 21} },    -- bank vault gold
+    Register = { value = 400,  speed = 15, color = {134, 239, 172}, name = "Register Cash", interact = "stuff" },  -- mart cash register
+    Lottery  = { value = 300,  speed = 15, color = {253, 186, 116}, name = "Lottery Tickets" },                  -- mart scratch tickets
+    Bonds    = { value = 3000, speed = 12, color = {165, 243, 252}, name = "Bonds" },                            -- bank bearer bonds
+    GoldBars = { value = 4000, speed = 9,  color = {250, 204, 21},  name = "Gold Bars", heavy = true },          -- bank vault gold
+
+    -- ── v3.0 themed loot ──
+    -- Villa Rosa
+    Painting     = { value = 3000, speed = 12, color = {196, 181, 253}, name = "Painting", interact = "cut" },
+    GoldRecord   = { value = 1800, speed = 14, color = {250, 204, 21},  name = "Gold Record" },
+    GoldFlamingo = { value = 7500, speed = 9,  color = {255, 150, 200}, name = "Golden Flamingo", heavy = true },   -- TARGET
+    Wine         = { value = 1600, speed = 14, color = {170, 40, 80},   name = "Fancy Wine", fragile = true },
+    JewelryBox   = { value = 2200, speed = 14, color = {244, 114, 182}, name = "Jewelry Box", interact = "dial" },
+    -- Diamond Dolls
+    Necklace     = { value = 1800, speed = 15, color = {226, 232, 240}, name = "Necklace", interact = "unscrew" },
+    Watch        = { value = 1200, speed = 15, color = {253, 224, 71},  name = "Gold Watch" },
+    PinkDiamond  = { value = 9000, speed = 13, color = {255, 120, 200}, name = "Pink Diamond" },                  -- TARGET
+    -- Sunny's Mart
+    ScratchTickets = { value = 250,  speed = 15, color = {253, 186, 116}, name = "Scratch Tickets" },
+    ATMCash      = { value = 1500, speed = 14, color = {74, 222, 128},  name = "ATM Cash", interact = "drill" },
+    SafeCash     = { value = 1200, speed = 14, color = {74, 222, 128},  name = "Safe Cash", interact = "dial" },
+    GoldenTicket = { value = 3000, speed = 15, color = {252, 211, 77},  name = "Golden Ticket" },                 -- TARGET
+    -- Ocean Bank
+    MoneyCart    = { value = 6000, speed = 9,  color = {74, 222, 128},  name = "Money Cart", heavy = true },
+    DepositBox   = { value = 1200, speed = 14, color = {203, 213, 225}, name = "Deposit Box", deposit = true },   -- value = a rough guess; real value rolled
+    CrownJewel   = { value = 12000, speed = 12, color = {192, 132, 252}, name = "Crown Jewel" },                  -- TARGET
+    -- any job: the ~1-in-20 secret stash
+    SecretStash  = { value = 4000, speed = 13, color = {45, 212, 191},  name = "Secret Stash" },
 }
 -- Anything a builder names that isn't listed above still pays this (never $0).
-Constants.LOOT_DEFAULT = { value = 500, speed = 13, color = {226, 232, 240} }
+Constants.LOOT_DEFAULT = { value = 500, speed = 13, color = {226, 232, 240}, name = "Loot" }
+
+-- ───── v3.0 "THE SCORE" loot rules (LOOT-CORE: LootService / LootShuffle / TargetService) ─────
+-- Words are for a 7-year-old. Keep them that way.
+Constants.LOOT_V3 = {
+    -- §2.3 shuffle: each run only SOME spots in a pool are out; one pool is the JACKPOT room
+    SHUFFLE_ACTIVE  = 0.6,     -- fraction of each pool that is out on a run (at least 1)
+    JACKPOT_MULT    = 1.5,     -- every spot in the jackpot room is out and worth x1.5
+    HIDDEN_CHANCE   = 1 / 20,  -- a hidden = true spot (secret stash) shows up on ~1 run in 20
+
+    -- §2.5 target (the Boss's named item) — paid to the crew on top of the take
+    TARGET_BONUS    = 5000,
+
+    -- §2.5 heavy loot
+    HEAVY_SPEED     = 9,       -- both carriers walk this fast (the Muscle alone walks full speed)
+    HEAVY_LIFT_WAIT = 10,      -- seconds the first lifter waits for a buddy
+    HEAVY_LIFT_NEAR = 12,      -- the buddy must be this close to join / a bot this close helps
+    HEAVY_TETHER    = 16,      -- carriers further apart than this for...
+    HEAVY_TETHER_TIME = 1.5,   -- ...this long drop it
+
+    -- §2.5 fragile loot
+    FRAGILE_LOSS    = 0.25,    -- value lost per bump (of the full value)
+    FRAGILE_FLOOR   = 0.25,    -- never worth less than this much of its value (kid-friendly)
+    FRAGILE_RUN_SPEED = 10,    -- faster than this counts as running (crouch-walk = 8 = safe)
+    FRAGILE_RUN_TIME  = 2,     -- running this long = a bump
+    FRAGILE_RECRACK   = 3,     -- after a bump, this long of running before the next one
+    FRAGILE_FALL    = 6,       -- falling further than this (studs) = a bump
+
+    -- §2.4 mini-games. `min` = the server's fastest believable finish (too fast = rejected).
+    --   prompt = the ProximityPrompt action, title/hint = the mini-game card
+    MINIGAMES = {
+        cut     = { min = 1.8, prompt = "Cut it out", title = "CUT IT OUT!",   hint = "Trace the frame all the way round" },
+        dial    = { min = 1.2, prompt = "Crack it",   title = "CRACK THE DIAL!", hint = "Turn the dial until it CLICKS (3 times)" },
+        stuff   = { min = 1.4, prompt = "Grab it",    title = "STUFF THE BAG!", hint = "Tap tap tap as fast as you can!" },
+        unscrew = { min = 1.2, prompt = "Unscrew it", title = "UNSCREW THE GLASS!", hint = "Hold each screw and spin it" },
+        drill   = { min = 2.2, prompt = "Drill it",   title = "DRILL IT!",     hint = "Wait for the drill. If it jams, TAP it!" },
+    },
+    MINIGAME_HOLD    = 3,      -- accessibility fallback: hold E / X / the HOLD button this long
+    MINIGAME_TIMEOUT = 30,     -- a mini-game left open longer than this is cancelled
+    MINIGAME_REACH   = 14,     -- studs from the loot you must still be when you finish
+
+    -- §2.2 Ocean Bank deposit boxes: what's inside (weights add to 100)
+    DEPOSIT_BOX = {
+        { id = "cash",   weight = 50, name = "Cash",   value = 1200 },
+        { id = "jewels", weight = 30, name = "Jewels", value = 2000 },
+        { id = "rare",   weight = 15, value = 4500,
+          names = { "Old Gold Coin", "Signed Baseball", "Treasure Map", "Tiny Gold Car", "Dino Egg" } },
+        { id = "duck",   weight = 5,  name = "Rubber Duck", value = 1,
+          line = "QUACK! It's just a rubber duck... worth $1!" },
+    },
+
+    -- §2.5 / §4 the Boss's target per job (exactly one per heist)
+    TARGETS = {
+        mart    = { kind = "GoldenTicket", name = "Golden Ticket",
+                    line = "Somewhere in the store is a GOLDEN TICKET. Find it and bring it to me for $5,000 extra!" },
+        villa   = { kind = "GoldFlamingo", name = "Golden Flamingo",
+                    line = "Bring me the GOLDEN FLAMINGO! It's heavy, so lift it with a buddy (or be the Muscle). $5,000 extra!" },
+        jewelry = { kind = "PinkDiamond", name = "Pink Diamond",
+                    line = "Bring me the PINK DIAMOND! It spins on its own stand behind lasers. $5,000 extra!" },
+        bank    = { kind = "CrownJewel", name = "Crown Jewel",
+                    line = "The CROWN JEWEL is locked in the vault. Bring it to me for $5,000 extra!" },
+    },
+}
 
 -- Security tuning (SecurityService)
 Constants.SECURITY = {

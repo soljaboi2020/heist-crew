@@ -42,6 +42,23 @@
         per-room lighting (warm vs cool, shadowed key lamps, moonlight in the
         bedroom), and Kenney props recoloured on arrival (tintProp).
 
+    v3.0 "THE SCORE" LOOT (2026-09-25, docs/V3_SPEC.md §2) — no more loose
+    cash on tables. refs.lootSpots is lootSpots v3; pool = room:
+      hall     2 Painting (cut) either side of the front door (under Camera_Hall)
+      gallery  5 Painting (cut): 4 on the walls + the unframed canvas on the easel
+      office   2 GoldRecord (framed, over the hi-fi console) · 1 Painting (cut,
+               dark SE corner) · SecretStash (hidden): wall safe behind the
+               painting over the sideboard — the painting swings open
+      cellar   3 Wine (fragile): RESERVE niches in the pantry wine wall (kitchen NE)
+      bedroom  JewelryBox (dial) in the green floor safe · 1 Painting (cut) ·
+               SecretStash (hidden): floor safe under the rug by the closet
+      vault    3 Cash (shrink-wrapped pallets) · 2 GoldBars (heavy) · Diamonds
+               (velvet tray) · 🦩 GoldFlamingo — THE TARGET (heavy, target =
+               "GoldFlamingo") on a spot-lit plinth dead centre, facing the door
+      "cut" leaves the empty gilt frame on the wall (visual = the canvas only).
+      Hidden stashes build INVISIBLE; spot.reveal(true/false) shows the stash
+      and its cover (painting swing / rug fold). refs.poolNames names each room.
+
     THE THREE WAYS IN (refs.entrances)
         front  — the obvious one. Camera_Hall watches it, Guard A walks the hall.
         side   — STAFF ONLY door on the east wall (opens onto the service yard)
@@ -377,7 +394,13 @@ local function tagVent(p, pairName, label, exit)
     return p
 end
 
--- ── abstract art on a wall ─────────────────────────────────────────────
+-- ── v3 PAINTED CANVASES ────────────────────────────────────────────────
+-- Every painting is a gilt frame + backing board (static) and a separate
+-- canvas Model (the loot visual: "cut" takes the canvas, the empty frame
+-- stays on the wall). The picture is drawn with Frames + UIGradients — no
+-- image assets. Five styles, all seeded, so a wall never repeats:
+--   sunset (Miami seascape + palm) · fields (soft colour blocks)
+--   grid (primary-colour lines) · orbits (circles on dark) · waves
 -- pos = point on the wall surface, normal = direction out of the wall into the room
 local ART_PALETTES = {
     { Color3.fromRGB(242, 160, 190), Color3.fromRGB(40, 60, 110), Color3.fromRGB(250, 200, 90), Color3.fromRGB(40, 190, 200) },
@@ -386,41 +409,193 @@ local ART_PALETTES = {
     { Color3.fromRGB(64, 150, 150), Color3.fromRGB(250, 210, 170), Color3.fromRGB(190, 90, 150), Color3.fromRGB(20, 40, 60) },
     { Color3.fromRGB(180, 150, 230), Color3.fromRGB(250, 240, 150), Color3.fromRGB(240, 110, 120), Color3.fromRGB(40, 36, 70) },
 }
+local ART_STYLES = { "sunset", "fields", "grid", "orbits", "waves" }
+local GILT    = Color3.fromRGB(184, 146, 72)
+local GILT_DK = Color3.fromRGB(120, 90, 44)
+local WHITE   = Color3.new(1, 1, 1)
+local BLACK   = Color3.new(0, 0, 0)
 
-local function painting(parent, pos, normal, w, h, seed)
-    local cf = CFrame.lookAt(pos, pos + normal)
-    cpart("PaintingFrame", Vector3.new(w + 0.5, h + 0.5, 0.2), cf * CFrame.new(0, 0, -0.1), BRASS, M.Metal, parent, DECOR)
-    local canvas = cpart("PaintingCanvas", Vector3.new(w, h, 0.06), cf * CFrame.new(0, 0, -0.23),
-        Color3.fromRGB(240, 236, 228), M.Fabric, parent, NOSHADOW)
+local function gradient(parent, colors, rotation, transparency)
+    local g = Instance.new("UIGradient")
+    local kps = {}
+    for i, c in ipairs(colors) do
+        table.insert(kps, ColorSequenceKeypoint.new((i - 1) / (#colors - 1), c))
+    end
+    g.Color = ColorSequence.new(kps)
+    g.Rotation = rotation or 90
+    if transparency then g.Transparency = transparency end
+    g.Parent = parent
+    return g
+end
 
+local function nseq(points)
+    local kps = {}
+    for _, p in ipairs(points) do table.insert(kps, NumberSequenceKeypoint.new(p[1], p[2])) end
+    return NumberSequence.new(kps)
+end
+
+-- draws one picture into SurfaceGui g. aspect = height / width of the canvas.
+local function paintArt(g, style, seed, aspect)
     local rng = Random.new(seed)
     local pal = ART_PALETTES[(seed % #ART_PALETTES) + 1]
+    local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = pal[1], ClipsDescendants = true }, g)
+    local function blob(x, y, w, h, color, z, extra)
+        local b = frame({ Position = UDim2.fromScale(x, y), Size = UDim2.fromScale(w, h), BackgroundColor3 = color, ZIndex = z or 2 }, bg)
+        for k, v in pairs(extra or {}) do b[k] = v end
+        return b
+    end
+    local MID = Vector2.new(0.5, 0.5)
+
+    if style == "sunset" then
+        local horizon = rng:NextNumber(0.56, 0.66)
+        local sky = blob(0, 0, 1, horizon, WHITE, 1)
+        gradient(sky, { Color3.fromRGB(46, 34, 90), Color3.fromRGB(200, 76, 128), Color3.fromRGB(252, 164, 92) }, 90)
+        local sx, sd = rng:NextNumber(0.35, 0.65), rng:NextNumber(0.26, 0.36)
+        local sun = blob(sx, horizon, sd, sd / aspect, WHITE, 2, { AnchorPoint = MID })
+        round(sun)
+        gradient(sun, { Color3.fromRGB(255, 238, 160), Color3.fromRGB(255, 120, 76) }, 90)
+        local sea = blob(0, horizon, 1, 1 - horizon, WHITE, 3)
+        gradient(sea, { Color3.fromRGB(44, 96, 128), Color3.fromRGB(14, 26, 52) }, 90)
+        for i = 0, 5 do   -- the sun's glitter path on the water
+            blob(sx, horizon + 0.03 + i * 0.05, sd * (0.9 - i * 0.13), 0.012, Color3.fromRGB(255, 196, 128), 4,
+                { AnchorPoint = Vector2.new(0.5, 0), BackgroundTransparency = 0.2 + i * 0.12 })
+        end
+        for _ = 1, 4 do   -- wispy clouds
+            blob(rng:NextNumber(-0.1, 0.6), rng:NextNumber(0.1, horizon - 0.18), rng:NextNumber(0.25, 0.5), 0.016,
+                Color3.fromRGB(255, 206, 196), 2, { BackgroundTransparency = 0.45 })
+        end
+        -- a palm silhouette leaning in from one side
+        local left = rng:NextNumber() < 0.5
+        local px = left and 0.17 or 0.83
+        local SIL = Color3.fromRGB(24, 16, 32)
+        blob(px, 0.66, 0.028, 0.72, SIL, 5, { AnchorPoint = MID, Rotation = left and 7 or -7 })
+        local tx, ty = px + (left and 0.04 or -0.04), 0.3
+        for _, r in ipairs({ -32, 28, -62, 58, 4 }) do
+            blob(tx, ty, 0.34, 0.022, SIL, 5, { AnchorPoint = MID, Rotation = r })
+        end
+        blob(0, 0.985, 1, 0.015, SIL, 5)
+    elseif style == "fields" then
+        bg.BackgroundColor3 = pal[4]:Lerp(BLACK, 0.35)
+        local n = rng:NextInteger(2, 3)
+        local gap = 0.06
+        local bh = (1 - gap * (n + 1)) / n
+        for i = 0, n - 1 do
+            local c = pal[((i + seed) % 3) + 1]
+            local b = blob(0.07, gap + i * (bh + gap), 0.86, bh, WHITE, 2 + i)
+            gradient(b, { c, c:Lerp(BLACK, 0.18) }, 90, nseq({ { 0, 0.4 }, { 0.1, 0.02 }, { 0.9, 0.02 }, { 1, 0.4 } }))
+            local cr = Instance.new("UICorner")
+            cr.CornerRadius = UDim.new(0.06, 0)
+            cr.Parent = b
+        end
+    elseif style == "grid" then
+        bg.BackgroundColor3 = Color3.fromRGB(240, 234, 220)
+        local xs = { 0, rng:NextNumber(0.2, 0.4), rng:NextNumber(0.55, 0.8), 1 }
+        local ys = { 0, rng:NextNumber(0.18, 0.4), rng:NextNumber(0.55, 0.8), 1 }
+        local fills = { Color3.fromRGB(206, 44, 40), Color3.fromRGB(30, 60, 150), Color3.fromRGB(246, 200, 40) }
+        for k = 1, 3 do
+            local i, j = rng:NextInteger(1, 3), rng:NextInteger(1, 3)
+            blob(xs[i], ys[j], xs[i + 1] - xs[i], ys[j + 1] - ys[j], fills[k], 2)
+        end
+        local t = 0.028
+        for i = 2, 3 do
+            blob(xs[i] - t / 2, 0, t, 1, Color3.fromRGB(22, 22, 26), 4)
+            blob(0, ys[i] - t / aspect / 2, 1, t / aspect, Color3.fromRGB(22, 22, 26), 4)
+        end
+    elseif style == "orbits" then
+        bg.BackgroundColor3 = WHITE
+        gradient(bg, { Color3.fromRGB(20, 22, 48), Color3.fromRGB(58, 30, 70) }, 120)
+        for i = 1, 6 do
+            local d = rng:NextNumber(0.12, 0.42)
+            local c = blob(rng:NextNumber(0.15, 0.85), rng:NextNumber(0.15, 0.85), d, d / aspect, WHITE, 2 + i, { AnchorPoint = MID })
+            round(c)
+            if i % 3 == 0 then   -- a bare ring
+                c.BackgroundTransparency = 1
+                local s = Instance.new("UIStroke")
+                s.Color = pal[(i % 4) + 1]
+                s.Thickness = 3
+                s.Parent = c
+            else
+                c.BackgroundTransparency = 0.08
+                gradient(c, { pal[(i % 4) + 1], pal[((i + 1) % 4) + 1] }, rng:NextNumber(0, 180))
+            end
+        end
+        for _ = 1, 3 do
+            blob(rng:NextNumber(0.3, 0.7), rng:NextNumber(0.3, 0.7), rng:NextNumber(0.5, 0.9), 0.01,
+                Color3.fromRGB(236, 230, 214), 10, { AnchorPoint = MID, Rotation = rng:NextNumber(-70, 70) })
+        end
+    else -- waves
+        bg.BackgroundColor3 = WHITE
+        gradient(bg, { Color3.fromRGB(246, 228, 200), Color3.fromRGB(236, 196, 170) }, 90)
+        local sun = blob(rng:NextNumber(0.6, 0.8), 0.2, 0.16, 0.16 / aspect, Color3.fromRGB(214, 70, 60), 2, { AnchorPoint = MID })
+        round(sun)
+        local blues = { Color3.fromRGB(70, 130, 170), Color3.fromRGB(34, 80, 128), Color3.fromRGB(18, 44, 84) }
+        for row = 1, 3 do
+            local y = 0.35 + row * 0.16
+            for k = 0, 3 do
+                local w = blob(-0.12 + k * 0.36 + (row % 2) * 0.16, y, 0.46, 0.5 / aspect, blues[row], 2 + row, { AnchorPoint = Vector2.new(0, 0) })
+                round(w)
+                local s = Instance.new("UIStroke")
+                s.Color = Color3.fromRGB(244, 240, 228)
+                s.Thickness = 2
+                s.Transparency = 0.15
+                s.Parent = w
+            end
+        end
+    end
+
+    -- varnish + canvas: soft vignette, a few lighter brush drags
+    local v1 = blob(0, 0, 1, 1, BLACK, 20)
+    gradient(v1, { BLACK, BLACK }, 0, nseq({ { 0, 0.55 }, { 0.18, 1 }, { 0.82, 1 }, { 1, 0.55 } }))
+    local v2 = blob(0, 0, 1, 1, BLACK, 20)
+    gradient(v2, { BLACK, BLACK }, 90, nseq({ { 0, 0.6 }, { 0.2, 1 }, { 0.8, 1 }, { 1, 0.5 } }))
+    for _ = 1, 6 do
+        blob(rng:NextNumber(0, 0.7), rng:NextNumber(0.05, 0.95), rng:NextNumber(0.15, 0.4), 0.006, WHITE, 21,
+            { BackgroundTransparency = 0.86, Rotation = rng:NextNumber(-6, 6) })
+    end
+end
+
+-- painting(parent, pos, normal, w, h, seed, opts) -> canvas Model
+--   opts.frame = false  : bare stretched canvas (the easel) — no frame/backing
+--   opts.style          : force a style (else picked from the seed)
+--   opts.canvasParent   : where the canvas Model goes (default parent)
+local function painting(parent, pos, normal, w, h, seed, opts)
+    opts = opts or {}
+    local cf = CFrame.lookAt(pos, pos + normal)
+    if opts.frame ~= false then
+        -- backing board: what's left on the wall once the canvas is cut out
+        cpart("PaintingBacking", Vector3.new(w + 0.05, h + 0.05, 0.08), cf * CFrame.new(0, 0, -0.05),
+            Color3.fromRGB(56, 44, 34), M.Wood, parent, NOSHADOW)
+        local fw = math.clamp(math.min(w, h) * 0.09, 0.28, 0.46)
+        local rails = {
+            { 0, (h + fw) / 2, w + 2 * fw, fw }, { 0, -(h + fw) / 2, w + 2 * fw, fw },
+            { -(w + fw) / 2, 0, fw, h }, { (w + fw) / 2, 0, fw, h },
+        }
+        for _, r in ipairs(rails) do
+            cpart("PaintingFrame", Vector3.new(r[3], r[4], 0.34), cf * CFrame.new(r[1], r[2], -0.17), GILT, M.Metal, parent,
+                merge(DECOR, { Reflectance = 0.06 }))
+        end
+        -- inner lip: a darker gilt bead, a step proud of the canvas
+        local lp = 0.1
+        local lips = {
+            { 0, (h - lp) / 2, w, lp }, { 0, -(h - lp) / 2, w, lp },
+            { -(w - lp) / 2, 0, lp, h - 2 * lp }, { (w - lp) / 2, 0, lp, h - 2 * lp },
+        }
+        for _, r in ipairs(lips) do
+            cpart("PaintingLip", Vector3.new(r[3], r[4], 0.1), cf * CFrame.new(r[1], r[2], -0.2), GILT_DK, M.Metal, parent, NOSHADOW)
+        end
+    end
+    local m = Instance.new("Model")
+    m.Name = "PaintingCanvas"
+    local depth = (opts.frame == false) and 0.12 or 0.05
+    local canvas = cpart("Canvas", Vector3.new(w, h, depth), cf * CFrame.new(0, 0, -(0.11 + depth / 2)),
+        Color3.fromRGB(240, 236, 228), M.Fabric, m, NOSHADOW)
     -- LightInfluence 1: art sits in the dark like everything else and only
     -- reads where a lamp reaches it
     local g = surface(canvas, Enum.NormalId.Front, 30, 1, 1)
-    local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = pal[1], ClipsDescendants = true }, g)
-    local aspect = h / w
-    for i = 1, 5 do
-        local s = rng:NextNumber(0.25, 0.7)
-        local shape = frame({
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.fromScale(rng:NextNumber(0.15, 0.85), rng:NextNumber(0.15, 0.85)),
-            BackgroundColor3 = pal[(i % 3) + 2],
-            BackgroundTransparency = rng:NextNumber(0, 0.25),
-        }, bg)
-        local kind = rng:NextInteger(1, 3)
-        if kind == 1 then          -- circle
-            shape.Size = UDim2.fromScale(s * aspect, s)
-            round(shape)
-        elseif kind == 2 then      -- slab
-            shape.Size = UDim2.fromScale(s * 0.9, s * 0.35)
-            shape.Rotation = rng:NextNumber(-35, 35)
-        else                       -- bar
-            shape.Size = UDim2.fromScale(0.06, s * 1.3)
-            shape.Rotation = rng:NextNumber(-60, 60)
-        end
-    end
-    return canvas
+    paintArt(g, opts.style or ART_STYLES[(seed % #ART_STYLES) + 1], seed, h / w)
+    m.PrimaryPart = canvas
+    m.Parent = opts.canvasParent or parent
+    return m
 end
 
 -- picture light above a painting (a small brass bar with a soft downward spot)
@@ -996,102 +1171,647 @@ function VillaBuilder:_terrace(f)
     end
 end
 
--- ── loot piles (visual = just the pile; pallets/plinths stay) ───────────
+-- ──────────────────────────────────────────────
+-- 💰 v3 LOOT "THE SCORE" (docs/V3_SPEC.md §2). Every lootSpot:
+--   { kind, pool, cframe = where you STAND (looking at the loot), visual = what
+--     LootService hides when it's bagged, interact, heavy, fragile, hidden,
+--     target, inVault }
+-- pools = rooms, so the shuffle + jackpot read as places:
+--   "hall" · "gallery" · "office" · "bedroom" · "cellar" · "vault"
+-- The furniture a thing sits on (frames, pallets, dollies, plinths, the rack)
+-- is static; only the valuable itself is in `visual`.
+-- ──────────────────────────────────────────────
 local function lootCF(stand, pile)
     return CFrame.lookAt(stand, Vector3.new(pile.X, stand.Y, pile.Z))
 end
 
-local CASH_A, CASH_B = Color3.fromRGB(86, 160, 96), Color3.fromRGB(104, 176, 110)
+-- stand / at are floor points (x, z); at = the loot itself
+local function addLoot(list, kind, pool, sx, sz, ax, az, visual, flags)
+    local e = {
+        kind = kind, pool = pool, visual = visual,
+        cframe = lootCF(Vector3.new(sx, FLOOR, sz), Vector3.new(ax, 0, az)),
+        heavy = false, fragile = false, hidden = false, inVault = false,
+    }
+    for k, v in pairs(flags or {}) do e[k] = v end
+    if visual then
+        visual:SetAttribute("LootKind", kind)
+        visual:SetAttribute("LootPool", pool)
+    end
+    table.insert(list, e)
+    return e
+end
 
-local function cashPile(f, loot, cx, cz, standPos)
-    box("CashPallet", cx - 1.2, FLOOR, cz - 1.1, cx + 1.2, FLOOR + 0.45, cz + 1.1, Color3.fromRGB(150, 118, 78), M.WoodPlanks, f)
-    local m = Instance.new("Model")
-    m.Name = "CashPile"
-    local bw, bh, bd = 1.05, 0.42, 0.62
-    for layer = 0, 2 do
-        for ix = 0, 1 do
-            for iz = 0, 2 do
-                if not (layer == 2 and ix == 1 and iz == 2) then
-                    local x = cx - 0.55 + ix * 1.1
-                    local z = cz - 0.68 + iz * 0.68
-                    local y0 = FLOOR + 0.45 + layer * bh
-                    box("CashBrick", x - bw / 2, y0, z - bd / 2, x + bw / 2, y0 + bh, z + bd / 2,
-                        ((ix + iz + layer) % 2 == 0) and CASH_A or CASH_B, M.Fabric, m)
-                end
+-- ── secret-stash plumbing ──
+-- Every BasePart / Light / SurfaceGui under `instances` starts HIDDEN (it only
+-- exists on the ~1-in-20 runs the stash is out). reveal(true|false) shows or
+-- hides it and runs cover(show) — the painting swings open, the rug folds back.
+-- Each part's real look is kept in attributes StashT / StashC / StashQ.
+local function stashReveal(instances, cover)
+    local parts, fx = {}, {}
+    local function add(p)
+        p:SetAttribute("StashT", p.Transparency)
+        p:SetAttribute("StashC", p.CanCollide)
+        p:SetAttribute("StashQ", p.CanQuery)
+        table.insert(parts, p)
+    end
+    for _, inst in ipairs(instances) do
+        if inst:IsA("BasePart") then add(inst) end
+        for _, d in ipairs(inst:GetDescendants()) do
+            if d:IsA("BasePart") then
+                add(d)
+            elseif d:IsA("Light") or d:IsA("SurfaceGui") then
+                table.insert(fx, d)
             end
         end
     end
-    m.Parent = f
-    table.insert(loot, { kind = "Cash", cframe = lootCF(standPos, Vector3.new(cx, 0, cz)), visual = m })
+    local shown = nil
+    local function reveal(show)
+        show = show == true
+        if shown == show then return end
+        shown = show
+        for _, p in ipairs(parts) do
+            p.Transparency = show and p:GetAttribute("StashT") or 1
+            p.CanCollide = show and p:GetAttribute("StashC") or false
+            p.CanQuery = show and p:GetAttribute("StashQ") or false
+        end
+        for _, d in ipairs(fx) do d.Enabled = show end
+        if cover then cover(show) end
+    end
+    reveal(false)
+    return reveal
 end
 
-local function goldPile(f, loot, cx, cz, standPos)
-    box("GoldShelf", cx - 1.2, FLOOR, cz - 1.0, cx + 1.2, FLOOR + 0.6, cz + 1.0, STEEL, M.Metal, f)
-    local m = Instance.new("Model")
-    m.Name = "GoldPile"
-    local base = FLOOR + 0.6
-    local layers = {
-        { xs = { -0.55, 0.55 }, zs = { -0.6, 0, 0.6 } },
-        { xs = { -0.55, 0.55 }, zs = { -0.3, 0.3 } },
-        { xs = { 0 },           zs = { -0.3, 0.3 } },
-        { xs = { 0 },           zs = { 0 } },
-    }
-    for li, L in ipairs(layers) do
-        local y0 = base + (li - 1) * 0.36
-        for _, dx in ipairs(L.xs) do
-            for _, dz in ipairs(L.zs) do
-                box("GoldBar", cx + dx - 0.5, y0, cz + dz - 0.25, cx + dx + 0.5, y0 + 0.36, cz + dz + 0.25,
-                    GOLD, M.Metal, m, { Reflectance = 0.25 })
-            end
+-- swing a set of parts about a vertical hinge: returns function(open)
+local function hinged(inst, hinge, angle)
+    local orig = {}
+    local list = inst:IsA("BasePart") and { inst } or {}
+    for _, d in ipairs(inst:GetDescendants()) do
+        if d:IsA("BasePart") then table.insert(list, d) end
+    end
+    for _, p in ipairs(list) do orig[p] = p.CFrame end
+    local h = CFrame.new(hinge)
+    local swing = h * CFrame.Angles(0, angle, 0) * h:Inverse()
+    return function(open)
+        for p, cf in pairs(orig) do
+            p.CFrame = open and (swing * cf) or cf
         end
     end
-    m.Parent = f
-    table.insert(loot, { kind = "Gold", cframe = lootCF(standPos, Vector3.new(cx, 0, cz)), visual = m })
 end
 
-local function diamondCase(f, loot, cx, cz, standPos)
-    box("DiamondPlinth", cx - 1.1, FLOOR, cz - 0.9, cx + 1.1, FLOOR + 1.4, cz + 0.9, MARBLE_DK, M.Marble, f)
-    box("DiamondCase", cx - 1.0, FLOOR + 1.4, cz - 0.8, cx + 1.0, FLOOR + 2.9, cz + 0.8, Color3.fromRGB(210, 235, 240), M.Glass, f,
-        { Transparency = 0.7, Reflectance = 0.15 })
-    local m = Instance.new("Model")
-    m.Name = "DiamondPile"
-    box("Cushion", cx - 0.85, FLOOR + 1.4, cz - 0.65, cx + 0.85, FLOOR + 1.6, cz + 0.65, Color3.fromRGB(36, 34, 86), M.Fabric, m)
-    local gems = {
-        { 0, 0, 0.5 }, { -0.5, -0.3, 0.32 }, { 0.5, -0.25, 0.34 }, { -0.45, 0.35, 0.3 }, { 0.45, 0.35, 0.3 }, { 0.05, 0.45, 0.26 },
-    }
-    local big
-    for i, g in ipairs(gems) do
-        local p = ball("Diamond", Vector3.new(cx + g[1], FLOOR + 1.6 + g[3] / 2, cz + g[2]), g[3],
-            Color3.fromRGB(120, 235, 255), M.Neon, m, NOSHADOW)
-        if i == 1 then big = p end
-    end
-    pointLight(big, Color3.fromRGB(110, 220, 255), 1.2, 8, false)
-    m.Parent = f
-    table.insert(loot, { kind = "Diamonds", cframe = lootCF(standPos, Vector3.new(cx, 0, cz)), visual = m })
+local CASH_A, CASH_B = Color3.fromRGB(94, 148, 96), Color3.fromRGB(112, 164, 106)
+local BAND = Color3.fromRGB(236, 230, 208)
+local GOLD_LITE = Color3.fromRGB(250, 208, 96)
+local GOLD_DEEP = Color3.fromRGB(176, 128, 36)
+local GOLD_M = { Reflectance = 0.25 }
+
+-- a banded bundle of notes (loose cash in the stashes)
+local function cashBundle(parent, cf, w, h, d)
+    w, h, d = w or 0.95, h or 0.3, d or 0.45
+    cpart("CashBundle", Vector3.new(w, h, d), cf, CASH_A, M.Fabric, parent, NOSHADOW)
+    cpart("CashBand", Vector3.new(0.16, h + 0.02, d + 0.02), cf, BAND, M.Fabric, parent, NOSHADOW)
 end
 
--- small cash stack on any surface (outer-room loot — grabbable without the vault)
-local function cashStack(f, loot, pos, standPos, n)
+-- ── 🎵 GOLD RECORD: a framed shadow box (the whole box comes off the wall) ──
+local function goldRecord(parent, pos, normal, info)
+    local cf = CFrame.lookAt(pos, pos + normal)
     local m = Instance.new("Model")
-    m.Name = "CashStack"
-    for i = 0, n - 1 do
-        local lx = (i % 2) * 1.1 - 0.55
-        local ly = math.floor(i / 2) * 0.42
-        box("CashBrick", pos.X + lx - 0.5, pos.Y + ly, pos.Z - 0.3, pos.X + lx + 0.5, pos.Y + ly + 0.4, pos.Z + 0.3,
-            (i % 2 == 0) and CASH_A or CASH_B, M.Fabric, m)
-        box("CashBand", pos.X + lx - 0.12, pos.Y + ly - 0.01, pos.Z - 0.31, pos.X + lx + 0.12, pos.Y + ly + 0.41, pos.Z + 0.31,
-            Color3.fromRGB(240, 236, 220), M.Fabric, m, NOSHADOW)
+    m.Name = "GoldRecord"
+    local W, H, D, fw = 2.7, 3.3, 0.36, 0.2
+    local LACQ = Color3.fromRGB(22, 20, 24)
+    cpart("RecordBack", Vector3.new(W, H, 0.08), cf * CFrame.new(0, 0, -0.04), Color3.fromRGB(14, 14, 18), M.Fabric, m, NOSHADOW)
+    for _, r in ipairs({ { 0, (H - fw) / 2, W, fw }, { 0, -(H - fw) / 2, W, fw },
+        { -(W - fw) / 2, 0, fw, H - 2 * fw }, { (W - fw) / 2, 0, fw, H - 2 * fw } }) do
+        cpart("RecordFrame", Vector3.new(r[3], r[4], D), cf * CFrame.new(r[1], r[2], -D / 2), LACQ, M.Wood, m,
+            merge(DECOR, { Reflectance = 0.12 }))
     end
-    m.Parent = f
-    table.insert(loot, { kind = "Cash", cframe = lootCF(standPos, pos), visual = m, inVault = false })
+    local c = (cf * CFrame.new(0, 0.32, -0.14)).Position
+    disc("RecordDisc", c, normal, 0.05, 2.1, GOLD, M.Metal, m, merge(NOSHADOW, { Reflectance = 0.35 }))
+    for i, dia in ipairs({ 1.8, 1.4 }) do   -- groove bands catch the light differently
+        disc("RecordGroove", c + normal * (0.026 + i * 0.002), normal, 0.01, dia, GOLD_DEEP, M.Metal, m,
+            merge(NOSHADOW, { Reflectance = 0.3 }))
+        disc("RecordGroove", c + normal * (0.027 + i * 0.002), normal, 0.01, dia - 0.12, GOLD, M.Metal, m,
+            merge(NOSHADOW, { Reflectance = 0.35 }))
+    end
+    disc("RecordLabel", c + normal * 0.036, normal, 0.012, 0.72, info.label, M.Fabric, m, NOSHADOW)
+    disc("RecordSpindle", c + normal * 0.04, normal, 0.012, 0.09, Color3.fromRGB(20, 20, 22), M.Metal, m, NOSHADOW)
+    local plq = cpart("RecordPlaque", Vector3.new(1.9, 0.6, 0.04), cf * CFrame.new(0, -1.1, -0.1), BRASS, M.Metal, m, NOSHADOW)
+    local g = surface(plq, Enum.NormalId.Front, 60, 1, 1)
+    text({ Text = info.title, Size = UDim2.fromScale(0.9, 0.42), Position = UDim2.fromScale(0.05, 0.08),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
+        TextColor3 = Color3.fromRGB(46, 34, 16) }, g)
+    text({ Text = info.sub, Size = UDim2.fromScale(0.9, 0.28), Position = UDim2.fromScale(0.05, 0.6),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.medium,
+        TextColor3 = Color3.fromRGB(70, 54, 28) }, g)
+    cpart("RecordGlass", Vector3.new(W - 2 * fw, H - 2 * fw, 0.03), cf * CFrame.new(0, 0, -(D - 0.05)),
+        Color3.fromRGB(220, 232, 238), M.Glass, m, merge(NOSHADOW, { Transparency = 0.88, Reflectance = 0.18 }))
+    m.Parent = parent
     return m
+end
+
+-- walnut hi-fi console under the records (decor). Against a wall at z = zb,
+-- front faces +Z. Open middle bay full of record sleeves, turntable on top.
+local function recordConsole(parent, x0, x1, zb, zf)
+    local top = FLOOR + 2.4
+    local mid0, mid1 = x0 + 1.6, x1 - 1.6
+    for _, c in ipairs({ { x0, mid0 }, { mid1, x1 } }) do
+        box("ConsoleCab", c[1], FLOOR + 0.4, zb, c[2], top, zf, WALNUT, M.Wood, parent)
+        box("SpeakerCloth", c[1] + 0.2, FLOOR + 0.6, zf, c[2] - 0.2, top - 0.2, zf + 0.03,
+            Color3.fromRGB(150, 128, 98), M.Fabric, parent, NOSHADOW)
+    end
+    box("ConsoleBack", mid0, FLOOR + 0.4, zb, mid1, top, zb + 0.1, WALNUT_DK, M.Wood, parent)
+    box("ConsoleShelf", mid0, FLOOR + 0.4, zb, mid1, FLOOR + 0.55, zf, WALNUT_DK, M.Wood, parent)
+    box("ConsoleTop", x0 - 0.06, top, zb, x1 + 0.06, top + 0.14, zf + 0.06, WALNUT_DK, M.WoodPlanks, parent)
+    for _, x in ipairs({ x0 + 0.3, x1 - 0.3 }) do
+        for _, z in ipairs({ zb + 0.3, zf - 0.3 }) do
+            vcyl("ConsoleLeg", x, FLOOR, FLOOR + 0.4, z, 0.16, BRASS, M.Metal, parent, DECOR)
+        end
+    end
+    local sleeves = { Color3.fromRGB(200, 60, 80), Color3.fromRGB(30, 30, 36), Color3.fromRGB(240, 200, 80),
+        Color3.fromRGB(60, 140, 170), Color3.fromRGB(236, 226, 206), Color3.fromRGB(120, 50, 130) }
+    local n = math.floor((mid1 - mid0 - 0.3) / 0.2)
+    for k = 0, n - 1 do
+        local x = mid0 + 0.2 + k * 0.2
+        box("RecordSleeve", x, FLOOR + 0.55, zb + 0.2, x + 0.05, FLOOR + 1.95 - (k % 3) * 0.06, zf - 0.1,
+            sleeves[(k % #sleeves) + 1], M.Fabric, parent, NOSHADOW)
+    end
+    -- turntable
+    local tx, tz = x0 + 1.0, (zb + zf) / 2
+    local t2 = top + 0.14
+    box("TurntablePlinth", tx - 0.8, t2, tz - 0.65, tx + 0.8, t2 + 0.18, tz + 0.65, WALNUT_DK, M.Wood, parent, DECOR)
+    vcyl("Platter", tx - 0.12, t2 + 0.18, t2 + 0.24, tz, 1.1, Color3.fromRGB(18, 18, 20), M.Rubber, parent, DECOR)
+    vcyl("PlatterSpindle", tx - 0.12, t2 + 0.24, t2 + 0.34, tz, 0.06, STEEL_LITE, M.Metal, parent, DECOR)
+    cpart("Tonearm", Vector3.new(0.05, 0.05, 0.9), CFrame.new(tx + 0.55, t2 + 0.34, tz + 0.05) * CFrame.Angles(0, math.rad(18), 0),
+        STEEL_LITE, M.Metal, parent, NOSHADOW)
+end
+
+-- ── 🍷 WINE (fragile): three RESERVE niches in the pantry wine wall ──
+local BOTTLE = { Color3.fromRGB(30, 56, 36), Color3.fromRGB(46, 28, 24), Color3.fromRGB(22, 38, 30) }
+local FOILS = { GOLD, Color3.fromRGB(128, 24, 40), Color3.fromRGB(26, 26, 30), Color3.fromRGB(210, 206, 196) }
+
+-- an upright bottle standing on y0 (visual parts go in `parent`)
+local function uprightBottle(parent, x, y0, z, glass, foil)
+    local bh, bd = 0.95, 0.4
+    vcyl("BottleBody", x, y0, y0 + bh, z, bd, glass, M.Glass, parent, { Transparency = 0.12, Reflectance = 0.15 })
+    ball("BottleShoulder", Vector3.new(x, y0 + bh, z), bd, glass, M.Glass, parent, { Transparency = 0.12, Reflectance = 0.15 })
+    vcyl("BottleNeck", x, y0 + bh + 0.15, y0 + bh + 0.5, z, 0.16, foil, M.Metal, parent, merge(NOSHADOW, { Reflectance = 0.2 }))
+    cpart("BottleLabel", Vector3.new(0.34, 0.42, 0.02), CFrame.new(x, y0 + 0.45, z + bd / 2 + 0.005),
+        Color3.fromRGB(240, 230, 204), M.Fabric, parent, NOSHADOW)
+    cpart("BottleLabelBand", Vector3.new(0.34, 0.07, 0.022), CFrame.new(x, y0 + 0.55, z + bd / 2 + 0.006),
+        foil, M.Metal, parent, NOSHADOW)
+end
+
+function VillaBuilder:_wineWall(f, loot)
+    local w = sub(f, "WineWall")
+    local x0, x1, zb, zf = 32.6, 41.5, -57.5, -56.0
+    local yt = 9.1
+    local bandLo, bandHi = 3.55, 5.35       -- the RESERVE band (loot niches)
+    box("RackBack", x0, FLOOR, zb, x1, yt, zb + 0.12, WALNUT_DK, M.Wood, w)
+    box("RackSide", x0 - 0.16, FLOOR, zb, x0, yt, zf, WALNUT, M.Wood, w)
+    box("RackPlinth", x0 - 0.16, FLOOR, zb, x1, FLOOR + 0.35, zf + 0.04, WALNUT_DK, M.Wood, w)
+    box("RackCornice", x0 - 0.3, yt, zb, x1, yt + 0.4, zf + 0.18, WALNUT, M.Wood, w)
+    local shelves = { 0.85, 1.75, 2.65, bandLo, bandHi, 6.25, 7.15, 8.05, yt - 0.02 }
+    for _, y in ipairs(shelves) do
+        box("RackShelf", x0, y - 0.1, zb, x1, y, zf, WALNUT, M.Wood, w)
+    end
+    local cols = 8
+    local cw = (x1 - x0) / cols
+    for i = 1, cols - 1 do
+        local x = x0 + i * cw
+        box("RackPost", x - 0.06, FLOOR + 0.35, zb, x + 0.06, bandLo - 0.1, zf, WALNUT, M.Wood, w)
+        box("RackPost", x - 0.06, bandHi, zb, x + 0.06, yt, zf, WALNUT, M.Wood, w)
+    end
+    -- decor bottles lying in the cubbies, necks out (not every hole is full)
+    local rng = Random.new(1961)
+    local rows = { { 0.85, 1.75 }, { 1.75, 2.65 }, { 2.65, bandLo }, { bandHi, 6.25 }, { 6.25, 7.15 }, { 7.15, 8.05 }, { 8.05, yt } }
+    for _, r in ipairs(rows) do
+        for i = 0, cols - 1 do
+            if rng:NextNumber() < 0.72 then
+                local x, y = x0 + (i + 0.5) * cw, (r[1] + r[2]) / 2 - 0.05
+                local glass = BOTTLE[rng:NextInteger(1, #BOTTLE)]
+                cpart("RackBottle", Vector3.new(1.0, 0.4, 0.4), CFrame.new(x, y, zb + 0.72) * CFrame.Angles(0, math.rad(90), 0),
+                    glass, M.Glass, w, merge(NOSHADOW, { Shape = Enum.PartType.Cylinder, Transparency = 0.12, Reflectance = 0.12 }))
+                cpart("RackBottleNeck", Vector3.new(0.5, 0.16, 0.16), CFrame.new(x, y, zb + 1.43) * CFrame.Angles(0, math.rad(90), 0),
+                    FOILS[rng:NextInteger(1, #FOILS)], M.Metal, w, merge(NOSHADOW, { Shape = Enum.PartType.Cylinder }))
+            end
+        end
+    end
+    -- the RESERVE niches: velvet back, brass dividers, a warm LED strip, a plaque each
+    local vint = { { "CHÂTEAU ROSA", "1961" }, { "VIÑA DEL MAR", "1978" }, { "GRAN RESERVA", "1985" } }
+    local nw = (x1 - x0) / 3
+    box("ReserveVelvet", x0, bandLo, zb + 0.12, x1, bandHi - 0.1, zb + 0.16, Color3.fromRGB(96, 20, 36), M.Fabric, w, NOSHADOW)
+    for i = 1, 2 do
+        local x = x0 + i * nw
+        box("ReserveDivider", x - 0.08, bandLo, zb, x + 0.08, bandHi - 0.1, zf, WALNUT_DK, M.Wood, w)
+        box("ReserveTrim", x - 0.1, bandLo, zf - 0.02, x + 0.1, bandHi - 0.1, zf + 0.02, BRASS, M.Metal, w, NOSHADOW)
+    end
+    local strip = box("ReserveLED", x0 + 0.1, bandHi - 0.16, zf - 0.3, x1 - 0.1, bandHi - 0.12, zf - 0.22, WARM, M.Neon, w, NOSHADOW)
+    pointLight(strip, LAMP_WARM, 0.55, 6, false)
+    for i = 0, 2 do
+        local nx = x0 + (i + 0.5) * nw
+        local m = Instance.new("Model")
+        m.Name = "WineReserve"
+        for k = -1, 1 do
+            uprightBottle(m, nx + k * 0.72, bandLo, zb + 0.75 + math.abs(k) * 0.12, BOTTLE[(i + k + 3) % 3 + 1], (i == 1) and FOILS[2] or GOLD)
+        end
+        m.Parent = w
+        local plq = box("ReservePlaque", nx - 0.7, bandLo - 0.34, zf, nx + 0.7, bandLo - 0.1, zf + 0.04, BRASS, M.Metal, w, NOSHADOW)
+        local g = surface(plq, Enum.NormalId.Back, 60, 1, 1)
+        text({ Text = vint[i + 1][1] .. "  " .. vint[i + 1][2], Size = UDim2.fromScale(0.92, 0.8), Position = UDim2.fromScale(0.04, 0.1),
+            TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold,
+            TextColor3 = Color3.fromRGB(46, 34, 16) }, g)
+        addLoot(loot, "Wine", "cellar", nx, -53.9, nx, zb + 0.8, m, { fragile = true })
+    end
+    -- a warm wall light over the nook (the pantry corner stays mostly dark)
+    box("WineSconce", 36.7, 10.3, zb, 37.4, 10.9, zb + 0.35, BRASS, M.Metal, w, DECOR)
+    local b = ball("WineSconceBulb", Vector3.new(37.05, 10.2, zb + 0.4), 0.28, LAMP_WARM, M.Neon, w, NOSHADOW)
+    spotLight(b, Enum.NormalId.Bottom, LAMP_WARM, 0.9, 12, 80, true)
+end
+
+-- ── 🔐 BEDROOM SAFE: an old green floor safe; the JewelryBox is inside ──
+-- (visual = the door + the box, so once it's cracked the safe stands open + empty)
+function VillaBuilder:_bedroomSafe(f, loot)
+    local s = sub(f, "Safe")
+    local x0, x1 = -22.6, -20.0
+    local zb, zf = -70.5, -72.9          -- back against the south wall, door faces north (-Z)
+    local y0, y1 = FLOOR, FLOOR + 3.4
+    local BODY = Color3.fromRGB(40, 62, 54)
+    box("SafeBase", x0 - 0.1, y0, zf - 0.1, x1 + 0.1, y0 + 0.3, zb, Color3.fromRGB(26, 28, 30), M.Metal, s)
+    box("SafeBack", x0, y0 + 0.3, zb - 0.25, x1, y1, zb, BODY, M.Metal, s)
+    box("SafeSide", x0, y0 + 0.3, zf, x0 + 0.25, y1, zb, BODY, M.Metal, s)
+    box("SafeSide", x1 - 0.25, y0 + 0.3, zf, x1, y1, zb, BODY, M.Metal, s)
+    box("SafeTop", x0, y1 - 0.25, zf, x1, y1, zb, BODY, M.Metal, s)
+    box("SafeFloor", x0, y0 + 0.3, zf, x1, y0 + 0.55, zb, BODY, M.Metal, s)
+    box("SafeLining", x0 + 0.25, y0 + 0.55, zb - 0.28, x1 - 0.25, y1 - 0.25, zb - 0.25, Color3.fromRGB(120, 24, 40), M.Fabric, s, NOSHADOW)
+    box("SafeShelf", x0 + 0.25, 2.05, zf + 0.1, x1 - 0.25, 2.15, zb - 0.25, STEEL_LITE, M.Metal, s)
+    box("SafeTrim", x0 - 0.02, y1 - 0.12, zf - 0.02, x1 + 0.02, y1 - 0.02, zb, BRASS, M.Metal, s, NOSHADOW)
+    local maker = box("SafeMaker", (x0 + x1) / 2 - 0.7, y1 - 0.55, zf - 0.03, (x0 + x1) / 2 + 0.7, y1 - 0.3, zf, BRASS, M.Metal, s, NOSHADOW)
+    signText(maker, Enum.NormalId.Front, "ROSA & CO · 1924", Color3.fromRGB(46, 34, 16), 60, 1)
+    for _, y in ipairs({ 1.4, 3.0 }) do
+        vcyl("SafeHinge", x0 + 0.08, y, y + 0.45, zf - 0.08, 0.18, BRASS, M.Metal, s, DECOR)
+    end
+
+    local m = Instance.new("Model")
+    m.Name = "JewelryBox"
+    local cx, cy = (x0 + x1) / 2, (y0 + 0.55 + y1 - 0.25) / 2
+    box("SafeDoor", x0 + 0.05, y0 + 0.58, zf - 0.14, x1 - 0.05, y1 - 0.28, zf + 0.02, BODY, M.Metal, m)
+    -- recessed panel line + gold pinstripe (painted safes of the 1920s)
+    local pd = box("SafeDoorPanel", x0 + 0.3, y0 + 0.85, zf - 0.16, x1 - 0.3, y1 - 0.55, zf - 0.14, BODY:Lerp(BLACK, 0.12), M.Metal, m, NOSHADOW)
+    local pg = surface(pd, Enum.NormalId.Front, 40, 1, 1)
+    local stripe = frame({ Size = UDim2.fromScale(0.9, 0.92), Position = UDim2.fromScale(0.05, 0.04), BackgroundTransparency = 1 }, pg)
+    local st = Instance.new("UIStroke")
+    st.Color = GOLD
+    st.Thickness = 2
+    st.Parent = stripe
+    local dc = Vector3.new(cx, cy + 0.35, zf - 0.17)
+    disc("DialFace", dc, NZ, 0.05, 0.9, Color3.fromRGB(20, 20, 22), M.Metal, m, NOSHADOW)
+    disc("DialRing", dc + NZ * 0.03, NZ, 0.03, 0.82, STEEL_LITE, M.Metal, m, NOSHADOW)
+    disc("DialKnob", dc + NZ * 0.1, NZ, 0.16, 0.46, BRASS, M.Metal, m, merge(NOSHADOW, { Reflectance = 0.2 }))
+    local hc = Vector3.new(cx, cy - 0.55, zf - 0.2)
+    disc("HandleHub", hc, NZ, 0.12, 0.26, STEEL_LITE, M.Metal, m, NOSHADOW)
+    for k = 0, 2 do
+        cpart("HandleSpoke", Vector3.new(0.08, 0.7, 0.08), CFrame.new(hc + NZ * 0.1) * CFrame.Angles(0, 0, math.rad(k * 120)),
+            STEEL_LITE, M.Metal, m, NOSHADOW)
+    end
+    -- the jewellery box on the shelf inside (burgundy leather, lid up, pearls + stones)
+    local jz = (zf + zb) / 2 - 0.1
+    box("JewelBoxBody", cx - 0.6, 2.15, jz - 0.4, cx + 0.6, 2.6, jz + 0.4, Color3.fromRGB(110, 26, 48), M.Leather, m)
+    box("JewelBoxVelvet", cx - 0.52, 2.6, jz - 0.32, cx + 0.52, 2.62, jz + 0.32, Color3.fromRGB(30, 22, 40), M.Fabric, m, NOSHADOW)
+    cpart("JewelBoxLid", Vector3.new(1.2, 0.8, 0.08), CFrame.new(cx, 2.95, jz + 0.44) * CFrame.Angles(math.rad(-12), 0, 0),
+        Color3.fromRGB(110, 26, 48), M.Leather, m, NOSHADOW)
+    for k = 0, 6 do
+        ball("Pearl", Vector3.new(cx - 0.45 + k * 0.15, 2.7, jz - 0.15 + math.sin(k * 0.9) * 0.08), 0.13,
+            Color3.fromRGB(246, 240, 232), M.SmoothPlastic, m, NOSHADOW)
+    end
+    local gems = { Color3.fromRGB(220, 30, 70), Color3.fromRGB(40, 190, 110), Color3.fromRGB(60, 110, 240), Color3.fromRGB(230, 240, 255) }
+    for k, c in ipairs(gems) do
+        cpart("Gem", Vector3.new(0.16, 0.16, 0.16), CFrame.new(cx - 0.35 + k * 0.17, 2.72, jz + 0.12) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+            c, M.Glass, m, merge(NOSHADOW, { Transparency = 0.1, Reflectance = 0.45 }))
+    end
+    m.Parent = s
+    addLoot(loot, "JewelryBox", "bedroom", cx, -75.6, cx, (zf + zb) / 2, m, { interact = "dial" })
+end
+
+-- ── 🕳 SECRET STASH #1: the wall safe behind the office painting ──
+function VillaBuilder:_officeStash(f, loot)
+    local s = sub(f, "WallStash")
+    local px, py = -28, 8.3
+    local wz = -38.5                         -- the wall's interior face; room is -Z
+    local art = Instance.new("Model")
+    art.Name = "StashPainting"
+    painting(art, Vector3.new(px, py, wz), NZ, 3.4, 2.6, 24, { style = "fields" })
+    art.Parent = s
+    -- the hidden safe: 2 x 2 steel box set into the wall, door swung open
+    local x0, x1, y0, y1, z0 = px - 1.0, px + 1.0, py - 1.0, py + 1.0, wz - 0.6
+    local shell = Instance.new("Model")
+    shell.Name = "WallSafe"
+    local SAFE = Color3.fromRGB(58, 62, 68)
+    box("WallSafeBack", x0, y0, wz - 0.08, x1, y1, wz, Color3.fromRGB(30, 30, 34), M.Metal, shell)
+    box("WallSafeSide", x0, y0, z0, x0 + 0.12, y1, wz, SAFE, M.Metal, shell)
+    box("WallSafeSide", x1 - 0.12, y0, z0, x1, y1, wz, SAFE, M.Metal, shell)
+    box("WallSafeTop", x0, y1 - 0.12, z0, x1, y1, wz, SAFE, M.Metal, shell)
+    box("WallSafeBottom", x0, y0, z0, x1, y0 + 0.12, wz, SAFE, M.Metal, shell)
+    -- door: hinged on the east edge (x1), swung 110° out into the room
+    local hinge = Vector3.new(x1, py, z0)
+    local dcf = CFrame.new(hinge) * CFrame.Angles(0, math.rad(-110), 0) * CFrame.new(-1.0, 0, -0.07)
+    cpart("WallSafeDoor", Vector3.new(2.0, 2.0, 0.14), dcf, SAFE, M.Metal, shell, NOSHADOW)
+    disc("WallSafeDial", (dcf * CFrame.new(0, 0.1, -0.1)).Position, dcf.LookVector, 0.06, 0.55, BRASS, M.Metal, shell, NOSHADOW)
+    shell.Parent = s
+    -- the stash: bundles of cash, a stack of gold coins, a velvet pouch
+    local m = Instance.new("Model")
+    m.Name = "SecretStash"
+    local fy = y0 + 0.12
+    for k = 0, 2 do
+        cashBundle(m, CFrame.new(px - 0.4, fy + 0.15 + k * 0.3, wz - 0.3), 0.95, 0.28, 0.42)
+    end
+    for k = 0, 5 do
+        vcyl("GoldCoin", px + 0.45, fy + k * 0.07, fy + k * 0.07 + 0.06, wz - 0.3, 0.42, GOLD, M.Metal, m,
+            merge(NOSHADOW, { Reflectance = 0.3 }))
+    end
+    ball("VelvetPouch", Vector3.new(px + 0.4, fy + 0.72, wz - 0.28), 0.42, Color3.fromRGB(90, 30, 110), M.Fabric, m, NOSHADOW)
+    m.Parent = s
+    -- the painting swings off the wall on its east edge to show the safe
+    local swing = hinged(art, Vector3.new(px + 1.9, py, wz), math.rad(-95))
+    local e = addLoot(loot, "SecretStash", "office", px, -41.6, px, wz, m, { hidden = true })
+    e.reveal = stashReveal({ shell, m }, swing)
+end
+
+-- ── 🕳 SECRET STASH #2: a floor safe under the bedroom rug ──
+local function rugPattern(p, face, field, border, accent)
+    local g = surface(p, face, 12, 1, 1)
+    local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = border }, g)
+    local fld = frame({ Position = UDim2.fromScale(0.08, 0.08), Size = UDim2.fromScale(0.84, 0.84), BackgroundColor3 = field }, bg)
+    local st = Instance.new("UIStroke")
+    st.Color = accent
+    st.Thickness = 3
+    st.Parent = fld
+    for i, sz in ipairs({ 0.46, 0.32, 0.16 }) do
+        frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(sz, sz),
+            Rotation = 45, BackgroundColor3 = (i % 2 == 1) and accent or border, ZIndex = 2 + i }, fld)
+    end
+    for _, c in ipairs({ { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } }) do
+        frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(c[1], c[2]), Size = UDim2.fromScale(0.26, 0.26),
+            Rotation = 45, BackgroundColor3 = accent, ZIndex = 2 }, fld)
+    end
+    return g
+end
+
+function VillaBuilder:_rugStash(f, loot)
+    local s = sub(f, "RugStash")
+    local x0, x1, z0, z1 = -25.2, -20.4, -82.6, -77.2
+    local fold = -79.9
+    local FIELD, BORDER, ACCENT = Color3.fromRGB(128, 34, 44), Color3.fromRGB(34, 36, 62), Color3.fromRGB(214, 176, 110)
+    local RUG = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+    -- the whole rug, lying flat (what you see on 19 runs out of 20)
+    local full = box("BedroomRug", x0, FLOOR, z0, x1, FLOOR + 0.06, z1, FIELD, M.Carpet, s, RUG)
+    local fullGui = rugPattern(full, Enum.NormalId.Top, FIELD, BORDER, ACCENT)
+    -- revealed: the rug is pulled back — a shorter rug + the folded-over flap (jute side up)
+    local short = box("BedroomRugShort", x0, FLOOR, fold, x1, FLOOR + 0.06, z1, FIELD, M.Carpet, s, RUG)
+    rugPattern(short, Enum.NormalId.Top, FIELD, BORDER, ACCENT)
+    local flap = box("RugFlap", x0 + 0.05, FLOOR + 0.06, fold, x1 - 0.05, FLOOR + 0.12, fold + (fold - z0), Color3.fromRGB(176, 150, 110), M.Fabric, s, RUG)
+    cpart("RugCurl", Vector3.new(x1 - x0 - 0.1, 0.22, 0.22), CFrame.new((x0 + x1) / 2, FLOOR + 0.1, fold) * CFrame.Angles(0, 0, 0),
+        FIELD, M.Carpet, s, merge(RUG, { Shape = Enum.PartType.Cylinder }))
+    -- the floor safe (flush steel rim, lid standing open against the flap)
+    local hx0, hx1, hz0, hz1 = -23.8, -21.8, -82.2, -80.2
+    local RIM = Color3.fromRGB(70, 74, 80)
+    box("FloorSafeRim", hx0, FLOOR, hz0, hx1, FLOOR + 0.1, hz0 + 0.15, RIM, M.Metal, s, DECOR)
+    box("FloorSafeRim", hx0, FLOOR, hz1 - 0.15, hx1, FLOOR + 0.1, hz1, RIM, M.Metal, s, DECOR)
+    box("FloorSafeRim", hx0, FLOOR, hz0, hx0 + 0.15, FLOOR + 0.1, hz1, RIM, M.Metal, s, DECOR)
+    box("FloorSafeRim", hx1 - 0.15, FLOOR, hz0, hx1, FLOOR + 0.1, hz1, RIM, M.Metal, s, DECOR)
+    box("FloorSafeWell", hx0 + 0.15, FLOOR, hz0 + 0.15, hx1 - 0.15, FLOOR + 0.02, hz1 - 0.15, Color3.fromRGB(16, 16, 18), M.Metal, s, DECOR)
+    local lid = cpart("FloorSafeLid", Vector3.new(2.0, 0.12, 2.0),
+        CFrame.new((hx0 + hx1) / 2, FLOOR + 0.1, hz0) * CFrame.Angles(math.rad(-100), 0, 0) * CFrame.new(0, 0, 1.0),
+        RIM, M.DiamondPlate, s, DECOR)
+    disc("FloorSafeDial", (lid.CFrame * CFrame.new(0, 0.08, 0)).Position, lid.CFrame.UpVector, 0.05, 0.5, BRASS, M.Metal, s, DECOR)
+    local m = Instance.new("Model")
+    m.Name = "SecretStash"
+    local cx, cz = (hx0 + hx1) / 2, (hz0 + hz1) / 2
+    for k = 0, 3 do
+        cashBundle(m, CFrame.new(cx - 0.38 + (k % 2) * 0.76, FLOOR + 0.17 + math.floor(k / 2) * 0.3, cz - 0.3) * CFrame.Angles(0, math.rad(90), 0), 0.95, 0.28, 0.42)
+    end
+    -- a gold watch on top
+    local wcf = CFrame.new(cx + 0.35, FLOOR + 0.12, cz + 0.5)
+    cpart("WatchStrap", Vector3.new(0.9, 0.04, 0.2), wcf, GOLD, M.Metal, m, merge(NOSHADOW, GOLD_M))
+    cpart("WatchCase", Vector3.new(0.08, 0.36, 0.36), wcf * CFrame.new(0, 0.05, 0) * CFrame.Angles(0, 0, math.rad(90)), GOLD, M.Metal, m,
+        merge(NOSHADOW, { Shape = Enum.PartType.Cylinder, Reflectance = 0.3 }))
+    cpart("WatchFace", Vector3.new(0.02, 0.28, 0.28), wcf * CFrame.new(0, 0.1, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(236, 232, 220), M.Glass, m,
+        merge(NOSHADOW, { Shape = Enum.PartType.Cylinder, Reflectance = 0.2 }))
+    m.Parent = s
+    local function cover(show)
+        full.Transparency = show and 1 or 0
+        fullGui.Enabled = not show
+    end
+    local e = addLoot(loot, "SecretStash", "bedroom", cx, -78.4, cx, cz, m, { hidden = true })
+    e.reveal = stashReveal({ short, flap, s:FindFirstChild("RugCurl"), lid, m }, cover)
+    -- the rim/well/dial are part of the reveal too (they'd poke through the rug)
+    local extra = {}
+    for _, c in ipairs(s:GetChildren()) do
+        if c.Name == "FloorSafeRim" or c.Name == "FloorSafeWell" or c.Name == "FloorSafeDial" then table.insert(extra, c) end
+    end
+    local r1, r2 = e.reveal, stashReveal(extra)
+    e.reveal = function(show) r1(show); r2(show) end
+end
+
+-- ── 🏦 VAULT: shrink-wrapped cash pallets ──
+local PALLET_WOOD = Color3.fromRGB(168, 132, 88)
+local function cashPallet(parent, cx, cz)
+    for i = -1, 1 do
+        box("PalletRunner", cx - 1.3, FLOOR, cz + i * 0.95 - 0.22, cx + 1.3, FLOOR + 0.35, cz + i * 0.95 + 0.22,
+            PALLET_WOOD:Lerp(BLACK, 0.15), M.WoodPlanks, parent)
+    end
+    for i = 0, 4 do
+        local x = cx - 1.04 + i * 0.52
+        box("PalletDeck", x - 0.22, FLOOR + 0.35, cz - 1.2, x + 0.22, FLOOR + 0.47, cz + 1.2, PALLET_WOOD, M.WoodPlanks, parent)
+    end
+    local m = Instance.new("Model")
+    m.Name = "CashPallet"
+    local y0 = FLOOR + 0.47
+    for layer = 0, 3 do
+        local y = y0 + layer * 0.48
+        for ix = 0, 1 do
+            local x = cx - 0.62 + ix * 1.24
+            for iz = 0, 2 do
+                local z = cz - 0.8 + iz * 0.8
+                box("CashBrick", x - 0.6, y, z - 0.38, x + 0.6, y + 0.46, z + 0.38,
+                    ((ix + iz + layer) % 2 == 0) and CASH_A or CASH_B, M.Fabric, m, NOSHADOW)
+            end
+            -- a paper strap round each column of bricks
+            box("CashStrap", x - 0.12, y - 0.01, cz - 1.2, x + 0.12, y + 0.47, cz + 1.2, BAND, M.Fabric, m, NOSHADOW)
+        end
+    end
+    local top = y0 + 4 * 0.48
+    -- the shrink-wrap film (the solid part of the load) + two black plastic straps
+    box("ShrinkWrap", cx - 1.28, y0 - 0.02, cz - 1.22, cx + 1.28, top + 0.04, cz + 1.22,
+        Color3.fromRGB(226, 238, 244), M.Glass, m, { Transparency = 0.6, Reflectance = 0.25, CastShadow = false })
+    for _, z in ipairs({ cz - 0.55, cz + 0.55 }) do
+        box("PalletStrap", cx - 1.3, top + 0.04, z - 0.07, cx + 1.3, top + 0.08, z + 0.07, Color3.fromRGB(24, 24, 26), M.Plastic, m, NOSHADOW)
+        box("PalletStrap", cx - 1.32, FLOOR + 0.35, z - 0.07, cx - 1.28, top + 0.08, z + 0.07, Color3.fromRGB(24, 24, 26), M.Plastic, m, NOSHADOW)
+        box("PalletStrap", cx + 1.28, FLOOR + 0.35, z - 0.07, cx + 1.32, top + 0.08, z + 0.07, Color3.fromRGB(24, 24, 26), M.Plastic, m, NOSHADOW)
+    end
+    m.Parent = parent
+    return m
+end
+
+-- ── 🏦 VAULT: a neat cross-stacked pile of gold bars on a steel dolly ──
+local function goldStack(parent, cx, cz)
+    box("GoldDolly", cx - 1.35, FLOOR + 0.25, cz - 0.95, cx + 1.35, FLOOR + 0.45, cz + 0.95, STEEL, M.DiamondPlate, parent)
+    for _, dx in ipairs({ -1.1, 1.1 }) do
+        for _, dz in ipairs({ -0.7, 0.7 }) do
+            ball("DollyCaster", Vector3.new(cx + dx, FLOOR + 0.13, cz + dz), 0.26, Color3.fromRGB(30, 30, 34), M.Rubber, parent, DECOR)
+        end
+    end
+    local m = Instance.new("Model")
+    m.Name = "GoldBars"
+    local base = FLOOR + 0.45
+    local last
+    local function bar(x, layer, z, alongX)
+        local y = base + (layer - 1) * 0.27
+        local L, W, H = 1.0, 0.46, 0.2
+        cpart("GoldBar", alongX and Vector3.new(L, H, W) or Vector3.new(W, H, L), CFrame.new(cx + x, y + H / 2, cz + z),
+            GOLD, M.Metal, m, { Reflectance = 0.28 })
+        last = cpart("GoldBarTop", alongX and Vector3.new(L - 0.16, 0.07, W - 0.12) or Vector3.new(W - 0.12, 0.07, L - 0.16),
+            CFrame.new(cx + x, y + H + 0.035, cz + z), GOLD_LITE, M.Metal, m, merge(NOSHADOW, { Reflectance = 0.32 }))
+    end
+    for _, x in ipairs({ -0.52, 0.52 }) do for _, z in ipairs({ -0.5, 0, 0.5 }) do bar(x, 1, z, true) end end
+    for _, x in ipairs({ -0.75, -0.25, 0.25, 0.75 }) do bar(x, 2, 0, false) end
+    for _, x in ipairs({ -0.52, 0.52 }) do for _, z in ipairs({ -0.25, 0.25 }) do bar(x, 3, z, true) end end
+    for _, x in ipairs({ -0.25, 0.25 }) do bar(x, 4, 0, false) end
+    bar(0, 5, 0, true)
+    local g = surface(last, Enum.NormalId.Top, 60, 1, 1)
+    text({ Text = "999.9", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.bold,
+        TextColor3 = GOLD_DEEP }, g)
+    m.Parent = parent
+    return m
+end
+
+-- ── 🏦 VAULT: a velvet tray of cut diamonds on a marble display stand ──
+local function diamondTray(parent, cx, cz)
+    box("TrayStand", cx - 0.85, FLOOR, cz - 0.65, cx + 0.85, FLOOR + 2.6, cz + 0.65, MARBLE_DK, M.Marble, parent)
+    box("TrayStandCap", cx - 1.05, FLOOR + 2.6, cz - 0.85, cx + 1.05, FLOOR + 2.75, cz + 0.85, BRASS, M.Metal, parent)
+    local m = Instance.new("Model")
+    m.Name = "DiamondTray"
+    local top = FLOOR + 2.75
+    box("Tray", cx - 0.9, top, cz - 0.7, cx + 0.9, top + 0.08, cz + 0.7, Color3.fromRGB(18, 18, 24), M.Fabric, m)
+    box("TrayRim", cx - 0.95, top, cz - 0.75, cx + 0.95, top + 0.14, cz - 0.7, BRASS, M.Metal, m, NOSHADOW)
+    box("TrayRim", cx - 0.95, top, cz + 0.7, cx + 0.95, top + 0.14, cz + 0.75, BRASS, M.Metal, m, NOSHADOW)
+    box("TrayRim", cx - 0.95, top, cz - 0.7, cx - 0.9, top + 0.14, cz + 0.7, BRASS, M.Metal, m, NOSHADOW)
+    box("TrayRim", cx + 0.9, top, cz - 0.7, cx + 0.95, top + 0.14, cz + 0.7, BRASS, M.Metal, m, NOSHADOW)
+    local ICE = Color3.fromRGB(214, 240, 255)
+    local rng = Random.new(58)
+    for i = 0, 4 do
+        for j = 0, 3 do
+            if not (i == 2 and (j == 1 or j == 2)) then
+                cpart("Diamond", Vector3.new(0.18, 0.18, 0.18),
+                    CFrame.new(cx - 0.64 + i * 0.32, top + 0.18, cz - 0.45 + j * 0.3) * CFrame.Angles(math.rad(45), math.rad(rng:NextNumber(0, 90)), math.rad(35)),
+                    ICE, M.Glass, m, merge(NOSHADOW, { Transparency = 0.12, Reflectance = 0.55 }))
+            end
+        end
+    end
+    -- the centre stone on a little brass claw
+    vcyl("CentreClaw", cx, top + 0.08, top + 0.2, cz, 0.22, BRASS, M.Metal, m, NOSHADOW)
+    local big = cpart("CentreDiamond", Vector3.new(0.34, 0.34, 0.34), CFrame.new(cx, top + 0.38, cz) * CFrame.Angles(math.rad(45), 0, math.rad(45)),
+        ICE, M.Glass, m, merge(NOSHADOW, { Transparency = 0.08, Reflectance = 0.6 }))
+    pointLight(big, Color3.fromRGB(200, 230, 255), 0.9, 7, false)
+    m.Parent = parent
+    return m
+end
+
+-- ── 🦩 THE TARGET: the solid-gold flamingo on a lit plinth, dead centre of the
+-- vault so it's the first thing you see when the round door swings open ──
+function VillaBuilder:_flamingo(f, loot)
+    local pf = sub(f, "FlamingoPlinth")
+    local cx, cz = 0, -91.2
+    -- art-deco backdrop on the north lining: pink marble panel + a brass sunburst
+    box("NicheBack", -3.6, FLOOR, -95.3, 3.6, 12.3, -95.05, Color3.fromRGB(214, 160, 170), M.Marble, pf)
+    box("NicheFrame", -3.9, FLOOR, -95.3, -3.6, 12.5, -94.9, BRASS, M.Metal, pf)
+    box("NicheFrame", 3.6, FLOOR, -95.3, 3.9, 12.5, -94.9, BRASS, M.Metal, pf)
+    box("NicheFrame", -3.9, 12.2, -95.3, 3.9, 12.5, -94.9, BRASS, M.Metal, pf)
+    local sc = Vector3.new(0, 6.2, -94.98)
+    for k = 0, 8 do
+        local a = math.rad(-60 + k * 15)
+        local len = (k % 2 == 0) and 4.3 or 3.1
+        local mid = sc + Vector3.new(math.sin(a), math.cos(a), 0) * (1.3 + len / 2)
+        cpart("SunRay", Vector3.new(0.14, len, 0.06), CFrame.new(mid) * CFrame.Angles(0, 0, -a), BRASS, M.Metal, pf,
+            merge(NOSHADOW, { Reflectance = 0.1 }))
+    end
+    -- the plinth: black marble drum, brass bands, a hairline of pink under the lip
+    vcyl("PlinthStep", cx, FLOOR, FLOOR + 0.35, cz, 4.2, MARBLE_DK, M.Marble, pf)
+    vcyl("PlinthBand", cx, FLOOR + 0.35, FLOOR + 0.5, cz, 3.4, BRASS, M.Metal, pf)
+    vcyl("PlinthDrum", cx, FLOOR + 0.5, 2.8, cz, 3.0, MARBLE_DK, M.Marble, pf)
+    vcyl("PlinthBand", cx, 2.8, 2.95, cz, 3.2, BRASS, M.Metal, pf)
+    vcyl("PlinthGlow", cx, 2.86, 2.9, cz, 3.26, HOT_PINK, M.Neon, pf, NOSHADOW)
+    local top = vcyl("PlinthTop", cx, 2.95, 3.2, cz, 3.5, MARBLE_DK, M.Marble, pf)
+    pointLight(lightHolder(pf, Vector3.new(cx, 2.7, cz + 1.9)), HOT_PINK, 0.35, 4, false)
+    local plq = cpart("PlinthPlaque", Vector3.new(1.4, 0.55, 0.06), CFrame.lookAt(Vector3.new(cx, 1.9, cz + 1.58), Vector3.new(cx, 1.9, cz + 5)),
+        BRASS, M.Metal, pf, NOSHADOW)
+    local g = surface(plq, Enum.NormalId.Front, 60, 1, 1)
+    text({ Text = "EL FLAMENCO DE ORO", Size = UDim2.fromScale(0.92, 0.45), Position = UDim2.fromScale(0.04, 0.08),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.display,
+        TextColor3 = Color3.fromRGB(46, 34, 16) }, g)
+    text({ Text = "SOLID GOLD · 1926", Size = UDim2.fromScale(0.8, 0.28), Position = UDim2.fromScale(0.1, 0.6),
+        TextXAlignment = Enum.TextXAlignment.Center, TextScaled = true, FontFace = UITheme.F.medium,
+        TextColor3 = Color3.fromRGB(70, 54, 28) }, g)
+    -- one tight, shadowed spot from the ceiling: the only bright thing in the room
+    local spotPos = Vector3.new(cx, 12.3, cz + 3.6)
+    local fx = cpart("TargetSpot", Vector3.new(0.6, 0.6, 0.9), CFrame.lookAt(spotPos, Vector3.new(cx, 6.2, cz)), STEEL, M.Metal, pf, DECOR)
+    spotLight(fx, Enum.NormalId.Front, Color3.fromRGB(255, 238, 212), 3, 18, 28, true)
+
+    -- the flamingo: side-on to the door, standing on one leg, beak to the east
+    local m = Instance.new("Model")
+    m.Name = "GoldFlamingo"
+    local y0 = top.Position.Y + top.Size.X / 2
+    local base = CFrame.lookAt(Vector3.new(cx, y0, cz), Vector3.new(cx + 1, y0, cz))   -- local -Z = east (beak), +X = south (to the door)
+    local function at(x, y, z) return (base * CFrame.new(x, y, z)).Position end
+    local function limb(a, b, dia, col)
+        local mid, len = (a + b) / 2, (b - a).Magnitude
+        cpart("FlamingoLimb", Vector3.new(len, dia, dia), CFrame.lookAt(mid, b) * CFrame.Angles(0, math.rad(90), 0),
+            col or GOLD, M.Metal, m, { Shape = Enum.PartType.Cylinder, Reflectance = 0.25 })
+    end
+    local function knob(p, dia, col)
+        ball("FlamingoJoint", p, dia, col or GOLD, M.Metal, m, GOLD_M)
+    end
+    vcyl("FlamingoBase", cx, y0, y0 + 0.18, cz, 1.9, GOLD, M.Metal, m, GOLD_M)
+    -- standing leg + webbed foot
+    local foot, knee, hip = at(0, 0.18, 0.15), at(0, 1.4, 0.08), at(0, 2.6, 0.2)
+    limb(foot, knee, 0.13); knob(knee, 0.22); limb(knee, hip, 0.15)
+    cpart("FlamingoFoot", Vector3.new(0.34, 0.06, 0.5), base * CFrame.new(0, 0.21, -0.05), GOLD, M.Metal, m, GOLD_M)
+    -- tucked leg: down-forward to the joint, then folded back up under the belly
+    local hip2, knee2, foot2 = at(0.2, 2.55, 0.25), at(0.2, 1.85, -0.3), at(0.2, 2.35, 0.6)
+    limb(hip2, knee2, 0.13); knob(knee2, 0.2); limb(knee2, foot2, 0.12)
+    -- body: overlapping ovals + wings + a tail
+    knob(at(0, 3.25, 0.05), 1.55)
+    knob(at(0, 3.3, 0.55), 1.4)
+    knob(at(0, 3.42, 1.0), 1.05)
+    for _, sx in ipairs({ -1, 1 }) do
+        knob(at(sx * 0.3, 3.42, 0.5), 1.15)
+        cpart("FlamingoWing", Vector3.new(0.14, 0.34, 1.0), base * CFrame.new(sx * 0.66, 3.55, 0.75) * CFrame.Angles(math.rad(-14), sx * math.rad(8), 0),
+            GOLD, M.Metal, m, GOLD_M)
+    end
+    cpart("FlamingoTail", Vector3.new(0.46, 0.26, 0.8), base * CFrame.new(0, 3.62, 1.45) * CFrame.Angles(math.rad(24), 0, 0),
+        GOLD, M.Metal, m, GOLD_M)
+    -- the S-curved neck
+    local neck = { at(0, 3.6, -0.55), at(0, 4.25, -0.9), at(0, 4.95, -0.82), at(0, 5.55, -0.45), at(0, 6.1, -0.35), at(0, 6.5, -0.62) }
+    for i = 1, #neck - 1 do
+        local dia = 0.38 - i * 0.025
+        limb(neck[i], neck[i + 1], dia)
+        if i > 1 then knob(neck[i], dia) end
+    end
+    knob(at(0, 6.62, -0.8), 0.54)                                   -- head
+    limb(at(0, 6.6, -1.0), at(0, 6.34, -1.38), 0.2)                -- beak
+    limb(at(0, 6.34, -1.38), at(0, 6.12, -1.34), 0.14, GOLD_DEEP)  -- the bent black tip, in darker gold
+    for _, sx in ipairs({ -1, 1 }) do
+        ball("FlamingoEye", at(sx * 0.24, 6.7, -0.86), 0.09, GOLD_DEEP, M.Metal, m, NOSHADOW)
+    end
+    m.Parent = pf
+    addLoot(loot, "GoldFlamingo", "vault", cx, cz + 3.8, cx, cz, m,
+        { heavy = true, target = "GoldFlamingo", inVault = true })
 end
 
 -- ──────────────────────────────────────────────
 -- 🏛 GRAND HALL  interior x -13.5..13.5, z -57.5..-38.5
 -- Guard A walks z = -47 between x -9 and 9 → nothing in z -49.5..-44.5 there.
 -- ──────────────────────────────────────────────
-function VillaBuilder:_hall(f, props, spots, hides)
+function VillaBuilder:_hall(f, props, spots, hides, loot)
     -- chandelier (the room's main light)
     local cz = -47
     box("ChandelierChain", -0.08, 13.4, cz - 0.08, 0.08, TOP - 0.9, cz + 0.08, GOLD, M.Metal, f, DECOR)
@@ -1172,11 +1892,16 @@ function VillaBuilder:_hall(f, props, spots, hides)
     curtains(f, "x", -38.6, -12.8, -9.4, Color3.fromRGB(120, 30, 44))
     curtains(f, "x", -38.6, 9.4, 12.8, Color3.fromRGB(120, 30, 44))
 
-    -- paintings on the side walls
+    -- paintings on the side walls. v3: two of them are LOOT (cut from the frame);
+    -- both flank the front door, right under the hall camera's sweep.
     painting(f, Vector3.new(-13.5, 8, -55), PX, 3.2, 3.6, 11)
-    painting(f, Vector3.new(-13.5, 7.6, -41), PX, 3.2, 3.2, 13)
+    local c1 = painting(f, Vector3.new(-13.5, 7.8, -41.2), PX, 3.2, 3.4, 13)
+    pictureLight(f, Vector3.new(-13.5, 10.1, -41.2), PX, 2.6)
+    addLoot(loot, "Painting", "hall", -11.4, -42.6, -13.5, -41.2, c1, { interact = "cut" })
     painting(f, Vector3.new(13.5, 8, -55), NX, 3.2, 3.6, 12)
-    painting(f, Vector3.new(13.5, 7.6, -41), NX, 3.2, 3.2, 14)
+    local c2 = painting(f, Vector3.new(13.5, 7.8, -41.2), NX, 3.2, 3.4, 14)
+    pictureLight(f, Vector3.new(13.5, 10.1, -41.2), NX, 2.6)
+    addLoot(loot, "Painting", "hall", 11.4, -42.6, 13.5, -41.2, c2, { interact = "cut" })
 end
 
 -- ──────────────────────────────────────────────
@@ -1206,16 +1931,19 @@ function VillaBuilder:_office(f, props, spots, loot)
     prop(props, "bookcaseClosedWide", -40.45, FLOOR, -54, PX)
     prop(props, "bookcaseClosedWide", -40.45, FLOOR, -42, PX)
 
-    -- open floor safe with cash in it (small loot, no vault needed)
-    local sx0, sx1, sz0, sz1 = -39, -36, -57.3, -55.1
-    box("SafeBack", sx0, FLOOR, sz0, sx1, 3.5, sz0 + 0.3, STEEL, M.Metal, f)
-    box("SafeSide", sx0, FLOOR, sz0, sx0 + 0.3, 3.5, sz1, STEEL, M.Metal, f)
-    box("SafeSide", sx1 - 0.3, FLOOR, sz0, sx1, 3.5, sz1, STEEL, M.Metal, f)
-    box("SafeTop", sx0, 3.2, sz0, sx1, 3.5, sz1, STEEL, M.Metal, f)
-    box("SafeFloor", sx0, FLOOR, sz0, sx1, 0.9, sz1, STEEL, M.Metal, f)
-    box("SafeDoor", sx1, FLOOR + 0.1, sz1 - 0.1, sx1 + 0.25, 3.4, sz1 + 2.2, VSTEEL, M.DiamondPlate, f)
-    disc("SafeDial", Vector3.new(sx1 + 0.3, 2.2, sz1 + 1.2), PX, 0.1, 0.8, BRASS, M.Metal, f, DECOR)
-    cashStack(f, loot, Vector3.new(-37.5, 0.9, -56.1), Vector3.new(-37.5, FLOOR, -53.2), 4)
+    -- v3 MUSIC CORNER (north wall, west of the door): the owner's hi-fi console
+    -- with two framed GOLD RECORDS above it (loot — the whole frame comes off)
+    recordConsole(f, -38.8, -33.2, -57.5, -55.9)
+    local records = {
+        { x = -37.6, title = "NEON NIGHTS", sub = "ROSA · 1,000,000 SOLD", label = Color3.fromRGB(196, 40, 70) },
+        { x = -34.4, title = "OCEAN DRIVE", sub = "ROSA & THE FLAMINGOS · GOLD", label = Color3.fromRGB(236, 226, 206) },
+    }
+    for _, r in ipairs(records) do
+        local rec = goldRecord(f, Vector3.new(r.x, 7.3, -57.5), PZ, r)
+        addLoot(loot, "GoldRecord", "office", r.x, -54.6, r.x, -57.5, rec)
+    end
+    local spot = box("RecordSpot", -36.4, TOP - 0.3, -56.4, -35.6, TOP, -55.6, STEEL, M.Metal, f, DECOR)
+    spotLight(spot, Enum.NormalId.Bottom, Color3.fromRGB(255, 230, 196), 0.9, 12, 60, true)
 
     -- lounge corner (NE): sofa, glass coffee table, armchair, floor lamp
     prop(props, "loungeSofa", -19.5, FLOOR, -55.7, PZ)
@@ -1234,8 +1962,12 @@ function VillaBuilder:_office(f, props, spots, loot)
 
     curtains(f, "z", -41.4, -50, -46, Color3.fromRGB(110, 30, 40))
     painting(f, Vector3.new(-14.5, 8, -55.3), NX, 3.4, 2.6, 21)
-    painting(f, Vector3.new(-35, 8, -57.5), PZ, 3.5, 2.6, 22)
     painting(f, Vector3.new(-37.5, 8, -38.5), NZ, 1.8, 2.6, 23)
+    -- v3 LOOT painting in the dark SE corner, above the crawl vent
+    local c = painting(f, Vector3.new(-14.5, 8.2, -41.4), NX, 3.0, 3.4, 22)
+    addLoot(loot, "Painting", "office", -16.9, -41.4, -14.5, -41.4, c, { interact = "cut" })
+    -- v3 SECRET STASH: a wall safe behind the painting over the sideboard
+    self:_officeStash(f, loot)
 end
 
 -- ──────────────────────────────────────────────
@@ -1247,10 +1979,8 @@ function VillaBuilder:_kitchen(f, props, spots, loot)
     prop(props, "kitchenStove", 39.6, FLOOR, -45, NX)
     prop(props, "kitchenSink", 39.6, FLOOR, -41.35, NX)
     prop(props, "kitchenCabinetUpper", 40.57, 7.2, -41.35, NX)
-    -- pantry shelves in the dark NE corner
-    prop(props, "bookcaseOpen", 36, FLOOR, -56.44, PZ)
-    prop(props, "bookcaseOpen", 39.5, FLOOR, -56.44, PZ)
-    prop(props, "cardboardBoxClosed", 33, FLOOR, -56.6, nil, 1.0)
+    -- v3: the dark NE corner is the PANTRY WINE WALL (Wine loot, fragile)
+    self:_wineWall(f, loot)
 
     -- marble island (part-built — cash + keycard spot on top)
     local top = 3.9
@@ -1258,7 +1988,11 @@ function VillaBuilder:_kitchen(f, props, spots, loot)
     box("IslandTop", 25, top - 0.3, -50, 33, top, -46, MARBLE, M.Marble, f)
     box("IslandKick", 25.3, FLOOR, -49.7, 32.7, 0.9, -46.3, TEAL_DARK, M.Metal, f, DECOR)
     table.insert(spots, CFrame.new(32, top + 0.01, -47.2))
-    cashStack(f, loot, Vector3.new(26.3, top, -48), Vector3.new(22.8, FLOOR, -48), 3)
+    -- (v3: the loose cash that sat here is gone — the kitchen's loot is the wine)
+    box("FruitBowl", 26.0, top, -48.6, 27.4, top + 0.25, -47.4, Color3.fromRGB(236, 232, 224), M.Marble, f, DECOR)
+    for k, c in ipairs({ Color3.fromRGB(250, 170, 40), Color3.fromRGB(230, 60, 50), Color3.fromRGB(250, 210, 60), Color3.fromRGB(120, 180, 60) }) do
+        ball("Fruit", Vector3.new(26.3 + (k % 2) * 0.7, top + 0.42 + math.floor(k / 3) * 0.2, -48.3 + math.floor((k - 1) / 2) * 0.55), 0.46, c, M.Plastic, f, NOSHADOW)
+    end
     prop(props, "kitchenCoffeeMachine", 29.5, top, -49.2, PZ, 1.0)
     for _, x in ipairs({ 27, 29, 31 }) do
         prop(props, "stoolBar", x, FLOOR, -43.9, NZ, 1.0)
@@ -1343,33 +2077,36 @@ function VillaBuilder:_corridor(f, props, loot, hides)
     box("EaselLeg", ex + 1.1, FLOOR, ez - 0.1, ex + 1.3, 7, ez + 0.1, WOOD_MID, M.Wood, f)
     box("EaselLeg", ex - 0.1, FLOOR, ez - 1.1, ex + 0.1, 6.5, ez - 0.9, WOOD_MID, M.Wood, f)
     box("EaselLedge", ex - 1.5, 2.6, ez - 0.1, ex + 1.5, 2.8, ez + 0.5, WOOD_MID, M.Wood, f)
-    local art1 = Instance.new("Model")
-    art1.Name = "ArtEasel"
-    painting(art1, Vector3.new(ex, 4.6, ez + 0.5), PZ, 3.2, 3.4, 61)
-    art1.Parent = f
-    table.insert(loot, { kind = "Art", cframe = lootCF(Vector3.new(ex, FLOOR, -65.2), Vector3.new(ex, 0, ez)), visual = art1, inVault = false })
+    -- v3 LOOT: the canvas on the easel (a work in progress — unframed)
+    local c0 = painting(f, Vector3.new(ex, 4.6, ez + 0.35), PZ, 3.2, 3.4, 61, { frame = false, style = "sunset" })
+    c0.Name = "EaselCanvas"
+    addLoot(loot, "Painting", "gallery", ex, -65.4, ex, ez, c0, { interact = "cut" })
     pictureLight(f, Vector3.new(ex, 9.2, -69.5), PZ, 3)
 
-    -- ART loot #2: a gold statue on a pedestal (south strip)
-    pedestal(f, 16, -59.6, F, "LA DORADA", "ON LOAN")
-    local art2 = Instance.new("Model")
-    art2.Name = "ArtStatue"
-    vcyl("StatueBase", 16, 3.7, 4.0, -59.6, 1.3, GOLD, M.Metal, art2, { Reflectance = 0.3 })
-    box("StatueBody", 15.65, 4.0, -59.85, 16.35, 5.6, -59.35, GOLD, M.Metal, art2, { Reflectance = 0.3 })
-    ball("StatueHead", Vector3.new(16, 6.0, -59.6), 0.7, GOLD, M.Metal, art2, { Reflectance = 0.3 })
-    cpart("StatueArm", Vector3.new(0.25, 1.4, 0.25), CFrame.new(16.55, 5.5, -59.6) * CFrame.Angles(0, 0, math.rad(-30)), GOLD, M.Metal, art2)
-    art2.Parent = f
-    table.insert(loot, { kind = "Art", cframe = lootCF(Vector3.new(16, FLOOR, -62.8), Vector3.new(16, 0, -59.6)), visual = art2, inVault = false })
+    -- a marble bust on the east pedestal (decor — the gold one lives in the vault now)
+    pedestal(f, 16, -59.6, F, "ROSA II", "CARRARA MARBLE")
+    sculpture(f, 16, -59.6, "bust")
     local fx = box("GallerySpot", 15.6, TOP - 0.3, -60, 16.4, TOP, -59.2, STEEL, M.Metal, f, DECOR)
-    spotLight(fx, Enum.NormalId.Bottom, Color3.fromRGB(255, 236, 214), 1.2, 18, 30, true)
+    spotLight(fx, Enum.NormalId.Bottom, Color3.fromRGB(255, 236, 214), 1.0, 18, 30, true)
 
-    -- wall paintings (+ picture lights on the middle ones only; the ends stay dark)
-    painting(f, Vector3.new(-37, 8, -69.5), PZ, 3.6, 2.8, 62)
-    painting(f, Vector3.new(-20, 8, -69.5), PZ, 3.0, 2.8, 63)
-    painting(f, Vector3.new(12, 8, -69.5), PZ, 4.0, 3.0, 64)
-    painting(f, Vector3.new(-15, 8, -58.5), NZ, 4.0, 3.0, 65)
-    painting(f, Vector3.new(15, 8.6, -58.5), NZ, 3.0, 2.4, 66)
-    painting(f, Vector3.new(37, 8, -58.5), NZ, 3.0, 2.8, 67)
+    -- wall paintings (+ picture lights on the middle ones only; the ends stay dark).
+    -- v3: four of them are LOOT — the dark west-end one is the risky grab
+    -- (Camera_Gallery sweeps that end).
+    local wall = {
+        { -37, 8, -69.5, PZ, 3.6, 2.8, 62, true },
+        { -20, 8, -69.5, PZ, 3.0, 2.8, 63, true },
+        { 12, 8, -69.5, PZ, 4.0, 3.0, 64, true },
+        { -15, 8, -58.5, NZ, 4.0, 3.0, 65, true },
+        { 15, 8.6, -58.5, NZ, 3.0, 2.4, 66, false },
+        { 37, 8, -58.5, NZ, 3.0, 2.8, 67, false },
+    }
+    for _, p in ipairs(wall) do
+        local c = painting(f, Vector3.new(p[1], p[2], p[3]), p[4], p[5], p[6], p[7])
+        if p[8] then
+            local standZ = p[3] + p[4].Z * 2.8
+            addLoot(loot, "Painting", "gallery", p[1], standZ, p[1], p[3], c, { interact = "cut" })
+        end
+    end
     pictureLight(f, Vector3.new(-20, 9.9, -69.5), PZ, 3)
     pictureLight(f, Vector3.new(12, 10.1, -69.5), PZ, 3.5)
     pictureLight(f, Vector3.new(-15, 10.1, -58.5), NZ, 3.5)
@@ -1550,9 +2287,10 @@ function VillaBuilder:_vault(f)
     box("VaultLiningS", -17.5, FLOOR, -82.7, -3, 12.5, -82.5, VSTEEL, M.Metal, f)
     box("VaultLiningS", 3, FLOOR, -82.7, 17.5, 12.5, -82.5, VSTEEL, M.Metal, f)
     box("VaultCeiling", -18, 12.5, -96, 18, 13, -82, STEEL, M.Metal, f)
-    for _, x in ipairs({ -10, 0, 10 }) do
+    -- v3: two dimmer side lights; the centre is the flamingo's own spot (_flamingo)
+    for _, x in ipairs({ -10, 10 }) do
         local fx = box("VaultLight", x - 0.8, 12.35, -89.5, x + 0.8, 12.5, -88.5, BRASS, M.Metal, f, DECOR)
-        pointLight(fx, Color3.fromRGB(255, 200, 110), 1.2, 15, true)   -- shadowed: gold must not bleed into the rooms round the vault
+        pointLight(fx, Color3.fromRGB(255, 200, 110), 0.95, 15, true)   -- shadowed: gold must not bleed into the rooms round the vault
     end
     -- safe-deposit wall on the east side
     local boxes = box("DepositBoxes", 16.9, 1, -93, 17.3, 10, -84, Color3.fromRGB(150, 130, 90), M.Metal, f)
@@ -1579,18 +2317,23 @@ end
 
 function VillaBuilder:_vaultLoot(f)
     local loot = {}
-    -- west wall: three cash pallets
-    for _, z in ipairs({ -86, -89.5, -93 }) do
-        cashPile(f, loot, -15.8, z, Vector3.new(-12.6, FLOOR, z))
+    local V = { inVault = true }
+    -- west wall: three shrink-wrapped pallets of cash
+    for _, z in ipairs({ -86.0, -89.5, -93.0 }) do
+        local m = cashPallet(f, -15.7, z)
+        addLoot(loot, "Cash", "vault", -12.3, z, -15.7, z, m, V)
     end
-    -- north wall: three gold stacks + two diamond cases. The open door sweeps
-    -- x 4.5..6.1 / z -81..-90, so nothing sits in x 3..8 south of z -91.
-    for _, x in ipairs({ -10, -6, -2 }) do
-        goldPile(f, loot, x, -94.3, Vector3.new(x, FLOOR, -91.3))
+    -- north wall, either side of the flamingo niche: gold bars (heavy) on dollies.
+    -- The open door sweeps x 4.5..6.1 / z -81..-90 — nothing east-side sits there.
+    for _, x in ipairs({ -9.5, 13.2 }) do
+        local m = goldStack(f, x, -93.6)
+        addLoot(loot, "GoldBars", "vault", x, -90.5, x, -93.6, m, { inVault = true, heavy = true })
     end
-    for _, x in ipairs({ 9.5, 13.5 }) do
-        diamondCase(f, loot, x, -94.1, Vector3.new(x, FLOOR, -91.1))
-    end
+    -- the diamond tray on its marble stand
+    local d = diamondTray(f, 8.6, -93.9)
+    addLoot(loot, "Diamonds", "vault", 8.6, -90.9, 8.6, -93.9, d, V)
+    -- 🦩 the target, dead centre
+    self:_flamingo(f, loot)
     return loot
 end
 
@@ -1615,7 +2358,7 @@ function VillaBuilder:_bedroom(f, props, spots, loot)
             pointLight(lightHolder(f, Vector3.new(-40.4, nsTop + 1.9, -76.6)), Color3.fromRGB(255, 190, 140), 0.8, 12, true)
         end
     end
-    -- dresser + mirror on the south wall, with the jewellery box (Jewels loot)
+    -- dresser + mirror on the south wall (v3: the jewels moved into the safe)
     box("Dresser", -40.5, FLOOR, -72.5, -35.5, 3.25, -70.5, WOOD_MID, M.Wood, f)
     box("DresserTop", -40.6, 3.25, -72.6, -35.4, 3.4, -70.5, MARBLE, M.Marble, f)
     for k = 0, 2 do
@@ -1623,19 +2366,13 @@ function VillaBuilder:_bedroom(f, props, spots, loot)
     end
     box("Mirror", -39.8, 4.2, -70.7, -36.2, 9, -70.5, Color3.fromRGB(200, 212, 218), M.Glass, f, { Reflectance = 0.45 })
     box("MirrorFrame", -40, 4.0, -70.6, -36, 9.2, -70.5, BRASS, M.Metal, f, DECOR)
-    local jewels = Instance.new("Model")
-    jewels.Name = "JewelleryBox"
-    box("JewelBox", -38.6, 3.4, -71.8, -37.4, 3.9, -71.0, Color3.fromRGB(120, 30, 60), M.Fabric, jewels)
-    cpart("JewelBoxLid", Vector3.new(1.2, 0.08, 0.8), CFrame.new(-38, 4.2, -70.95) * CFrame.Angles(math.rad(70), 0, 0),
-        Color3.fromRGB(120, 30, 60), M.Fabric, jewels)
-    for k = 0, 5 do
-        ball("Pearl", Vector3.new(-38.9 + k * 0.28, 3.5, -72.2 + math.sin(k) * 0.1), 0.22,
-            Color3.fromRGB(245, 240, 235), M.SmoothPlastic, jewels, NOSHADOW)
+    -- perfume bottles + a brush on the dresser (decor)
+    for k, c in ipairs({ Color3.fromRGB(250, 190, 210), Color3.fromRGB(190, 220, 240), Color3.fromRGB(250, 220, 150) }) do
+        local x = -39.6 + k * 0.55
+        vcyl("Perfume", x, 3.4, 3.4 + 0.45 + (k % 2) * 0.15, -71.4, 0.34, c, M.Glass, f, merge(NOSHADOW, { Transparency = 0.25, Reflectance = 0.2 }))
+        vcyl("PerfumeCap", x, 3.85 + (k % 2) * 0.15, 4.0 + (k % 2) * 0.15, -71.4, 0.16, GOLD, M.Metal, f, NOSHADOW)
     end
-    ball("Ruby", Vector3.new(-37.9, 4.0, -71.4), 0.3, Color3.fromRGB(255, 60, 110), M.Neon, jewels, NOSHADOW)
-    ball("Emerald", Vector3.new(-38.2, 4.0, -71.3), 0.25, Color3.fromRGB(60, 240, 150), M.Neon, jewels, NOSHADOW)
-    jewels.Parent = f
-    table.insert(loot, { kind = "Jewels", cframe = lootCF(Vector3.new(-38, FLOOR, -75), Vector3.new(-38, 0, -71.4)), visual = jewels, inVault = false })
+    box("HairBrush", -37.2, 3.4, -71.7, -36.2, 3.52, -71.35, WALNUT, M.Wood, f, NOSHADOW)
 
     -- TV corner on the east wall, armchair facing it
     prop(props, "cabinetTelevision", -19.56, FLOOR, -86, NX)
@@ -1665,7 +2402,13 @@ function VillaBuilder:_bedroom(f, props, spots, loot)
     curtains(f, "z", -41.4, -94, -90, Color3.fromRGB(230, 200, 210))
     curtains(f, "z", -41.4, -76, -72, Color3.fromRGB(230, 200, 210))
     painting(f, Vector3.new(-41.5, 8, -83), PX, 5, 3, 31)
-    painting(f, Vector3.new(-18.5, 8.5, -91), NX, 3, 2.4, 32)
+    -- v3 LOOT painting on the east wall (north of the TV), with a picture light
+    local c = painting(f, Vector3.new(-18.5, 8.4, -91.2), NX, 3.4, 2.8, 32)
+    pictureLight(f, Vector3.new(-18.5, 10.2, -91.2), NX, 2.8)
+    addLoot(loot, "Painting", "bedroom", -21.3, -91.2, -18.5, -91.2, c, { interact = "cut" })
+    -- v3: the bedroom SAFE (JewelryBox, dial) in the SE corner + the rug stash
+    self:_bedroomSafe(f, loot)
+    self:_rugStash(f, loot)
 end
 
 -- ──────────────────────────────────────────────
@@ -2444,7 +3187,7 @@ function VillaBuilder:build(folder)
     self:_facade(sub(root, "Facade"), facadeRefs)
     self:_garden(sub(root, "Garden"))
     self:_terrace(sub(root, "Terrace"))
-    self:_hall(sub(root, "GrandHall"), props, keycardSpots, hideSpots)
+    self:_hall(sub(root, "GrandHall"), props, keycardSpots, hideSpots, lootSpots)
     self:_office(sub(root, "Office"), props, keycardSpots, lootSpots)
     self:_kitchen(sub(root, "Kitchen"), props, keycardSpots, lootSpots)
     self:_corridor(sub(root, "Gallery"), props, lootSpots, hideSpots)
@@ -2503,7 +3246,7 @@ function VillaBuilder:build(folder)
     end
     openSign(false)
 
-    print("[VillaBuilder] Villa Rosa v2 built 🌴")
+    print("[VillaBuilder] Villa Rosa v3 built 🌴🦩")
 
     return {
         id = "villa",
@@ -2529,7 +3272,13 @@ function VillaBuilder:build(folder)
         breaker = breaker,
         cameras = cameras,
         laserRows = laserRows,
+        -- v3 (docs/V3_SPEC.md §2.1): every spot has kind/pool/visual + flags.
+        -- Hidden SecretStash spots also carry reveal(show) — see _officeStash.
         lootSpots = lootSpots,
+        poolNames = {
+            hall = "Grand Hall", gallery = "Art Gallery", office = "Office",
+            bedroom = "Master Bedroom", cellar = "Wine Cellar", vault = "Vault",
+        },
         smashCases = {},
         hideSpots = hideSpots,
         shadowZones = shadowZones,

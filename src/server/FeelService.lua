@@ -130,7 +130,7 @@ function FeelService:loot(player, kind, worldPos)
     end
     send(nil, withSound({
         kind = "loot",
-        text = tostring(kind or "LOOT"),
+        text = tostring(info.name or kind or "LOOT"),   -- v3.0: display name, not the id
         amount = info.value,
         pos = pos,
         by = player and player.Name or nil,

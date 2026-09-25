@@ -29,6 +29,15 @@
     v2.0: a cop catching you now sends you to JAIL (JobService → JailService),
     not straight out of the run. Cops ignore Hidden / Jailed players and bots.
 
+    v3.0 "THE SCORE" (getaway agent): nobody drives, so there is no car chase
+    and no bust meter in the real world any more — the chase is part of the
+    getaway cut-scene. PoliceService.CAR_CHASE = false makes chaseCar() a no-op
+    (the old code stays; flip it back if driving ever returns). dispatch()
+    still sends the cruisers + cops on foot when the alarm trips (cops ignore
+    anyone sitting in a car, so the getaway car is the safe place).
+    PoliceService.buildCruiserModel(index) -> { model, root, reds, blues, … }
+    is exported: GetawayProps clones it for the scene's chase cars + roadblock.
+
     TAGS: each cop model is tagged "Guard" (so Lookout / thermal / marks see
     them). Cruiser models are tagged "PoliceCruiser" — NOT "Guard".
 
@@ -59,6 +68,9 @@ local Build = VehicleService.Build
 local BOUNDS = VehicleService.BOUNDS
 
 local PoliceService = {}
+
+-- v3.0: the getaway is a cut-scene; real cruisers never chase / bust the car
+PoliceService.CAR_CHASE = false
 
 local W = Constants.WORLD
 local STREET_Z = W.STREET_Z
@@ -278,11 +290,14 @@ local function buildCruiserModel(index)
     siren.Parent = root
 
     CollectionService:AddTag(model, "PoliceCruiser")
+    model:SetAttribute("CruiserIndex", index)
     return {
         model = model, root = root, reds = reds, blues = blues,
         redLight = redLight, blueLight = blueLight, siren = siren,
     }
 end
+
+PoliceService.buildCruiserModel = buildCruiserModel   -- v3.0 (GetawayProps)
 
 -- ──────────────────────────────────────────────
 -- Cruiser placement + movement
@@ -786,6 +801,7 @@ function PoliceService:dispatch(stopPos, getCrewPlayers)
 end
 
 function PoliceService:chaseCar(car)
+    if not PoliceService.CAR_CHASE then return end   -- v3.0: the chase lives in the cut-scene
     if not carValid(car) then return end
     if chaseTarget ~= car then
         bustFired = false

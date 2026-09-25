@@ -197,9 +197,9 @@ function HeistHud:showResult(win, payload)
     elseif win then
         self._rSub.Text = "Clean getaway — but the car was empty"
     else
-        local why = ({ busted = "The cops boxed in the car.", time = "Out of time.", caught = "Everyone got caught.",
+        local why = ({ busted = "The cops got everyone.", time = "Out of time.", caught = "Everyone got caught.",
             timeout = "The Boss called it off.", abandoned = "The crew bailed." })[payload.result or ""]
-        self._rSub.Text = why or "Nobody made it to the marina."
+        self._rSub.Text = why or "Nobody got away this time."
     end
     local jobName = game:GetService("ReplicatedStorage"):GetAttribute("ActiveJob")
     -- (v2.0) look the name up instead of assuming villa/jewelry

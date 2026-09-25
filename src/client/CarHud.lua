@@ -1,23 +1,26 @@
 --[[
     HEIST CREW — CarHud
     ────────────────────────────────────────────────
-    v1.0 "Neon Miami" (2026-09-25). The dashboard you see while you're in
-    the getaway car (driver or passenger). Hidden the rest of the time.
+    v3.0 "THE SCORE" (getaway agent, 2026-09-25): NOBODY DRIVES ANY MORE.
+    The card you see while you sit in the getaway car is now the escape
+    button, kid-simple:
 
-      • SPEED   big number, "Speed" model attribute (studs/s) x 1.3 → MPH
-      • MARINA  small arrow + distance to the drop-off, relative to the camera
-      • BUST    thin red meter, only while the car's "BustMeter" > 0
-      • NITRO   Driver role in the driver seat only: "SHIFT  NITRO" chip with
-                a cooldown fill (NitroUntil / NitroReadyAt vs server time).
-                LeftShift / ButtonL3 / on-screen touch button → Nitro remote.
-      • CAR     (v2.2) top-right: the car type + its power ("MONSTER TRUCK ·
-                +20% SPEED"), from the model's CarName / CarPerk attributes.
-                The nitro cooldown fill follows the model's NitroCooldown
-                (Muscle Car: 7 s).
+      • CAR      the car type + what it pays ("TANK · +12% cash getaway"),
+                 from the model's CarName / CarPerk attributes
+      • BAGS     💰 how many bags are in the car ("Bags" model attribute)
+      • CREW     👥 how many of the crew are sitting in the car
+                 ("CrewIn" / "CrewNeed", kept fresh by JobService)
+      • GO!      a big green button. Everyone in the car = it goes by itself;
+                 or the driver (anyone, if the driver seat is empty) presses
+                 GO! once at least one bag is loaded. Enter / gamepad X / tap.
+                 Fires the "Getaway" remote { action = "go" }.
+      • VOTE     while the crew picks the escape the button turns into a
+                 status line ("Pick how we escape!" / "Here we go!").
+                 ("GetawayPhase" model attribute: wait | vote | decided | scene)
 
-    Also mirrors the driver's throttle/steer to the server on the "CarInput"
-    remote (VehicleService prefers it over the replicated VehicleSeat values
-    when it is fresh — belt and braces, since nobody could playtest this).
+    Also starts GetawayVote + GetawayCinematic (sibling modules) if the client
+    bootstrap hasn't — both :start() calls are idempotent, so adding them to
+    init.client's ORDER later is harmless.
 
     PUBLIC API:
         CarHud:start()
@@ -31,23 +34,16 @@ local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local T = UITheme.C
 
 local CarHud = {}
 local localPlayer = Players.LocalPlayer
 
-local NITRO_ACTION = "HeistCrewNitro"
-local CAR_INPUT_REMOTE = "CarInput"
-local MPH_PER_STUD = 1.3
-local METERS_PER_STUD = 0.28
-local DEFAULT_NITRO_COOLDOWN = 12
-local W = Constants.WORLD
-local DROPOFF = Vector3.new(W.DROPOFF.x, W.DROPOFF.y, W.DROPOFF.z)
+local GO_ACTION = "HeistCrewGetawayGo"
+local REMOTE = "Getaway"
 
--- Non-yielding remote lookup (Remotes.getRemote waits up to 10s on the client)
+-- Non-yielding remote lookup
 local function findRemote(name)
     local f = ReplicatedStorage:FindFirstChild("Remotes")
     local r = f and f:FindFirstChild(name)
@@ -85,143 +81,106 @@ function CarHud:_buildUi()
     local existing = playerGui:FindFirstChild("CarHud")
     if existing then existing:Destroy() end
 
-    -- (v2.1) the dashboard is a card in the UITheme bottomCenter slot (hidden until you sit in the car)
     local panel = UITheme.card({
-        Name = "CarPanel", LayoutOrder = 50, Size = UDim2.fromOffset(340, 122), radius = 18, Visible = false,
+        Name = "CarPanel", LayoutOrder = 50, Size = UDim2.fromOffset(400, 150), radius = 20, Visible = false,
     })
     panel.Parent = UITheme.slot("bottomCenter")
 
-    -- ── drop-off navigation row ──
-    local boat = UITheme.badge(UITheme.ICON.marina, T.info, 30)
-    boat.Position = UDim2.fromOffset(12, 8)
-    boat.Parent = panel
-    local arrow = UITheme.label({
-        Name = "Arrow", Text = "▲", Position = UDim2.fromOffset(48, 10), Size = UDim2.fromOffset(26, 26),
-        TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = T.info, TextSize = 20,
-    })
-    arrow.Parent = panel
-    UITheme.caption("Marina", { Position = UDim2.fromOffset(80, 8), Size = UDim2.fromOffset(120, 14) }).Parent = panel
-    local distLabel = UITheme.label({
-        Name = "Distance", Text = "--", Position = UDim2.fromOffset(80, 21), Size = UDim2.fromOffset(140, 18),
-        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.text,
-    })
-    distLabel.Parent = panel
-
-    -- ── (v2.2) car type + power ──
+    -- car name + what it pays
+    local carBadge = UITheme.badge(UITheme.ICON.car, T.gold, 34)
+    carBadge.Position = UDim2.fromOffset(14, 12)
+    carBadge.Parent = panel
     local carName = UITheme.label({
-        Name = "CarName", Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 8),
-        Size = UDim2.fromOffset(125, 16), TextXAlignment = Enum.TextXAlignment.Right,
-        FontFace = UITheme.F.display, TextSize = 14, TextColor3 = T.gold,
-        TextTruncate = Enum.TextTruncate.AtEnd,
+        Name = "CarName", Text = "", Position = UDim2.fromOffset(56, 10), Size = UDim2.fromOffset(200, 20),
+        FontFace = UITheme.F.display, TextSize = 18, TextColor3 = T.gold, TextTruncate = Enum.TextTruncate.AtEnd,
     })
     carName.Parent = panel
     local carPerk = UITheme.label({
-        Name = "CarPerk", Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 25),
-        Size = UDim2.fromOffset(125, 14), TextXAlignment = Enum.TextXAlignment.Right,
-        FontFace = UITheme.F.bold, TextSize = 12, TextColor3 = T.muted,
-        TextTruncate = Enum.TextTruncate.AtEnd,
+        Name = "CarPerk", Text = "", Position = UDim2.fromOffset(56, 30), Size = UDim2.fromOffset(200, 16),
+        FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.muted, TextTruncate = Enum.TextTruncate.AtEnd,
     })
     carPerk.Parent = panel
 
-    -- ── speed ──
-    local speed = UITheme.label({
-        Name = "Speed", Text = "0", Position = UDim2.fromOffset(10, 40), Size = UDim2.fromOffset(112, 52),
-        FontFace = UITheme.F.display, TextSize = 52, TextXAlignment = Enum.TextXAlignment.Right,
+    -- bags + crew counters (big, readable)
+    local bags = UITheme.label({
+        Name = "Bags", Text = "💰 0 bags", Position = UDim2.fromOffset(16, 58), Size = UDim2.fromOffset(230, 34),
+        FontFace = UITheme.F.display, TextSize = 28, TextColor3 = T.money,
     })
-    speed.Parent = panel
-    UITheme.caption("mph", { Position = UDim2.fromOffset(128, 72), Size = UDim2.fromOffset(40, 14) }).Parent = panel
-
-    -- ── nitro chip (Driver only) ──
-    local chip = Instance.new("Frame")
-    chip.Name = "NitroChip"
-    chip.AnchorPoint = Vector2.new(1, 0)
-    chip.Position = UDim2.new(1, -14, 0, 52)
-    chip.Size = UDim2.fromOffset(130, 34)
-    chip.BackgroundColor3 = T.bgRaised
-    chip.BackgroundTransparency = 0.1
-    chip.BorderSizePixel = 0
-    chip.ClipsDescendants = true
-    chip.Visible = false
-    chip.Parent = panel
-    UITheme.corner(chip, 8)
-    local chipStroke = UITheme.stroke(chip, T.gold, 0.55)
-    local chipFill = Instance.new("Frame")
-    chipFill.Name = "Fill"
-    chipFill.Size = UDim2.fromScale(1, 1)
-    chipFill.BackgroundColor3 = T.gold
-    chipFill.BackgroundTransparency = 0.72
-    chipFill.BorderSizePixel = 0
-    chipFill.Parent = chip
-    UITheme.corner(chipFill, 8)
-    local chipLabel = UITheme.label({
-        Name = "Label", Text = "SHIFT  NITRO", Size = UDim2.fromScale(1, 1),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 15, TextColor3 = T.gold, ZIndex = 2,
+    bags.Parent = panel
+    local crew = UITheme.label({
+        Name = "Crew", Text = "👥 0/0 in the car", Position = UDim2.fromOffset(16, 92), Size = UDim2.fromOffset(230, 22),
+        FontFace = UITheme.F.bold, TextSize = 18, TextColor3 = T.text,
     })
-    chipLabel.Parent = chip
+    crew.Parent = panel
+    local hint = UITheme.label({
+        Name = "Hint", Text = "", Position = UDim2.fromOffset(16, 118), Size = UDim2.new(1, -32, 0, 20),
+        FontFace = UITheme.F.medium, TextSize = 14, TextColor3 = T.muted, TextTruncate = Enum.TextTruncate.AtEnd,
+    })
+    hint.Parent = panel
 
-    -- ── bust meter ──
-    local bustRow = Instance.new("Frame")
-    bustRow.Name = "Bust"
-    bustRow.BackgroundTransparency = 1
-    bustRow.Position = UDim2.fromOffset(14, 98)
-    bustRow.Size = UDim2.new(1, -28, 0, 16)
-    bustRow.Visible = false
-    bustRow.Parent = panel
-    UITheme.caption("Bust", {
-        Position = UDim2.fromOffset(0, 0), Size = UDim2.fromOffset(40, 14), TextColor3 = T.danger,
-    }).Parent = bustRow
-    local bustTrack = Instance.new("Frame")
-    bustTrack.Name = "Track"
-    bustTrack.Position = UDim2.new(0, 42, 0.5, -3)
-    bustTrack.Size = UDim2.new(1, -42, 0, 6)
-    bustTrack.BackgroundColor3 = T.faint
-    bustTrack.BackgroundTransparency = 0.4
-    bustTrack.BorderSizePixel = 0
-    bustTrack.Parent = bustRow
-    UITheme.corner(bustTrack, 3)
-    local bustFill = Instance.new("Frame")
-    bustFill.Name = "Fill"
-    bustFill.Size = UDim2.fromScale(0, 1)
-    bustFill.BackgroundColor3 = T.danger
-    bustFill.BorderSizePixel = 0
-    bustFill.Parent = bustTrack
-    UITheme.corner(bustFill, 3)
+    -- the GO! button
+    local go = UITheme.button("GO!", T.money, {
+        Name = "GoButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 14),
+        Size = UDim2.fromOffset(130, 96), TextSize = 44,
+    })
+    go.Parent = panel
+    local goSub = UITheme.label({
+        Name = "GoSub", Text = "", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6),
+        Size = UDim2.new(1, -8, 0, 16), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
+        TextSize = 12, TextColor3 = T.bgDeep, ZIndex = 3,
+    })
+    goSub.Parent = go
+    go.Activated:Connect(function() self:_pressGo() end)
+
+    -- during the vote / movie the button becomes a status line
+    local status = UITheme.label({
+        Name = "Status", Text = "", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 14),
+        Size = UDim2.fromOffset(150, 96), TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true,
+        FontFace = UITheme.F.display, TextSize = 20, TextColor3 = T.gold, Visible = false,
+    })
+    status.Parent = panel
 
     self.ui = {
-        panel = panel, arrow = arrow, dist = distLabel, speed = speed,
-        chip = chip, chipStroke = chipStroke, chipFill = chipFill, chipLabel = chipLabel,
-        bustRow = bustRow, bustFill = bustFill,
-        carName = carName, carPerk = carPerk,
+        panel = panel, carName = carName, carPerk = carPerk, bags = bags, crew = crew, hint = hint,
+        go = go, goSub = goSub, status = status,
     }
 end
 
 -- ──────────────────────────────────────────────
--- Nitro binding
+-- GO!
 -- ──────────────────────────────────────────────
-function CarHud:_fireNitro()
-    if os.clock() - (self._lastNitro or 0) < 0.3 then return end
-    self._lastNitro = os.clock()
-    local r = findRemote(Remotes.NAMES.Nitro)
-    if r then r:FireServer() end
+function CarHud:_canGo()
+    local car = self.car
+    if not car then return false, "" end
+    local phase = car:GetAttribute("GetawayPhase")
+    if phase == "vote" or phase == "decided" or phase == "scene" then return false, "" end
+    if phase ~= "wait" then return false, "No heist going" end
+    if num(car:GetAttribute("Bags")) < 1 then return false, "Load a bag first" end
+    local driverSeat = car:FindFirstChild("GetawayDriverSeat", true)
+    local driverHum = driverSeat and (driverSeat:IsA("Seat") or driverSeat:IsA("VehicleSeat")) and driverSeat.Occupant or nil
+    if driverHum and driverHum.Parent ~= localPlayer.Character then return false, "Driver's call" end
+    return true, "Let's go!"
 end
 
-function CarHud:_refreshNitroBinding()
-    local want = self.isDriverSeat == true and localPlayer:GetAttribute("Role") == "Driver"
-    if want and not self.nitroBound then
-        ContextActionService:BindActionAtPriority(NITRO_ACTION, function(_, state)
-            if state == Enum.UserInputState.Begin then self:_fireNitro() end
-            return Enum.ContextActionResult.Sink
-        end, true, Enum.ContextActionPriority.High.Value, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
-        pcall(function() ContextActionService:SetTitle(NITRO_ACTION, "NITRO") end)
-        self.nitroBound = true
-    elseif not want and self.nitroBound then
-        ContextActionService:UnbindAction(NITRO_ACTION)
-        self.nitroBound = false
-    end
-    if self.ui then
-        self.ui.chip.Visible = want
-        self.ui.chipLabel.Text = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-            and "NITRO" or "SHIFT  NITRO"
+function CarHud:_pressGo()
+    if os.clock() - (self._lastGo or 0) < 0.6 then return end
+    self._lastGo = os.clock()
+    local ok = self:_canGo()
+    if not ok then return end
+    local r = findRemote(REMOTE)
+    if r then r:FireServer({ action = "go" }) end
+end
+
+function CarHud:_bindGo(on)
+    if on and not self.goBound then
+        ContextActionService:BindActionAtPriority(GO_ACTION, function(_, state)
+            if state == Enum.UserInputState.Begin then self:_pressGo() end
+            return Enum.ContextActionResult.Pass
+        end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Return, Enum.KeyCode.KeypadEnter, Enum.KeyCode.ButtonX)
+        self.goBound = true
+    elseif not on and self.goBound then
+        ContextActionService:UnbindAction(GO_ACTION)
+        self.goBound = false
     end
 end
 
@@ -233,16 +192,13 @@ function CarHud:_onSeat(seat)
     if car then
         self.seat = seat
         self.car = car
-        self.isDriverSeat = seat:IsA("VehicleSeat") and seat.Name == "GetawayDriverSeat"
         if self.ui then self.ui.panel.Visible = true end
     else
         self.seat = nil
         self.car = nil
-        self.isDriverSeat = false
         if self.ui then self.ui.panel.Visible = false end
-        self:_sendInput(0, 0, true)
     end
-    self:_refreshNitroBinding()
+    self:_bindGo(self.car ~= nil)
 end
 
 function CarHud:_bindCharacter(character)
@@ -263,45 +219,6 @@ function CarHud:_bindCharacter(character)
 end
 
 -- ──────────────────────────────────────────────
--- Driver input mirror (see header)
--- ──────────────────────────────────────────────
-function CarHud:_sendInput(throttle, steer, force)
-    local last = self._lastInput
-    local now = os.clock()
-    local changed = not last or last.t ~= throttle or last.s ~= steer
-    if not force then
-        if changed and last and now - last.at < 0.05 then return end
-        if not changed and last and now - last.at < 0.2 then return end
-    elseif last and last.t == 0 and last.s == 0 then
-        return   -- already told the server we stopped
-    end
-    local r = findRemote(CAR_INPUT_REMOTE)
-    if not r then return end
-    r:FireServer(throttle, steer)
-    self._lastInput = { t = throttle, s = steer, at = now }
-end
-
-local function keyAxis(pos, neg, pos2, neg2)
-    local v = 0
-    if UserInputService:IsKeyDown(pos) or UserInputService:IsKeyDown(pos2) then v = v + 1 end
-    if UserInputService:IsKeyDown(neg) or UserInputService:IsKeyDown(neg2) then v = v - 1 end
-    return v
-end
-
-function CarHud:_pollDriverInput()
-    local seat = self.seat
-    if not seat or not seat:IsA("VehicleSeat") then return end
-    local throttle = num(seat.ThrottleFloat)
-    local steer = num(seat.SteerFloat)
-    -- if the stock vehicle controller isn't feeding the seat, read the keys ourselves
-    if throttle == 0 and steer == 0 and not UserInputService:GetFocusedTextBox() then
-        throttle = keyAxis(Enum.KeyCode.W, Enum.KeyCode.S, Enum.KeyCode.Up, Enum.KeyCode.Down)
-        steer = keyAxis(Enum.KeyCode.D, Enum.KeyCode.A, Enum.KeyCode.Right, Enum.KeyCode.Left)
-    end
-    self:_sendInput(math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1), false)
-end
-
--- ──────────────────────────────────────────────
 -- Per-frame update
 -- ──────────────────────────────────────────────
 function CarHud:_update()
@@ -312,73 +229,44 @@ function CarHud:_update()
         if ui.panel.Visible then
             self.car = nil
             ui.panel.Visible = false
+            self:_bindGo(false)
         end
         return
     end
 
-    if self.isDriverSeat then self:_pollDriverInput() end
-
-    -- speed
-    local speed = math.abs(num(car:GetAttribute("Speed")))
-    ui.speed.Text = tostring(math.floor(speed * MPH_PER_STUD + 0.5))
-
-    -- drop-off arrow + distance (relative to where the camera looks)
-    local ok, pivot = pcall(function() return car:GetPivot() end)
-    local here = ok and pivot.Position or DROPOFF
-    local toDrop = Vector3.new(DROPOFF.X - here.X, 0, DROPOFF.Z - here.Z)
-    local dist = toDrop.Magnitude
-    ui.dist.Text = string.format("%d m", math.floor(dist * METERS_PER_STUD + 0.5))
-    local cam = Workspace.CurrentCamera
-    if cam and dist > 0.5 then
-        local look = cam.CFrame.LookVector
-        local flatLook = Vector3.new(look.X, 0, look.Z)
-        if flatLook.Magnitude > 1e-3 then
-            flatLook = flatLook.Unit
-            local right = Vector3.new(-flatLook.Z, 0, flatLook.X)
-            local dir = toDrop.Unit
-            ui.arrow.Rotation = math.deg(math.atan2(dir:Dot(right), dir:Dot(flatLook)))
-        end
-    end
-    ui.arrow.TextColor3 = dist <= W.DROPOFF_RADIUS and T.money or T.info
-
-    -- (v2.2) car type
     local cn = car:GetAttribute("CarName")
     local cp = car:GetAttribute("CarPerk")
-    ui.carName.Text = type(cn) == "string" and string.upper(cn) or ""
+    ui.carName.Text = type(cn) == "string" and string.upper(cn) or "GETAWAY CAR"
     ui.carPerk.Text = type(cp) == "string" and cp or ""
 
-    -- bust meter
-    local bust = math.clamp(num(car:GetAttribute("BustMeter")), 0, 1)
-    ui.bustRow.Visible = bust > 0.001
-    ui.bustFill.Size = UDim2.fromScale(bust, 1)
+    local n = math.floor(num(car:GetAttribute("Bags")))
+    ui.bags.Text = string.format("💰 %d bag%s", n, n == 1 and "" or "s")
+    ui.bags.TextColor3 = n > 0 and T.money or T.muted
+    local crewIn, need = math.floor(num(car:GetAttribute("CrewIn"))), math.floor(num(car:GetAttribute("CrewNeed")))
+    ui.crew.Text = need > 0 and string.format("👥 %d/%d in the car", crewIn, need) or "👥 In the car"
 
-    -- nitro chip
-    if ui.chip.Visible then
-        local now = Workspace:GetServerTimeNow()
-        local untilT = num(car:GetAttribute("NitroUntil"))
-        local readyAt = num(car:GetAttribute("NitroReadyAt"))
-        local cooldown = num(car:GetAttribute("NitroCooldown"))
-        if cooldown <= 0 then cooldown = DEFAULT_NITRO_COOLDOWN end
-        if now < untilT then
-            ui.chipFill.Size = UDim2.fromScale(1, 1)
-            ui.chipFill.BackgroundColor3 = T.info
-            ui.chipFill.BackgroundTransparency = 0.45
-            ui.chipLabel.TextColor3 = T.text
-            ui.chipStroke.Color = T.info
-        elseif now < readyAt then
-            local frac = math.clamp(1 - (readyAt - now) / cooldown, 0, 1)
-            ui.chipFill.Size = UDim2.fromScale(frac, 1)
-            ui.chipFill.BackgroundColor3 = T.muted
-            ui.chipFill.BackgroundTransparency = 0.7
-            ui.chipLabel.TextColor3 = T.muted
-            ui.chipStroke.Color = T.faint
-        else
-            ui.chipFill.Size = UDim2.fromScale(1, 1)
-            ui.chipFill.BackgroundColor3 = T.gold
-            ui.chipFill.BackgroundTransparency = 0.72
-            ui.chipLabel.TextColor3 = T.gold
-            ui.chipStroke.Color = T.gold
-        end
+    local phase = car:GetAttribute("GetawayPhase")
+    local busy = phase == "vote" or phase == "decided" or phase == "scene"
+    ui.go.Visible = not busy
+    ui.status.Visible = busy
+    if busy then
+        ui.status.Text = (phase == "vote") and "Pick how we escape!" or "Here we go!"
+        ui.hint.Text = "Hold on tight…"
+        return
+    end
+    local ok, why = self:_canGo()
+    ui.go.BackgroundColor3 = ok and T.money or T.faint
+    ui.go.AutoButtonColor = ok
+    ui.goSub.Text = why or ""
+    if phase ~= "wait" then
+        ui.hint.Text = "Start a heist to use the getaway car"
+    elseif n < 1 then
+        ui.hint.Text = "Bring loot! Put a bag in the trunk (E)"
+    elseif need > 0 and crewIn >= need then
+        ui.hint.Text = "Everyone's in! Here we go…"
+    else
+        ui.hint.Text = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+            and "Everyone in the car = we go! Or tap GO!" or "Everyone in the car = we go! Or press GO! (Enter)"
     end
 end
 
@@ -396,9 +284,6 @@ function CarHud:start()
     localPlayer.CharacterRemoving:Connect(function()
         self:_onSeat(nil)
     end)
-    localPlayer:GetAttributeChangedSignal("Role"):Connect(function()
-        self:_refreshNitroBinding()
-    end)
     if localPlayer.Character then
         self:_bindCharacter(localPlayer.Character)
     end
@@ -410,6 +295,18 @@ function CarHud:start()
             warn("[CarHud] update error:", err)
         end
     end)
+
+    -- v3.0: the vote cards + the getaway movie (idempotent starts)
+    for _, name in ipairs({ "GetawayVote", "GetawayCinematic" }) do
+        local mod = script.Parent:FindFirstChild(name)
+        if mod then
+            task.spawn(function()
+                local ok, err = pcall(function() require(mod):start() end)
+                if not ok then warn("[CarHud] " .. name .. " failed: " .. tostring(err)) end
+            end)
+        end
+    end
+    print("[HEIST CREW] CarHud mounted ✅")
 end
 
 return CarHud

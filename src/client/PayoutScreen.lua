@@ -19,6 +19,15 @@
     v2.1 UI overhaul: chunky card with a colour wash in the result colour,
     the grade stamped in a ringed disc, every row gets an icon badge, big
     PLAY AGAIN button, and the whole card follows the HUD scale (UITheme).
+
+    v3.0 "THE SCORE" (getaway agent): the card lands over the getaway movie's
+    final shot (GetawayCinematic holds it; the dim is lighter while the movie
+    plays). "got away by boat / in the helicopter / on the highway", plus the
+    new bonus rows from the payload: car power (+5..12%, half when sneaky, x2
+    on the highway), helicopter +10%, and the Boss's target (+$5,000). More
+    than 4 bags fold into one "N bags" row so the bonuses always fit.
+    Sets the LOCAL player attribute PayoutOpen = true while the card is up
+    (GetawayCinematic hands the camera back when it goes false).
 --]]
 
 local Players = game:GetService("Players")
@@ -41,12 +50,15 @@ local GRADE_WORD = {
     S = "PERFECT!", A = "SNEAKY", B = "LOUD", C = "NO LOOT", F = "BUSTED",
 }
 local TIPS = {
-    busted  = "Tip: don't stop the car next to the police. The Driver can press Shift to go super fast!",
+    busted  = "Tip: when the alarm goes off, jump in the car fast and hit GO!",
     time    = "Tip: when the alarm goes off, stop grabbing stuff and get everyone in the car!",
     caught  = "Tip: if the police catch you, a friend can break you out of jail. Stick together!",
     timeout = "Tip: talk to the Boss (F) to hear the plan, and follow the markers.",
     abandoned = "Tip: bring friends! Every crew job has a special power.",
 }
+-- v3.0: how the crew got away
+local ROUTE_WORDS = { boat = "by boat", heli = "in the helicopter", highway = "on the highway" }
+
 local FAIL_TITLE = {
     time = "OUT OF TIME", timeout = "TOO SLOW", caught = "CAUGHT!", busted = "BUSTED!", abandoned = "CREW LEFT",
 }
@@ -74,6 +86,7 @@ function PayoutScreen:_build()
     screen.Parent = pg
 
     local dim = Instance.new("Frame")
+    dim.Name = "Dim"
     dim.Size = UDim2.fromScale(1, 1)
     dim.BackgroundColor3 = Color3.new(0, 0, 0)
     dim.BackgroundTransparency = 0.45
@@ -178,7 +191,7 @@ function PayoutScreen:_build()
         Position = UDim2.new(0.5, 0, 1, -20), Size = UDim2.fromOffset(280, 54), TextSize = 24 })
     again.Parent = card
 
-    self._u = { screen = screen, card = card, scale = scale, accent = accent, wash = wash, gradeRing = gradeRing,
+    self._u = { screen = screen, dim = dim, card = card, scale = scale, accent = accent, wash = wash, gradeRing = gradeRing,
         grade = grade, gradeWord = gradeWord,
         jobCap = jobCap, title = title, subtitle = subtitle, list = list, cut = cut, meta = meta, again = again }
     again.Activated:Connect(function() self:close() end)
@@ -211,6 +224,7 @@ function PayoutScreen:close()
     out:Play()
     out.Completed:Wait()
     u.screen.Enabled = false
+    localPlayer:SetAttribute("PayoutOpen", false)
 end
 
 function PayoutScreen:show(win, p)
@@ -232,7 +246,8 @@ function PayoutScreen:show(win, p)
     if win then
         u.title.Text = "YOU DID IT!"
         u.title.TextColor3 = T.text
-        u.subtitle.Text = string.format("%d of %d got away on the boat", p.escaped or 0, math.max(p.crewSize or 0, p.escaped or 0))
+        local how = ROUTE_WORDS[p.route or (p.getaway and p.getaway.route) or ""] or "with the loot"
+        u.subtitle.Text = string.format("%d of %d got away %s", p.escaped or 0, math.max(p.crewSize or 0, p.escaped or 0), how)
     else
         u.title.Text = FAIL_TITLE[p.result or ""] or "BUSTED!"
         u.title.TextColor3 = T.danger
@@ -241,17 +256,37 @@ function PayoutScreen:show(win, p)
 
     local rows = {}
     local order = 0
-    for _, b in ipairs(p.bags or {}) do
+    local bagList = p.bags or {}
+    if #bagList > 4 then
+        -- v3.0: lots of bags fold into one row so the getaway bonuses still fit
+        local sum = 0
+        for _, b in ipairs(bagList) do sum = sum + (tonumber(b.value) or 0) end
         order = order + 1
-        local info = Constants.LOOT[b.kind] or Constants.LOOT_DEFAULT
-        local col = info and info.color and UITheme.rgb(info.color) or T.text
-        local left = tostring(b.kind or "Loot")
-        if b.bot then left = left .. "  ·  " .. tostring(b.bot) .. " carried it" end
-        table.insert(rows, row(u.list, order, left, UITheme.money(b.value or 0), col, b.bot and "🤖" or UITheme.ICON.bag))
+        table.insert(rows, row(u.list, order, string.format("%d bags of loot", #bagList), UITheme.money(sum), T.money, UITheme.ICON.bag))
+    else
+        for _, b in ipairs(bagList) do
+            order = order + 1
+            local info = Constants.LOOT[b.kind] or Constants.LOOT_DEFAULT
+            local col = info and info.color and UITheme.rgb(info.color) or T.text
+            local left = tostring(b.name or b.kind or "Loot")
+            if b.bot then left = left .. "  ·  " .. tostring(b.bot) .. " carried it" end
+            table.insert(rows, row(u.list, order, left, UITheme.money(b.value or 0), col, b.bot and "🤖" or UITheme.ICON.bag))
+        end
     end
     if win and (p.stealthBonus or 0) > 0 then
         order = order + 1
         table.insert(rows, row(u.list, order, "Sneaky bonus (no alarm!)", "+" .. UITheme.money(p.stealthBonus), T.gold, UITheme.ICON.star))
+    end
+    -- v3.0 getaway bonuses (car power, helicopter) + the Boss's target
+    if win and type(p.getaway) == "table" then
+        for _, g in ipairs(p.getaway.rows or {}) do
+            order = order + 1
+            table.insert(rows, row(u.list, order, tostring(g.label or "Getaway bonus"), "+" .. UITheme.money(g.amount or 0), T.gold, g.icon or UITheme.ICON.car))
+        end
+    end
+    if win and type(p.target) == "table" and (tonumber(p.target.amount) or 0) > 0 then
+        order = order + 1
+        table.insert(rows, row(u.list, order, "Boss's target: " .. tostring(p.target.name or "?"), "+" .. UITheme.money(p.target.amount), T.gold, UITheme.ICON.target))
     end
     if win and #(p.bags or {}) == 0 then
         order = order + 1
@@ -278,6 +313,9 @@ function PayoutScreen:show(win, p)
     end
 
     u.screen.Enabled = true
+    localPlayer:SetAttribute("PayoutOpen", true)
+    -- v3.0: lighter dim while the getaway movie's final shot plays behind the card
+    if u.dim then u.dim.BackgroundTransparency = localPlayer:GetAttribute("GetawayPlaying") and 0.75 or 0.45 end
     u.card.GroupTransparency = 1
     local fit = self._fit or 1
     u.scale.Scale = 0.9 * fit

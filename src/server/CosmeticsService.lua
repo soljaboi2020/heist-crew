@@ -7,12 +7,17 @@
 
       CARS    real getaway car TYPES (VehicleService builds a different model
               for each). Colour is folded into the type — no separate paint.
-                Classic        free      the '80s wedge, normal stats
-                Muscle Car     $8,000    +15% speed, nitro recharges in 7 s (not 12)
-                Street Racer   $20,000   low supercar wedge, +35% top speed
-                Armored Truck  $35,000   police bust meter fills 50% slower
-                Monster Truck  $60,000   +20% speed, bust fills 30% slower
-                Tank           $150,000  VIP only. -15% speed, bust fills 75% slower
+              (v3.0: nobody drives — cars PAY instead of going faster. The
+               bonus comes from VehicleService.GETAWAY_BONUS; loud escape = full,
+               sneaky = half, Highway = x2. The stunt is what it does in the movie.)
+                Classic        free      +0%   dodges the cops
+                Muscle Car     $8,000    +5%   nitro burst
+                Street Racer   $20,000   +8%   leaves the cops in the dust
+                Armored Truck  $35,000   +8%   cops bounce off
+                Monster Truck  $60,000   +10%  jumps a police car
+                Tank           $150,000  +12%  VIP only. smashes the roadblock
+              (speedMult / bustMult / nitroCooldown are kept for old saves and
+               the dormant driving code; nothing reads them while DRIVING = false)
               WHICH CAR SPAWNS: the crew's BEST car = the most expensive car
               anyone in the crew has equipped (ties → the first player in the
               crew list). In the club the preview car uses everyone in the
@@ -119,27 +124,27 @@ local COSMETICS = {
     -- CARS (real getaway car types — VehicleService builds each one)
     { id = "CarClassic",  category = "car", name = "Classic",       price = 0, starter = true,
       carType = "classic", color = { 242, 242, 238 }, speedMult = 1.00, bustMult = 1.00, nitroCooldown = 12,
-      power = { name = "ALL-ROUNDER", desc = "Normal speed. Gets the job done." },
+      power = { name = "ALL-ROUNDER", desc = "Dodges the cops. Gets the job done." },
       blurb = "The trusty Miami wedge" },
     { id = "CarMuscle",   category = "car", name = "Muscle Car",    price = 8000,
       carType = "muscle", color = { 214, 58, 34 }, speedMult = 1.15, bustMult = 1.00, nitroCooldown = 7,
-      power = { name = "+15% SPEED", desc = "Faster, and nitro recharges quicker" },
-      blurb = "Loud engine, fast nitro" },
+      power = { name = "+5% ESCAPE CASH", desc = "Nitro burst past the cops!" },
+      blurb = "Loud engine, big nitro" },
     { id = "CarRacer",    category = "car", name = "Street Racer",  price = 20000,
       carType = "racer", color = { 255, 196, 20 }, speedMult = 1.35, bustMult = 1.00, nitroCooldown = 12,
-      power = { name = "+35% SPEED", desc = "Super fast. Leave the cops behind!" },
+      power = { name = "+8% ESCAPE CASH", desc = "Leaves the cops in the dust!" },
       blurb = "Low, wide supercar" },
     { id = "CarArmored",  category = "car", name = "Armored Truck", price = 35000,
       carType = "armored", color = { 92, 98, 104 }, speedMult = 1.00, bustMult = 0.50, nitroCooldown = 12,
-      power = { name = "BUST 50% SLOWER", desc = "Cops need twice as long to stop you" },
+      power = { name = "+8% ESCAPE CASH", desc = "Cops bounce right off it!" },
       blurb = "Steel plates everywhere" },
     { id = "CarMonster",  category = "car", name = "Monster Truck", price = 60000,
       carType = "monster", color = { 40, 170, 90 }, speedMult = 1.20, bustMult = 0.70, nitroCooldown = 12,
-      power = { name = "+20% SPEED", desc = "Fast, and cops bust you 30% slower" },
+      power = { name = "+10% ESCAPE CASH", desc = "Jumps right over a police car!" },
       blurb = "Giant wheels. Giant fun." },
     { id = "CarTank",     category = "car", name = "Tank",          price = 150000, vipOnly = true,
       carType = "tank", color = { 96, 110, 66 }, speedMult = 0.85, bustMult = 0.25, nitroCooldown = 12,
-      power = { name = "BUST 75% SLOWER", desc = "A bit slow, but cops can barely stop it" },
+      power = { name = "+12% ESCAPE CASH", desc = "Smashes through the roadblock!" },
       blurb = "VIP only. It's a TANK." },
 
     -- TRAILS (behind your character + walk speed)
@@ -406,17 +411,29 @@ local function hookCharacter(player)
     end)
 end
 
+-- (v3.0 polish) a car card's power, straight from VehicleService's getaway
+-- numbers so the shop can never drift from what the payout actually pays
+local function carPower(item)
+    local V = optionalService("VehicleService")
+    if not V or type(V.GETAWAY_BONUS) ~= "table" then return item.power end
+    local b = tonumber(V.GETAWAY_BONUS[item.carType or "classic"]) or 0
+    local desc = (type(V.stuntFor) == "function" and V.stuntFor(item.carType)) or (item.power and item.power.desc) or ""
+    local name = b > 0 and string.format("+%d%% ESCAPE CASH", math.floor(b * 100 + 0.5)) or "ALL-ROUNDER"
+    return { name = name, desc = desc }
+end
+
 -- ── public: catalog / state ───────────────────────────────────────────
 function CosmeticsService:catalog()
     local out = {}
     for i, item in ipairs(COSMETICS) do
+        local power = item.category == "car" and carPower(item) or item.power
         out[i] = {
             id = item.id, category = item.category, name = item.name, blurb = item.blurb or "",
             price = item.price or 0, starter = item.starter == true, vipOnly = item.vipOnly == true,
             rewardOnly = item.rewardOnly == true, rainbow = item.rainbow == true,
             color = item.color, color2 = item.color2, material = item.material, reflectance = item.reflectance,
             -- v2.2 powers
-            power = item.power and { name = item.power.name, desc = item.power.desc } or nil,
+            power = power and { name = power.name, desc = power.desc } or nil,
             carType = item.carType, speedMult = item.speedMult, bustMult = item.bustMult,
             nitroCooldown = item.nitroCooldown, speedBoost = item.speedBoost,
             valueMult = item.valueMult, scale = item.scale, size = item.size,

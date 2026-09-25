@@ -40,6 +40,21 @@
         desk lamp in the office, product rows shaded by the room, painted
         instead of stripy wood, Kenney props repainted after they load.
 
+    v3.0 "THE SCORE" (2026-09-25, docs/V3_SPEC.md §2 — lootSpots v3):
+      • COUNTER   both registers pop open on a real till drawer — bills in the
+        slots, coins in the cups (Register, "stuff"); behind the clerk a 9-bin
+        SCRATCH & WIN dispenser full of ticket rolls (ScratchTickets).
+      • FLOOR     an ATM by the drinks fridges, jammed and spitting twenties
+        out of the cash slot (ATMCash, "drill"); the SECRET STASH — cash
+        hidden in a box of frozen peas in the ice-cream freezer (hidden).
+      • STOCK ROOM a carton of lotto ticket packs on the top rack (Lottery) +
+        tonight's night-deposit bag and a till tray on the soda pallet
+        (Register, "stuff").
+      • OFFICE    the safe's cash bricks (SafeCash ×2, "dial") and THE TARGET:
+        Sunny's GOLDEN TICKET, framed behind glass on the wall by the desk
+        with its own picture light (GoldenTicket).
+      Pools: counter / floor / stockroom / office (refs.poolNames).
+
     Geometry + props + refs ONLY (no Scripts / prompts / gameplay). Tags set
     here (V2_SPEC §2): HideSpot (+Label), ShadowZone, Vent (+Pair). Vent /
     hatch parts face (LookVector) the open floor you step out onto.
@@ -389,19 +404,74 @@ local function productRow(name, x0, y0, z0, x1, y1, z1, face, seed, parent, wide
     return p
 end
 
--- a stack of banded cash (loot visuals)
-local function cashStack(parent, x, y, z, nx, nz, layers)
+-- (v3.0) print a banknote on one face of a part: pale green paper, a darker
+-- engraved panel, the round portrait window, a big corner number
+local BILL = rgb(186, 206, 168)
+local BILL_INK = rgb(92, 128, 88)
+local function billFace(p, face, number)
+    local g = lit(surface(p, face, 60, 1))
+    frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = BILL }, g)
+    frame({ Size = UDim2.fromScale(0.92, 0.8), Position = UDim2.fromScale(0.04, 0.1), BackgroundColor3 = BILL_INK,
+        BackgroundTransparency = 0.55 }, g)
+    local oval = frame({ Size = UDim2.fromScale(0.26, 0.64), Position = UDim2.fromScale(0.37, 0.18),
+        BackgroundColor3 = rgb(214, 226, 200) }, g)
+    UITheme.corner(oval, 999)
+    if number then
+        text({ Text = number, Size = UDim2.fromScale(0.22, 0.4), Position = UDim2.fromScale(0.05, 0.08), TextScaled = true,
+            FontFace = UITheme.F.display, TextColor3 = rgb(40, 70, 44) }, g)
+    end
+    return g
+end
+
+-- a stack of banded cash (loot visuals). `band` = the paper strap colour
+-- (real straps: mustard = $10,000 of hundreds, violet = $2,000 of twenties).
+-- The top layer gets a printed bill so it reads as money, not green blocks.
+local function cashStack(parent, x, y, z, nx, nz, layers, band)
     for l = 0, layers - 1 do
         for i = 0, nx - 1 do
             for j = 0, nz - 1 do
                 local bx = x + (i - (nx - 1) / 2) * 0.72
                 local bz = z + (j - (nz - 1) / 2) * 0.36
-                box("CashBrick", bx - 0.34, y + l * 0.26, bz - 0.16, bx + 0.34, y + l * 0.26 + 0.24, bz + 0.16,
-                    CASH_GREEN, M.Fabric, parent, nc({ CastShadow = false }))
-                box("CashBand", bx - 0.06, y + l * 0.26, bz - 0.17, bx + 0.06, y + l * 0.26 + 0.25, bz + 0.17,
-                    rgb(236, 230, 200), M.Fabric, parent, nc({ CastShadow = false }))
+                local brick = box("CashBrick", bx - 0.34, y + l * 0.26, bz - 0.16, bx + 0.34, y + l * 0.26 + 0.24, bz + 0.16,
+                    BILL, M.Fabric, parent, nc({ CastShadow = false }))
+                if l == layers - 1 then billFace(brick, Enum.NormalId.Top, "100") end
+                box("CashBand", bx - 0.08, y + l * 0.26 - 0.005, bz - 0.17, bx + 0.08, y + l * 0.26 + 0.245, bz + 0.17,
+                    band or rgb(214, 170, 60), M.Fabric, parent, nc({ CastShadow = false }))
             end
         end
+    end
+end
+
+-- (v3.0) a cash-register till drawer, popped open. Origin = the drawer's
+-- back-left corner on the counter top; it opens toward +X (the customer side).
+-- Five bill slots under spring clips + four coin cups at the front.
+local function tillDrawer(parent, x0, y, z0, x1, z1)
+    box("Drawer", x0, y, z0, x1, y + 0.26, z1, rgb(40, 40, 46), M.Metal, parent, nc())
+    box("DrawerFront", x1, y - 0.02, z0 - 0.03, x1 + 0.06, y + 0.3, z1 + 0.03, rgb(28, 28, 32), M.Metal, parent, nc())
+    local slots = 5
+    local w = (z1 - z0 - 0.08) / slots
+    local billX1 = x0 + (x1 - x0) * 0.62
+    for k = 0, slots - 1 do
+        local sz0 = z0 + 0.04 + k * w
+        box("Divider", x0 + 0.02, y + 0.26, sz0 - 0.01, billX1, y + 0.3, sz0 + 0.01, rgb(20, 20, 24), M.Metal, parent, nc())
+        local b = box("Bills", x0 + 0.04, y + 0.2, sz0 + 0.02, billX1 - 0.03, y + 0.3, sz0 + w - 0.02, BILL, M.Fabric, parent,
+            nc({ CastShadow = false }))
+        billFace(b, Enum.NormalId.Top, ({ "1", "5", "10", "20", "50" })[k + 1])
+        box("Clip", billX1 - 0.16, y + 0.3, sz0 + 0.03, billX1 - 0.12, y + 0.34, sz0 + w - 0.03, STEEL_LT, M.Metal, parent, nc())
+    end
+    -- coin cups (silver + copper)
+    local cups = 4
+    local cw = (z1 - z0 - 0.08) / cups
+    for k = 0, cups - 1 do
+        local cz = z0 + 0.04 + (k + 0.5) * cw
+        local cx = (billX1 + x1) / 2
+        part({ Name = "CoinCup", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.16, cw * 0.8, cw * 0.8),
+            CFrame = CFrame.new(cx, y + 0.2, cz) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = rgb(24, 24, 28), Material = M.Metal, CanCollide = false, CastShadow = false }, parent)
+        part({ Name = "Coins", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.04, cw * 0.62, cw * 0.62),
+            CFrame = CFrame.new(cx, y + 0.28, cz) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = (k == 3) and rgb(184, 110, 70) or rgb(196, 200, 206), Material = M.Metal, Reflectance = 0.35,
+            CanCollide = false, CastShadow = false }, parent)
     end
 end
 
@@ -726,18 +796,15 @@ function MartBuilder:_checkout(f, refs, loot)
         text({ Text = "$0.00", Size = UDim2.fromScale(0.9, 0.8), Position = UDim2.fromScale(0.05, 0.1),
             TextXAlignment = Enum.TextXAlignment.Right, TextScaled = true, FontFace = UITheme.F.mono,
             TextColor3 = UITheme.C.money }, sg)
-        -- the open drawer full of cash, sticking out toward the customer side
+        -- (v3.0) the till drawer popped open toward the customer side: bills in
+        -- five slots, coins in the cups. The whole drawer is the loot visual.
         local drawer = Instance.new("Model")
         drawer.Name = "RegisterCash" .. k
         drawer.Parent = c
-        box("Drawer", rx + 0.5, topY + 0.05, rz - 0.5, rx + 1.2, topY + 0.3, rz + 0.5, rgb(52, 52, 60), M.Metal, drawer, nc())
-        for b = 0, 3 do
-            box("Bills", rx + 0.6, topY + 0.3, rz - 0.45 + b * 0.24, rx + 1.1, topY + 0.38, rz - 0.27 + b * 0.24,
-                CASH_GREEN, M.Fabric, drawer, nc({ CastShadow = false }))
-        end
+        tillDrawer(drawer, rx + 0.5, topY + 0.02, rz - 0.5, rx + 1.3, rz + 0.5)
         local stand = Vector3.new(COUNTER_X1 + 2, FLOOR + 3, rz)
         table.insert(loot, { kind = "Register", cframe = CFrame.lookAt(stand, Vector3.new(rx, stand.Y, rz)),
-            visual = drawer, inVault = false })
+            visual = drawer, interact = "stuff", pool = "counter", inVault = false })
     end
 
     -- behind the clerk: product wall + the lottery ticket case (Lottery loot)
@@ -748,23 +815,54 @@ function MartBuilder:_checkout(f, refs, loot)
         productRow("WallProducts", IX0 + 1, y, IZ0 + 0.4, IX0 + 1.05, y + 1.2, 5.5, Enum.NormalId.Right, 20 + s, c)
         productRow("WallProducts", IX0 + 1, y, 8.3, IX0 + 1.05, y + 1.2, 11.3, Enum.NormalId.Right, 24 + s, c)
     end
-    box("LottoCase", IX0, FLOOR + 2.4, 5.8, IX0 + 0.9, FLOOR + 6.6, 8, rgb(40, 20, 60), M.Metal, c)
+    -- (v3.0) the SCRATCH & WIN dispenser: 9 clear bins on a black backboard,
+    -- a roll of tickets in each with a strip hanging out of the slot. The
+    -- rolls + strips are the loot (ScratchTickets); the dispenser stays.
+    local dz0, dz1 = 5.75, 8.05
+    box("DispenserBack", IX0, FLOOR + 2.2, dz0, IX0 + 0.25, FLOOR + 6.7, dz1, rgb(22, 20, 28), M.Metal, c)
     local tickets = Instance.new("Model")
-    tickets.Name = "LottoTickets"
+    tickets.Name = "ScratchTickets"
     tickets.Parent = c
-    local tk = box("Tickets", IX0 + 0.9, FLOOR + 2.7, 5.95, IX0 + 1, FLOOR + 6.3, 7.85, rgb(255, 214, 120), M.Fabric, tickets, nc())
-    local tg = lit(surface(tk, Enum.NormalId.Right, 30, 1.3))
-    for r = 0, 3 do
+    local games = {
+        { "$$$", rgb(40, 170, 90) },  { "LUCKY 7", rgb(220, 40, 60) },  { "GOLD RUSH", rgb(230, 170, 30) },
+        { "BINGO", rgb(40, 110, 220) }, { "WIN $500", rgb(160, 60, 200) }, { "HOT CASH", rgb(250, 110, 30) },
+        { "x10", rgb(20, 160, 170) },  { "SUNNY $", rgb(250, 200, 40) },  { "JACKPOT", rgb(230, 60, 150) },
+    }
+    local bw = (dz1 - dz0) / 3
+    for row = 0, 2 do
         for col = 0, 2 do
-            frame({ Size = UDim2.fromScale(0.28, 0.2), Position = UDim2.fromScale(0.04 + col * 0.32, 0.03 + r * 0.245),
-                BackgroundColor3 = PRODUCT[((r * 3 + col) % #PRODUCT) + 1] }, tg)
+            local k = row * 3 + col + 1
+            local by = FLOOR + 5.25 - row * 1.45           -- bin centre height (top row first)
+            local bz = dz0 + (col + 0.5) * bw
+            -- the bin: side walls + an acrylic front
+            box("BinWall", IX0 + 0.25, by - 0.5, bz - bw / 2, IX0 + 0.9, by + 0.55, bz - bw / 2 + 0.04, rgb(40, 40, 48), M.Metal, c, nc())
+            box("BinShelf", IX0 + 0.25, by - 0.52, bz - bw / 2, IX0 + 0.9, by - 0.48, bz + bw / 2, rgb(40, 40, 48), M.Metal, c, nc())
+            box("BinFront", IX0 + 0.86, by - 0.3, bz - bw / 2 + 0.04, IX0 + 0.9, by + 0.55, bz + bw / 2, rgb(210, 230, 240), M.Glass, c,
+                nc({ Transparency = 0.6, Reflectance = 0.2, CastShadow = false }))
+            local num = box("BinNumber", IX0 + 0.9, by + 0.38, bz - 0.12, IX0 + 0.92, by + 0.54, bz + 0.12, rgb(250, 250, 244), M.Plastic, c, nc())
+            lit(printOn(num, Enum.NormalId.Right, tostring(k), rgb(30, 30, 30), UITheme.F.display, 80, 1).Parent)
+            -- the roll (axis along z) and the strip of tickets hanging out
+            part({ Name = "TicketRoll", Shape = Enum.PartType.Cylinder, Size = Vector3.new(bw - 0.14, 0.62, 0.62),
+                CFrame = CFrame.new(IX0 + 0.58, by + 0.05, bz) * CFrame.Angles(0, math.rad(90), 0),
+                Color = games[k][2], Material = M.Fabric, CanCollide = false, CastShadow = false }, tickets)
+            local strip = box("TicketStrip", IX0 + 0.92, by - 1.05, bz - bw / 2 + 0.1, IX0 + 0.95, by - 0.28, bz + bw / 2 - 0.08,
+                games[k][2], M.Fabric, tickets, nc({ CastShadow = false }))
+            local sg = lit(surface(strip, Enum.NormalId.Right, 60, 1))
+            frame({ Size = UDim2.fromScale(0.86, 0.34), Position = UDim2.fromScale(0.07, 0.08),
+                BackgroundColor3 = rgb(200, 204, 210) }, sg)           -- the silver scratch panel
+            text({ Text = games[k][1], Size = UDim2.fromScale(0.9, 0.3), Position = UDim2.fromScale(0.05, 0.5), TextScaled = true,
+                TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextColor3 = rgb(255, 255, 255) }, sg)
+            frame({ Size = UDim2.new(1, 0, 0, 2), Position = UDim2.fromScale(0, 0.97), BackgroundColor3 = rgb(250, 250, 244),
+                BackgroundTransparency = 0.3 }, sg)                  -- perforation
         end
     end
+    box("BinWall", IX0 + 0.25, FLOOR + 1.3, dz1 - 0.04, IX0 + 0.9, FLOOR + 6.3, dz1, rgb(40, 40, 48), M.Metal, c, nc())
+    box("DispenserTrim", IX0 + 0.25, FLOOR + 6.3, dz0, IX0 + 0.95, FLOOR + 6.45, dz1, rgb(212, 172, 92), M.Metal, c, nc())
     local lotto = box("LottoSign", IX0 + 0.9, FLOOR + 6.6, 5.8, IX0 + 1, FLOOR + 7.5, 8, SUN, M.Metal, c, nc())
-    lit(printOn(lotto, Enum.NormalId.Right, "LOTTO", rgb(120, 20, 60), UITheme.F.display, 40, 1.2).Parent)
-    local lstand = Vector3.new(IX0 + 2.8, FLOOR + 3, 6.9)
-    table.insert(loot, { kind = "Lottery", cframe = CFrame.lookAt(lstand, Vector3.new(IX0, lstand.Y, 6.9)),
-        visual = tickets, inVault = false })
+    lit(printOn(lotto, Enum.NormalId.Right, "SCRATCH & WIN", rgb(120, 20, 60), UITheme.F.display, 40, 1.2).Parent)
+    local lstand = Vector3.new(IX0 + 2.4, FLOOR + 3, 6.9)
+    table.insert(loot, { kind = "ScratchTickets", cframe = CFrame.lookAt(lstand, Vector3.new(IX0, lstand.Y, 6.9)),
+        visual = tickets, pool = "counter", inVault = false })
 
     -- clerk's stool + a little TV
     part({ Name = "Stool", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 1.4, 1.4),
@@ -772,12 +870,129 @@ function MartBuilder:_checkout(f, refs, loot)
         Color = rgb(200, 40, 60), Material = M.Fabric }, c)
     bar("StoolLeg", Vector3.new(53.2, FLOOR, 9.2), Vector3.new(53.2, FLOOR + 2.25, 9.2), 0.2, STEEL_LT, M.Metal, c, nc())
 
-    -- ice-cream chest freezer in the back-west corner
-    box("IceCreamFreezer", IX0 + 0.1, FLOOR, 13.4, 56, FLOOR + 3, SALES_Z1, rgb(236, 244, 250), M.Metal, c)
-    box("FreezerLid", IX0 + 0.2, FLOOR + 3, 13.5, 55.9, FLOOR + 3.1, SALES_Z1 - 0.1, rgb(200, 230, 245), M.Glass, c,
-        { Transparency = 0.4 })
+    -- ice-cream chest freezer in the back-west corner. (v3.0) Now a real tub:
+    -- white walls, frosty rim, tubs of ice cream under a glass lid — and on ~1
+    -- run in 20 the SECRET STASH: a box of "frozen peas" that is really cash.
+    local fx0, fx1, fz0, fz1 = IX0 + 0.1, 56, 13.4, SALES_Z1
+    local fTop = FLOOR + 3
+    local FRZ = rgb(236, 244, 250)
+    box("IceCreamFreezer", fx0, FLOOR, fz0, fx1, FLOOR + 1.9, fz1, FRZ, M.Metal, c)           -- body below the tubs
+    box("FreezerWall", fx0, FLOOR + 1.9, fz0, fx1, fTop, fz0 + 0.2, FRZ, M.Metal, c)
+    box("FreezerWall", fx0, FLOOR + 1.9, fz1 - 0.2, fx1, fTop, fz1, FRZ, M.Metal, c)
+    box("FreezerWall", fx0, FLOOR + 1.9, fz0 + 0.2, fx0 + 0.2, fTop, fz1 - 0.2, FRZ, M.Metal, c)
+    box("FreezerWall", fx1 - 0.2, FLOOR + 1.9, fz0 + 0.2, fx1, fTop, fz1 - 0.2, FRZ, M.Metal, c)
+    box("FrostRim", fx0 + 0.2, fTop - 0.12, fz0 + 0.2, fx1 - 0.2, fTop - 0.05, fz0 + 0.28, rgb(244, 250, 255), M.Ice, c, nc())
+    box("FrostRim", fx0 + 0.2, fTop - 0.12, fz1 - 0.28, fx1 - 0.2, fTop - 0.05, fz1 - 0.2, rgb(244, 250, 255), M.Ice, c, nc())
+    box("FreezerLid", IX0 + 0.2, fTop, 13.5, 55.9, fTop + 0.1, SALES_Z1 - 0.1, rgb(200, 230, 245), M.Glass, c,
+        { Transparency = 0.6, Reflectance = 0.2 })
+    point(lightAnchor("FreezerGlow", Vector3.new(53.5, FLOOR + 2.6, 14.2), c), rgb(200, 230, 255), 0.5, 5, false)
+    local tubCols = { rgb(250, 190, 210), rgb(120, 70, 40), rgb(250, 240, 200), rgb(140, 220, 160), rgb(250, 150, 90) }
+    for k = 0, 7 do
+        local tx = fx0 + 0.55 + (k % 4) * 0.72
+        local tz = fz0 + 0.5 + math.floor(k / 4) * 0.6
+        part({ Name = "IceCreamTub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.5, 0.55, 0.55),
+            CFrame = CFrame.new(tx, FLOOR + 2.15, tz) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = rgb(250, 250, 246), Material = M.Plastic, CanCollide = false }, c)
+        part({ Name = "TubLid", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, 0.58, 0.58),
+            CFrame = CFrame.new(tx, FLOOR + 2.42, tz) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = tubCols[k % 5 + 1], Material = M.Plastic, CanCollide = false }, c)
+    end
+    -- the stash (the loot visual): a torn-open FROZEN PEAS box stuffed with cash
+    local stash = Instance.new("Model")
+    stash.Name = "SecretStash"
+    stash.Parent = c
+    local sx0, sx1, sz0, sz1 = 54.3, 55.6, 13.75, 14.65
+    local peas = box("PeasBox", sx0, FLOOR + 1.9, sz0, sx1, FLOOR + 2.4, sz1, rgb(60, 150, 70), M.Cardboard, stash, nc())
+    local pg = lit(surface(peas, Enum.NormalId.Top, 50, 1))
+    text({ Text = "FROZEN PEAS", Size = UDim2.fromScale(0.9, 0.4), Position = UDim2.fromScale(0.05, 0.05), TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextColor3 = rgb(250, 250, 240) }, pg)
+    for k = 0, 2 do
+        local p0 = box("StashCash", sx0 + 0.15 + k * 0.38, FLOOR + 2.3, sz0 + 0.2, sx0 + 0.47 + k * 0.38, FLOOR + 2.62,
+            sz1 - 0.2, BILL, M.Fabric, stash, nc({ CastShadow = false }))
+        billFace(p0, Enum.NormalId.Top, "100")
+    end
+    box("FrostFlakes", sx0 - 0.05, FLOOR + 2.4, sz0 - 0.05, sx1 + 0.05, FLOOR + 2.44, sz0 + 0.15, rgb(244, 250, 255), M.Ice, stash, nc())
+    local fstand = Vector3.new(53.6, FLOOR + 3, 12.1)
+    table.insert(loot, { kind = "SecretStash", cframe = CFrame.lookAt(fstand, Vector3.new(54.9, fstand.Y, 14.2)),
+        visual = stash, hidden = true, pool = "floor", inVault = false })
     lit(printOn(box("FreezerLabel", IX0 + 0.5, FLOOR + 1, 13.38, 55.5, FLOOR + 2.4, 13.4, HOT_PINK, M.Metal, c, nc()),
         Enum.NormalId.Front, "ICE CREAM", rgb(255, 255, 255), UITheme.F.display, 40, 1.2).Parent)
+end
+
+-- 🏧 (v3.0) the ATM in the back-east corner by the drinks fridges, facing
+-- west into the store. It's jammed — a wad of twenties is poking out of the
+-- cash slot (that wad is the loot visual; drill the machine to take it).
+function MartBuilder:_atm(f, loot)
+    local a = Instance.new("Model")
+    a.Name = "ATM"
+    a.Parent = f
+    local x0, x1, z0, z1 = 71.5, IX1, 13.15, SALES_Z1 - 0.05      -- cabinet footprint
+    local GRAPHITE = rgb(46, 50, 58)
+    local BRUSHED = rgb(172, 178, 188)
+    local fx = x0 - 0.12                                          -- fascia front face
+    box("AtmCabinet", x0, FLOOR, z0, x1, FLOOR + 5.5, z1, GRAPHITE, M.Metal, a)
+    box("AtmPlinth", x0 - 0.05, FLOOR, z0 - 0.05, x1, FLOOR + 0.4, z1 + 0.02, rgb(26, 28, 32), M.Metal, a)
+    box("AtmFascia", fx, FLOOR + 1.4, z0 + 0.1, x0, FLOOR + 5.3, z1 - 0.1, BRUSHED, M.Metal, a, { Reflectance = 0.12 })
+    -- backlit header
+    local hdr = box("AtmHeader", fx - 0.05, FLOOR + 5.5, z0, x1, FLOOR + 6.3, z1, rgb(18, 84, 186), M.Metal, a)
+    local hg = surface(hdr, Enum.NormalId.Left, 40, 1.6)
+    text({ Text = "ATM", Size = UDim2.fromScale(0.5, 0.8), Position = UDim2.fromScale(0.05, 0.1), TextScaled = true,
+        FontFace = UITheme.F.display, TextColor3 = rgb(255, 255, 255) }, hg)
+    text({ Text = "CASH 24/7", Size = UDim2.fromScale(0.4, 0.4), Position = UDim2.fromScale(0.56, 0.3), TextScaled = true,
+        FontFace = UITheme.F.bold, TextColor3 = rgb(255, 214, 120) }, hg)
+    -- the screen, recessed under a little privacy hood
+    local zc = (z0 + z1) / 2
+    local scr = box("AtmScreen", fx - 0.02, FLOOR + 3.7, zc - 0.55, fx, FLOOR + 4.7, zc + 0.35, rgb(10, 20, 40), M.Glass, a, nc())
+    local sg = surface(scr, Enum.NormalId.Left, 60, 1.3)
+    local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1) }, sg)
+    local grad = Instance.new("UIGradient")
+    grad.Rotation = 90
+    grad.Color = ColorSequence.new(rgb(30, 110, 210), rgb(10, 40, 110))
+    grad.Parent = bg
+    text({ Text = "OUT OF ORDER?", Size = UDim2.fromScale(0.9, 0.26), Position = UDim2.fromScale(0.05, 0.14), TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextColor3 = rgb(255, 214, 120) }, sg)
+    text({ Text = "PLEASE TAKE YOUR CASH", Size = UDim2.fromScale(0.9, 0.18), Position = UDim2.fromScale(0.05, 0.56), TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextColor3 = rgb(255, 255, 255) }, sg)
+    point(scr, rgb(120, 170, 255), 0.6, 8, false)
+    box("HoodTop", fx - 0.4, FLOOR + 4.7, zc - 0.62, fx, FLOOR + 4.78, zc + 0.42, GRAPHITE, M.Metal, a, nc())
+    box("HoodSide", fx - 0.4, FLOOR + 3.7, zc - 0.62, fx, FLOOR + 4.78, zc - 0.56, GRAPHITE, M.Metal, a, nc())
+    box("HoodSide", fx - 0.4, FLOOR + 3.7, zc + 0.36, fx, FLOOR + 4.78, zc + 0.42, GRAPHITE, M.Metal, a, nc())
+    -- card slot (green LED) to the right of the screen, keypad shelf below
+    box("CardSlot", fx - 0.08, FLOOR + 3.9, zc + 0.5, fx, FLOOR + 4.1, zc + 0.75, rgb(20, 20, 24), M.Metal, a, nc())
+    box("CardLed", fx - 0.09, FLOOR + 4.12, zc + 0.56, fx - 0.05, FLOOR + 4.16, zc + 0.69, rgb(80, 255, 120), M.Neon, a,
+        nc({ CastShadow = false }))
+    local pad = part({ Name = "Keypad", Size = Vector3.new(0.5, 0.08, 0.9),
+        CFrame = CFrame.new(fx - 0.25, FLOOR + 3.3, zc - 0.1) * CFrame.Angles(0, 0, math.rad(12)),
+        Color = GRAPHITE, Material = M.Metal, CanCollide = false }, a)
+    local kg = lit(surface(pad, Enum.NormalId.Top, 80, 1))
+    for r = 0, 3 do
+        for col = 0, 3 do
+            local key = frame({ Size = UDim2.fromScale(0.2, 0.2), Position = UDim2.fromScale(0.04 + r * 0.24, 0.04 + col * 0.24),
+                BackgroundColor3 = (col == 3) and ({ rgb(220, 50, 50), rgb(240, 200, 40), rgb(60, 190, 90), rgb(200, 204, 210) })[r + 1]
+                    or rgb(200, 204, 210) }, kg)
+            UITheme.corner(key, 3)
+        end
+    end
+    -- receipt slot + the cash dispenser slot
+    box("ReceiptSlot", fx - 0.06, FLOOR + 2.95, zc + 0.35, fx, FLOOR + 3.02, zc + 0.75, rgb(20, 20, 24), M.Metal, a, nc())
+    box("CashSlot", fx - 0.08, FLOOR + 2.3, zc - 0.5, fx, FLOOR + 2.55, zc + 0.3, rgb(16, 16, 20), M.Metal, a, nc())
+    local brands = { rgb(26, 60, 150), rgb(230, 60, 40), rgb(240, 170, 30) }
+    for k, col in ipairs(brands) do
+        box("CardLogo", fx - 0.02, FLOOR + 1.7, zc - 0.7 + (k - 1) * 0.5, fx, FLOOR + 1.98, zc - 0.32 + (k - 1) * 0.5, col, M.Plastic, a, nc())
+    end
+    -- the loot: a fan of twenties sticking out of the cash slot
+    local wad = Instance.new("Model")
+    wad.Name = "ATMCash"
+    wad.Parent = f
+    for k = 0, 4 do
+        local b = part({ Name = "Twenty", Size = Vector3.new(0.5, 0.03, 0.72),
+            CFrame = CFrame.new(fx - 0.2, FLOOR + 2.36 + k * 0.035, zc - 0.1) * CFrame.Angles(0, math.rad(-8 + k * 4), math.rad(-6)),
+            Color = BILL, Material = M.Fabric, CanCollide = false, CastShadow = false }, wad)
+        if k == 4 then billFace(b, Enum.NormalId.Top, "20") end
+    end
+    local stand = Vector3.new(69.3, FLOOR + 3, zc)
+    table.insert(loot, { kind = "ATMCash", cframe = CFrame.lookAt(stand, Vector3.new(x0, stand.Y, zc)),
+        visual = wad, interact = "drill", pool = "floor", inVault = false })
 end
 
 function MartBuilder:_salesFloor(f, refs, loot)
@@ -788,6 +1003,7 @@ function MartBuilder:_salesFloor(f, refs, loot)
     self:_gondola(s, GONDOLAS[2][1], GONDOLAS[2][2], 2, "CANDY")
     self:_fridges(s)
     self:_checkout(s, refs, loot)
+    self:_atm(s, loot)
 
     -- the BIG BOX: a giant soda-case display you can hide inside (HideSpot)
     local bx0, bx1, bz0, bz1 = 57.2, 59.8, 13.1, SALES_Z1 - 0.05
@@ -827,8 +1043,9 @@ function MartBuilder:_salesFloor(f, refs, loot)
     box("CoveBase", CURTAIN_X1, FLOOR, SALES_Z1 - 0.16, IX1, FLOOR + 0.5, SALES_Z1 - 0.1, rgb(26, 26, 30), M.Rubber, s, nc())
     box("WainscotCap", IX0, FLOOR + 3, SALES_Z1 - 0.18, CURTAIN_X0, FLOOR + 3.2, SALES_Z1, TEAL, M.Plaster, s, nc())
     box("WainscotCap", CURTAIN_X1, FLOOR + 3, SALES_Z1 - 0.18, IX1, FLOOR + 3.2, SALES_Z1, TEAL, M.Plaster, s, nc())
-    for _, pp in ipairs({ { 52.2, 57, "HOT DOGS\n$1.99", SUN_DEEP }, { 70.6, 72.8, "SLUSH!", CYAN } }) do
-        local po = box("PromoPoster", pp[1], FLOOR + 5.6, SALES_Z1 - 0.06, pp[2], FLOOR + 9.4, SALES_Z1, rgb(250, 248, 240), M.Fabric, s, nc())
+    -- (v3.0) the SLUSH! poster rides above the new ATM's header
+    for _, pp in ipairs({ { 52.2, 57, "HOT DOGS\n$1.99", SUN_DEEP, 5.6 }, { 70.6, 72.8, "SLUSH!", CYAN, 6.9 } }) do
+        local po = box("PromoPoster", pp[1], FLOOR + pp[5], SALES_Z1 - 0.06, pp[2], FLOOR + pp[5] + 3.8, SALES_Z1, rgb(250, 248, 240), M.Fabric, s, nc())
         local pg = lit(surface(po, Enum.NormalId.Front, 30, 1))
         frame({ Size = UDim2.fromScale(1, 0.18), BackgroundColor3 = pp[4] }, pg)
         text({ Text = pp[3], Size = UDim2.fromScale(0.9, 0.7), Position = UDim2.fromScale(0.05, 0.24),
@@ -840,7 +1057,7 @@ function MartBuilder:_salesFloor(f, refs, loot)
 
     -- a mop bucket + wet floor sign (cover in the front aisle's east end)
     local sign = part({ Name = "WetFloorSign", Size = Vector3.new(1.2, 2.2, 0.2),
-        CFrame = CFrame.new(70.2, FLOOR + 1.1, 13.9) * CFrame.Angles(math.rad(-12), math.rad(20), 0),
+        CFrame = CFrame.new(68.3, FLOOR + 1.1, 12.8) * CFrame.Angles(math.rad(-12), math.rad(20), 0),   -- (v3.0) off the ATM
         Color = rgb(255, 214, 40), Material = M.Rubber, CanCollide = false }, s)
     lit(printOn(sign, Enum.NormalId.Front, "WET\nFLOOR", rgb(30, 30, 30), UITheme.F.display, 50, 1).Parent)
     return bigBox
@@ -913,14 +1130,38 @@ function MartBuilder:_stockRoom(f, refs, loot)
         box("StockBox", bxa, y, rz0 + 0.2, bxa + 1.05, y + 1.3 + (k % 3) * 0.3, IZ1 - 0.1,
             rgb(176 + (k % 3) * 8, 140 + (k % 2) * 10, 96), M.Cardboard, s)
     end
-    -- a box of lotto tickets on the top shelf (Lottery loot)
+    -- (v3.0) an open carton of lotto ticket packs on the top rack (Lottery):
+    -- fanfold packs standing in rows, two more lying shrink-wrapped on top
     local lot = Instance.new("Model")
-    lot.Name = "LottoBox"
+    lot.Name = "LottoCarton"
     lot.Parent = s
-    local lb = box("LottoBox", 68.2, FLOOR + 5.45, rz0 + 0.2, 70.1, FLOOR + 6.6, IZ1 - 0.1, rgb(255, 214, 120), M.Cardboard, lot, nc())
-    lit(printOn(lb, Enum.NormalId.Front, "LOTTO", rgb(160, 30, 80), UITheme.F.display, 40, 1).Parent)
+    local lx0, lx1, lz0, lz1 = 68.2, 70.1, rz0 + 0.2, IZ1 - 0.1
+    local ly0, ly1 = FLOOR + 5.45, FLOOR + 6.3
+    box("CartonBase", lx0, ly0, lz0, lx1, ly0 + 0.08, lz1, rgb(196, 160, 110), M.Cardboard, lot, nc())
+    local front = box("CartonFront", lx0, ly0, lz0, lx1, ly1, lz0 + 0.06, rgb(255, 214, 120), M.Cardboard, lot, nc())
+    lit(printOn(front, Enum.NormalId.Front, "SUNSHINE LOTTO · 40 PACKS", rgb(160, 30, 80), UITheme.F.display, 40, 1).Parent)
+    box("CartonBack", lx0, ly0, lz1 - 0.06, lx1, ly1, lz1, rgb(255, 214, 120), M.Cardboard, lot, nc())
+    box("CartonSide", lx0, ly0, lz0, lx0 + 0.06, ly1, lz1, rgb(255, 214, 120), M.Cardboard, lot, nc())
+    box("CartonSide", lx1 - 0.06, ly0, lz0, lx1, ly1, lz1, rgb(255, 214, 120), M.Cardboard, lot, nc())
+    part({ Name = "CartonFlap", Size = Vector3.new(lx1 - lx0, 0.04, 0.6),
+        CFrame = CFrame.new((lx0 + lx1) / 2, ly1 + 0.22, lz0 - 0.2) * CFrame.Angles(math.rad(-50), 0, 0),
+        Color = rgb(255, 214, 120), Material = M.Cardboard, CanCollide = false }, lot)
+    local packCols = { rgb(230, 57, 70), rgb(33, 158, 188), rgb(106, 176, 76), rgb(155, 93, 229), rgb(251, 133, 0) }
+    for k = 0, 9 do
+        local px = lx0 + 0.16 + (k % 5) * 0.34
+        local pz = lz0 + 0.3 + math.floor(k / 5) * 0.6
+        box("TicketPack", px - 0.14, ly0 + 0.08, pz - 0.24, px + 0.14, ly1 + 0.08, pz + 0.24, packCols[k % 5 + 1],
+            M.Cardboard, lot, nc({ CastShadow = false }))
+    end
+    for k = 0, 1 do
+        box("SealedPack", lx0 + 0.3 + k * 0.7, ly1 + 0.08, lz0 + 0.3, lx0 + 0.9 + k * 0.7, ly1 + 0.24, lz0 + 1.0,
+            packCols[k + 3], M.Cardboard, lot, nc())
+        box("ShrinkWrap", lx0 + 0.28 + k * 0.7, ly1 + 0.07, lz0 + 0.28, lx0 + 0.92 + k * 0.7, ly1 + 0.26, lz0 + 1.02,
+            rgb(230, 240, 250), M.Glass, lot, nc({ Transparency = 0.7, CastShadow = false }))
+    end
     local ls = Vector3.new(69.1, FLOOR + 3, rz0 - 2.2)
-    table.insert(loot, { kind = "Lottery", cframe = CFrame.lookAt(ls, Vector3.new(69.1, ls.Y, IZ1)), visual = lot, inVault = false })
+    table.insert(loot, { kind = "Lottery", cframe = CFrame.lookAt(ls, Vector3.new(69.1, ls.Y, IZ1)), visual = lot,
+        pool = "stockroom", inVault = false })
 
     -- pallet of shrink-wrapped soda with tonight's cash deposit bag on top (Cash loot)
     local px0, px1, pz0, pz1 = 63.5, 66.5, 18, 20.6
@@ -928,14 +1169,23 @@ function MartBuilder:_stockRoom(f, refs, loot)
     box("PalletLoad", px0 + 0.1, FLOOR + 0.5, pz0 + 0.1, px1 - 0.1, FLOOR + 2.8, pz1 - 0.1, rgb(220, 60, 60), M.Cardboard, s)
     box("ShrinkWrap", px0 + 0.05, FLOOR + 0.5, pz0 + 0.05, px1 - 0.05, FLOOR + 2.85, pz1 - 0.05, rgb(230, 240, 250), M.Glass, s,
         nc({ Transparency = 0.7 }))
+    -- (v3.0) tonight's takings waiting for the bank run: a zipped NIGHT
+    -- DEPOSIT bag + the spare till tray, still full (Register, "stuff")
     local bag = Instance.new("Model")
-    bag.Name = "DepositBag"
+    bag.Name = "NightDeposit"
     bag.Parent = s
-    part({ Name = "Bag", Shape = Enum.PartType.Ball, Size = Vector3.new(1.6, 1.1, 1.2),
-        Position = Vector3.new(65, FLOOR + 3.3, 19.3), Color = rgb(110, 116, 110), Material = M.Fabric, CanCollide = false }, bag)
-    box("BagZip", 64.4, FLOOR + 3.8, 19.25, 65.6, FLOOR + 3.9, 19.35, rgb(220, 190, 60), M.Metal, bag, nc())
+    local ty = FLOOR + 2.85
+    box("DepositBag", 63.9, ty, 18.5, 65.3, ty + 0.5, 19.6, rgb(60, 72, 96), M.Fabric, bag, nc())
+    part({ Name = "BagPuff", Shape = Enum.PartType.Ball, Size = Vector3.new(1.3, 0.35, 1.0),
+        Position = Vector3.new(64.6, ty + 0.5, 19.05), Color = rgb(60, 72, 96), Material = M.Fabric, CanCollide = false }, bag)
+    box("BagZip", 63.95, ty + 0.62, 19.0, 65.25, ty + 0.66, 19.1, rgb(220, 190, 60), M.Metal, bag, nc())
+    box("BagLock", 65.2, ty + 0.5, 18.95, 65.34, ty + 0.72, 19.15, rgb(220, 190, 60), M.Metal, bag, nc())
+    local lab = box("BagLabel", 64.1, ty + 0.1, 18.47, 65.1, ty + 0.4, 18.5, rgb(250, 250, 244), M.Fabric, bag, nc())
+    lit(printOn(lab, Enum.NormalId.Front, "NIGHT DEPOSIT", rgb(30, 40, 80), UITheme.F.bold, 60, 1).Parent)
+    tillDrawer(bag, 65.4, ty, 18.4, 66.3, 19.6)
     local bs = Vector3.new(65, FLOOR + 3, 16.9)
-    table.insert(loot, { kind = "Cash", cframe = CFrame.lookAt(bs, Vector3.new(65, bs.Y, 19.3)), visual = bag, inVault = false })
+    table.insert(loot, { kind = "Register", cframe = CFrame.lookAt(bs, Vector3.new(65, bs.Y, 19.3)), visual = bag,
+        interact = "stuff", pool = "stockroom", inVault = false })
 
     -- tall steel broom closet in the south-east corner (HideSpot)
     local closet = box("BroomCloset", 70.8, FLOOR, IZ1 - 1.8, IX1 - 0.05, FLOOR + 7.4, IZ1, rgb(120, 150, 170), M.Metal, s)
@@ -1034,8 +1284,9 @@ function MartBuilder:_office(f, refs, loot)
     point(lightAnchor("MonitorGlow", Vector3.new(56.5, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.5, 7)
 
     -- calendar + "SAFE CODE? NICE TRY" note
-    local cal = box("Calendar", 52, 5.5, BACK_Z0 + 0.06, 53.6, 7.6, BACK_Z0 + 0.14, rgb(250, 250, 244), M.Fabric, o, nc())
-    local calg = lit(surface(cal, Enum.NormalId.Back, 40, 1))
+    -- (v3.0) the calendar moved to the west wall; the golden ticket hangs where it was
+    local cal = box("Calendar", IX0, 5.5, 21.6, IX0 + 0.08, 7.6, 23.2, rgb(250, 250, 244), M.Fabric, o, nc())
+    local calg = lit(surface(cal, Enum.NormalId.Right, 40, 1))
     frame({ Size = UDim2.fromScale(1, 0.3), BackgroundColor3 = SUN_DEEP }, calg)
     text({ Text = "SEPT", Size = UDim2.fromScale(0.9, 0.25), Position = UDim2.fromScale(0.05, 0.03),
         TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
@@ -1130,17 +1381,83 @@ function MartBuilder:_office(f, refs, loot)
     local c1 = Instance.new("Model")
     c1.Name = "SafeCashTop"
     c1.Parent = o
-    cashStack(c1, SAFE_X, SAFE_Y, innerZ, 2, 2, 3)
+    cashStack(c1, SAFE_X, SAFE_Y, innerZ, 2, 2, 3, rgb(214, 170, 60))       -- mustard straps: $10,000 of hundreds
     local c2 = Instance.new("Model")
     c2.Name = "SafeCashLow"
     c2.Parent = o
-    cashStack(c2, SAFE_X, FLOOR + 0.4, innerZ, 3, 2, 2)
+    cashStack(c2, SAFE_X, FLOOR + 0.4, innerZ, 3, 2, 2, rgb(150, 90, 200))  -- violet straps: $2,000 of twenties
+    -- a bundle of loose twenties + a coin bag on top of the low stack
+    local loose = box("LooseBills", SAFE_X + 0.2, FLOOR + 0.92, innerZ - 0.2, SAFE_X + 0.9, FLOOR + 0.97, innerZ + 0.15, BILL, M.Fabric,
+        c2, nc({ CastShadow = false }))
+    billFace(loose, Enum.NormalId.Top, "20")
+    part({ Name = "CoinBag", Shape = Enum.PartType.Ball, Size = Vector3.new(0.6, 0.5, 0.5),
+        Position = Vector3.new(SAFE_X - 0.8, FLOOR + 1.15, innerZ), Color = rgb(150, 130, 96), Material = M.Fabric,
+        CanCollide = false, CastShadow = false }, c2)
     local function stand(x)
         local p = Vector3.new(x, FLOOR + 3, 19.2)
         return CFrame.lookAt(p, Vector3.new(x, p.Y, SAFE_Z0))
     end
-    table.insert(loot, { kind = "Cash", cframe = stand(SAFE_X + 0.9), visual = c1 })
-    table.insert(loot, { kind = "Cash", cframe = stand(SAFE_X - 0.9), visual = c2 })
+    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X + 0.9), visual = c1, interact = "dial", pool = "office" })
+    table.insert(loot, { kind = "SafeCash", cframe = stand(SAFE_X - 0.9), visual = c2, interact = "dial", pool = "office" })
+
+    -- 🎟️ THE TARGET: Sunny's GOLDEN TICKET — the store sold a $1,000,000
+    -- winner in 1987 and the owner had the ticket framed. It hangs on the north
+    -- wall beside the desk, behind glass, under its own brass picture light.
+    local gx, gy = 52.7, FLOOR + 6.6                 -- frame centre
+    local fw, fh = 1.2, 0.85                         -- frame half-size
+    local wz = BACK_Z0 + 0.06                        -- the wallpaper face
+    local GILT = rgb(226, 178, 62)
+    box("FrameBack", gx - fw, gy - fh, wz, gx + fw, gy + fh, wz + 0.06, rgb(110, 16, 34), M.Fabric, o, nc())   -- velvet mat
+    for _, e in ipairs({
+        { gx - fw - 0.16, gy + fh, gx + fw + 0.16, gy + fh + 0.16 }, { gx - fw - 0.16, gy - fh - 0.16, gx + fw + 0.16, gy - fh },
+        { gx - fw - 0.16, gy - fh, gx - fw, gy + fh }, { gx + fw, gy - fh, gx + fw + 0.16, gy + fh },
+    }) do
+        box("GiltFrame", e[1], e[2], wz, e[3], e[4], wz + 0.26, GILT, M.Metal, o, nc({ Reflectance = 0.3 }))
+    end
+    box("FrameLip", gx - fw, gy + fh - 0.05, wz + 0.06, gx + fw, gy + fh, wz + 0.2, rgb(150, 110, 40), M.Metal, o, nc())
+    box("FrameLip", gx - fw, gy - fh, wz + 0.06, gx + fw, gy - fh + 0.05, wz + 0.2, rgb(150, 110, 40), M.Metal, o, nc())
+    box("FrameGlass", gx - fw, gy - fh, wz + 0.2, gx + fw, gy + fh, wz + 0.22, rgb(220, 236, 244), M.Glass, o,
+        nc({ Transparency = 0.85, Reflectance = 0.3, CastShadow = false }))
+    local tv = Instance.new("Model")
+    tv.Name = "GoldenTicket"
+    tv.Parent = o
+    local ticket = box("Ticket", gx - 0.8, gy - 0.34, wz + 0.07, gx + 0.8, gy + 0.34, wz + 0.1, rgb(240, 196, 70), M.Metal, tv,
+        nc({ Reflectance = 0.25, CastShadow = false }))
+    local tg = surface(ticket, Enum.NormalId.Back, 80, 1)
+    tg.LightInfluence = 0.6
+    local tbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1) }, tg)
+    local tgrad = Instance.new("UIGradient")
+    tgrad.Rotation = 20
+    tgrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, rgb(250, 220, 110)),
+        ColorSequenceKeypoint.new(0.5, rgb(255, 244, 190)),
+        ColorSequenceKeypoint.new(1, rgb(214, 160, 40)),
+    })
+    tgrad.Parent = tbg
+    local border = frame({ Size = UDim2.fromScale(0.94, 0.86), Position = UDim2.fromScale(0.03, 0.07), BackgroundTransparency = 1 }, tg)
+    local bst = Instance.new("UIStroke")
+    bst.Color = rgb(150, 100, 20)
+    bst.Thickness = 3
+    bst.Parent = border
+    frame({ Size = UDim2.new(0, 3, 0.86, 0), Position = UDim2.fromScale(0.2, 0.07), BackgroundColor3 = rgb(150, 100, 20),
+        BackgroundTransparency = 0.4 }, tg)                                    -- the tear-off stub
+    text({ Text = "No.\n000001", Size = UDim2.fromScale(0.15, 0.5), Position = UDim2.fromScale(0.035, 0.25), TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.mono, TextColor3 = rgb(110, 70, 10) }, tg)
+    text({ Text = "GOLDEN TICKET", Size = UDim2.fromScale(0.74, 0.36), Position = UDim2.fromScale(0.23, 0.1), TextScaled = true,
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextColor3 = rgb(120, 60, 10) }, tg)
+    text({ Text = "SUNNY'S MART  ·  $1,000,000 WINNER  ·  1987", Size = UDim2.fromScale(0.72, 0.2), Position = UDim2.fromScale(0.24, 0.52),
+        TextScaled = true, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextColor3 = rgb(110, 70, 10) }, tg)
+    frame({ Size = UDim2.fromScale(0.5, 0.06), Position = UDim2.fromScale(0.35, 0.8), BackgroundColor3 = rgb(150, 100, 20) }, tg)
+    point(ticket, rgb(255, 214, 120), 0.5, 4, false)
+    -- brass picture light over the frame
+    bar("PictureLightArm", Vector3.new(gx, gy + fh + 0.16, wz + 0.05), Vector3.new(gx, gy + fh + 0.5, wz + 0.4), 0.06, GILT, M.Metal, o, nc())
+    local pl = box("PictureLight", gx - 0.8, gy + fh + 0.42, wz + 0.3, gx + 0.8, gy + fh + 0.58, wz + 0.55, GILT, M.Metal, o, nc())
+    spot(pl, Enum.NormalId.Bottom, rgb(255, 226, 170), 1.5, 7, 75, false)
+    local plq = box("TicketPlaque", gx - 0.6, gy - fh - 0.52, wz, gx + 0.6, gy - fh - 0.28, wz + 0.04, GILT, M.Metal, o, nc())
+    lit(printOn(plq, Enum.NormalId.Back, "OUR FIRST MILLIONAIRE", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
+    local ts = Vector3.new(gx, FLOOR + 3, 18.4)
+    table.insert(loot, { kind = "GoldenTicket", target = "GoldenTicket", cframe = CFrame.lookAt(ts, Vector3.new(gx, ts.Y, BACK_Z0)),
+        visual = tv, pool = "office", inVault = false })
 
     -- (v2.0 fix) chair nudged east, off the safe line: at x 56.4 it sat right where the drill goes and blocked the "Place drill" prompt's line of sight
     -- (v2.0.2) both repainted after they load — they import as plain white blocks
@@ -1368,6 +1685,8 @@ function MartBuilder:build(folder)
         keycardSpots = {},
         laserRows = {},
         smashCases = {},
+        -- (v3.0) jackpot-room names for the HUD (LootShuffle.poolName)
+        poolNames = { counter = "COUNTER", floor = "SHOP FLOOR", stockroom = "STOCK ROOM", office = "OFFICE" },
     }
     local loot = {}
 

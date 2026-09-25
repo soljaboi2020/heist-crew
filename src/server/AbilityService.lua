@@ -9,7 +9,7 @@
     The other roles' perks are PASSIVE and live where they apply:
       Hacker  → SecurityService (fast breaker, hack keypads)
       Muscle  → LootService (no bag slowdown, longer throw) + GuardService (takedown)
-      Driver  → VehicleService (+20% speed, nitro)
+      Driver  → GetawayService "Getaway pro" (escape vote x2, +5% getaway cash)
       Lookout → AbilityHud (always sees guards/cameras) + this mark
 
     PUBLIC API:

@@ -18,8 +18,9 @@
 
     Which target is "current":
         lobby      → the Boss (until you heard the plan) → then the heist door
-        carrying   → the car (or the marina once you're in it)
-        alarm      → the car → the marina
+        carrying   → the car
+        alarm      → the car  (v3.0: no marina drive — the getaway is a movie;
+                     the old "marina" kind is still understood but never sent)
         running    → first unfinished step of the job:
                      cases/open/loot → LOOT/SMASH · keycard → SEARCH (or KEYPAD
                      once someone has it) · door → KEYPAD · vault → DRILL · car → CAR

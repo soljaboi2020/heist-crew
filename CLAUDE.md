@@ -499,7 +499,7 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     foxspeed · powerthrow · ghost · surprise · hackchip.
   - **Robux cash packs LIVE on Roblox** (RobuxService ProcessReceipt, idempotent): universe **10127256584**,
     products 3714635306 / 3714635777 / 3714635779 / 3714635781 ($5K/25 · $30K/99 · $100K/249 · $500K/799 R$),
-    icons in `docs/icons/`. Created + iconed via **Open Cloud** (`~/.claude/roblox-opencloud-key`, scope
+    icons in `docs/icons/`. Created + iconed via **Open Cloud** (`~/.claude/roblox-opencloud-devproducts-key` — NOT the assets key file, scope
     developer-product:read+write; PATCH with multipart `imageFile` sets the icon — no asset scope needed).
   - Malachi must set in Studio: Lighting.Technology = Future; Game Settings → Security → Studio API access ON.
 
@@ -514,6 +514,26 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - **BriefingShots** (server) publishes per-job fly-through shots to `ReplicatedStorage.BriefingShots`;
     BriefingUI matches each Boss line to a shot (breaker/keycard/lasers/vault/car/side/wide).
   - `default.project.json`: Workspace.StreamingEnabled = false (far heist buildings must exist for the camera).
+
+- **2026-09-25** — **🎬 v3.0 "THE SCORE"** (Malachi: *"do everything you named except the hybrid, in one go"*).
+  Contract = **`docs/V3_SPEC.md`**. 5 builders + polish/integration tester (mock: `drv_v3int` 205/205, getaway 1257/1257).
+  - **Movie getaway, no driving** (GetawayService/GetawayProps/GetawayCinematic/GetawayVote, remote `Getaway`):
+    all seated or driver hits **GO!** → 8 s vote **Boat / Heli (locked if anyone caught, +10%) / Highway (car bonus ×2)**
+    → server-built scene played by each client with local clones (shutter, chase cruisers, roadblock stunt per car,
+    stealth = "Miami Nights FM" cruise; highway set at x 900–1800) → payout over the final shot.
+    Car types now pay **escape cash**: Muscle 5 · Racer 8 · Armored 8 · Monster 10 · Tank 12 % (stealth = half)
+    via `VehicleService.GETAWAY_BONUS/GETAWAY_STUNT`. **Driver perk "Getaway pro":** vote ×2 + 5% crew bonus.
+    Marina ring removed (decor sign now). Old driving/nitro code kept but dead.
+  - **Themed loot v3** (LootService/LootShuffle/TargetService/LootMinigames, remote `LootMinigame`): mini-games
+    cut/dial/stuff/unscrew/drill (server-validated, hold-E fallback) · heavy (2-player lift w/ rope or Muscle solo) ·
+    fragile (−25%/bump) · shuffle ~60%/pool + one **jackpot room ×1.5** · hidden stashes ~1/20 (`spot.reveal`) ·
+    **Boss targets +$5,000** + BOSS TARGETS trophy wall (saved `data.targetTrophies`): Golden Ticket (mart) · Golden
+    Flamingo (villa, heavy) · Pink Diamond (jewelry, spinning in a laser cage) · Crown Jewel (bank). Bank has a
+    20-box safe-deposit wall (cash/jewels/rare/🦆 duck $1). Boss names the target as his last briefing line.
+  - Villa ~2,250 parts now (watch perf). Studio-only checks: cut-scene timing, mini-game feel, heavy tether, cage reach.
+  - ⚠️ Open Cloud keys: dev-products key = `~/.claude/roblox-opencloud-devproducts-key` (works); the old assets key
+    file `~/.claude/roblox-opencloud-key` was briefly overwritten, restored from transcript, but Roblox now answers 401
+    → new assets key needed before any more Kenney uploads.
 
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**

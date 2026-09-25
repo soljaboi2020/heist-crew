@@ -15,14 +15,19 @@
         • DRILL the vault/safe: it runs on its own, it JAMS (fix it), door
           swings open → loot unlocks
         • carry bags to the getaway car → "Load bag" (or give it to a bot)
-        • DRIVE the car to the marina drop-off → run ends, loaded bags pay out
+        • v3.0 THE GETAWAY (no driving): everyone still in the run sits in the
+          car (with a bag loaded, or the alarm going), or the driver presses the
+          big GO! button with ≥ 1 bag → GetawayService runs the 8 s escape vote
+          (Boat / Helicopter / Highway) and the movie, then the run ends and the
+          loaded bags pay out (+ car / helicopter / target bonuses)
       v2.0 rules (V2_SPEC §6), simple enough for a 7-year-old:
         • a GUARD sees / grabs you  → back to the sneakIn door (kickBack, v1.2.5)
         • a COP grabs you           → JAIL (JailService). A teammate holds E at
           your cell door to break you out (you respawn at sneakIn). Nobody frees
           you in 30 s → released to the club, out of this run. If nobody is left
           free to break anyone out, the run ends.
-        • car busted = everyone in it is out.
+        • (v3.0: no car chase / bust — the chase is in the movie. The alarm
+          timer still ends the run if the crew isn't in the car in time.)
       Jobs without keycard doors / lasers / smash cases (the mart) just skip
       those steps — every system copes with an empty list.
 
@@ -53,6 +58,27 @@
         JobService:useJail(JailService)               -- JailService:init calls this
         JobService:noteBots(names)                    -- BotService: names of this run's bots (payout)
         JobService.hub, JobService.onJobChanged, JobService.onFinished   (set by init.server)
+
+    v3.0 "THE SCORE" (getaway agent):
+        deps.getaway? (GetawayService — required lazily from this folder if absent;
+                       JobService calls its :init, so init.server needs no change)
+        JobService:beginGetaway(why?, player?) -> boolean   (tests / integrator)
+        JobService:triggerAlarm(reason?, player?) · JobService:catchPlayer(player, by?)   (tests)
+        Car model attributes kept fresh during a run (CarHud reads them):
+            CrewIn, CrewNeed (seated / still-in-the-run crew), GetawayPhase
+            ("wait" | "vote" | "decided" | "scene" | ""), GetawayLoud, HeliOk
+        Payout (HeistState COMPLETE payload) adds: route, getaway = { route,
+            routeName, icon, loud, carName, carType, rows = {{label, amount, icon}} },
+            target = { name, amount }?, bonusEach
+        LOOT-CORE hooks (V3_SPEC §4, all optional / pcall'd):
+            LootShuffle:prepare — the v3 LootService already shuffles inside
+                arm()/reset(); JobService only calls prepare itself for an older
+                LootService (no :valueOf), so the shuffle never runs twice.
+            LootService:valueOf(bag) — fallback value for a loaded row with no value
+                (counts().take already includes jackpot / fragile / bag tier).
+            TargetService:bonusFor(run) → +cash per escapee (read BEFORE clearLoaded,
+                which resets it) + TargetService:awardCrew(escapees) trophies,
+                TargetService:targetFor(jobId).name → the payout row label.
 --]]
 
 local Players = game:GetService("Players")
@@ -77,6 +103,8 @@ local drillPrompt = nil
 local vaultClosed = nil      -- { [part] = CFrame }
 local drillModel = nil
 local listeners = {}         -- event -> { fn }
+local beginGetaway, checkGetaway, syncCarAttrs   -- v3.0 (forward declarations)
+local legacyShuffle
 
 local DRILL_TIME = 24
 local JAM_POINTS = { 0.33, 0.7 }
@@ -272,8 +300,6 @@ local function buildTargets(j, c)
         return t
     end
     local carPos = car and car.model and car.model.Parent and car.model:GetPivot().Position
-    local d = Constants.WORLD.DROPOFF
-    local marina = Vector3.new(d.x, 3, d.z)
     -- v2.0: a teammate in a cell → point the crew at the cell door
     if S.jail and type(S.jail.getOccupiedDoors) == "function" then
         local ok, doors = pcall(S.jail.getOccupiedDoors, S.jail)
@@ -283,9 +309,9 @@ local function buildTargets(j, c)
             end
         end
     end
+    if run.getaway then return t end   -- v3.0: the movie is playing
     if run.alarm then
-        add(carPos and carPos + Vector3.new(0, 4, 0), "CAR", "car")
-        add(marina, "MARINA", "marina")
+        add(carPos and carPos + Vector3.new(0, 4, 0), "GET IN THE CAR", "car")
         return t
     end
     if refs.breaker and has(refs, "cameras") and not S.security:camerasCut() then
@@ -313,8 +339,7 @@ local function buildTargets(j, c)
         if run.drill then label = run.drill.jammed and "FIX DRILL" or "DRILLING" end
         add(refs.vault.door.Position, label, "vault")
     end
-    add(carPos and carPos + Vector3.new(0, 4, 0), "CAR", "car")
-    if c.loaded > 0 then add(marina, "MARINA", "marina") end
+    add(carPos and carPos + Vector3.new(0, 4, 0), c.loaded > 0 and "GETAWAY CAR" or "CAR", "car")
     return t
 end
 
@@ -366,7 +391,11 @@ local function buildInfo()
                 (c.vaultTaken or 0) >= c.vault)
         end
     end
-    add("car", string.format("Put bags in the car (%d)  ·  drive to the boats", c.loaded), false)
+    if run and run.getaway then
+        add("car", "Getaway! Enjoy the ride", true)
+    else
+        add("car", string.format("Put bags in the car (%d)  ·  then everyone hop in!", c.loaded), false)
+    end
 
     local jailedNames = {}
     if run then
@@ -385,6 +414,7 @@ local function buildInfo()
         readyCount = rc, playerCount = pc, readyNames = rn, launchAt = launchAt,
         jailed = jailedNames, bots = run and run.botNames or {},
         difficulty = j.cfg.difficulty,
+        getaway = run and run.getaway and run.getaway.phase or nil,   -- v3.0
     }
 end
 
@@ -576,6 +606,7 @@ startRun = function(player, why, crewList)
     run = {
         jobId = j.cfg.id, startedAt = os.clock(), startedAtServer = now(), crew = {}, alarm = false, alarmEndsAt = 0,
         silent = false, vaultOpen = false, keycardFound = false, drill = nil, botNames = {},
+        caught = false, getaway = nil,   -- v3.0: caught locks the helicopter; getaway = the escape is on
     }
     for _, p in ipairs(crewList or Players:GetPlayers()) do addToCrew(p) end
     if player then addToCrew(player) end
@@ -591,11 +622,13 @@ startRun = function(player, why, crewList)
     task.spawn(function()
         while run == thisRun do
             pushInfo()
+            pcall(checkGetaway)   -- v3.0: everyone in the car → go
+            pcall(syncCarAttrs)
             task.wait(1)
         end
     end)
     task.delay(Constants.HEIST_RUN_LIMIT, function()
-        if run == thisRun then
+        if run == thisRun and not run.getaway then
             notifyAll("That took too long — the Boss called it off", "red", 4)
             finish("timeout")
         end
@@ -609,7 +642,7 @@ triggerAlarm = function(reason, player)
     local j = job()
     if not j then return end
     if not run then startRun(player, "alarm") end
-    if not run or run.alarm then return end
+    if not run or run.alarm or run.getaway then return end
     addToCrew(player)
     run.alarm = true
     run.alarmEndsAt = now() + j.cfg.alarmTimer
@@ -627,13 +660,12 @@ triggerAlarm = function(reason, player)
     S.guards:setAlarmActive(true, player and rootPos(player))
     S.police:dispatch(j.refs.policeStop, activeCrew)
     if car then
-        car:setAlarmMode(true)
-        if #car:getOccupants() > 0 then S.police:chaseCar(car) end
+        car:setAlarmMode(true)   -- (v3.0: no car chase — the chase is in the getaway movie)
     end
     broadcastState("ESCAPING", { escapeSeconds = j.cfg.alarmTimer })
     local thisRun = run
     task.delay(j.cfg.alarmTimer, function()
-        if run == thisRun then
+        if run == thisRun and not run.getaway then
             notifyAll("Out of time — the police closed the roads", "red", 4)
             finish("time")
         end
@@ -646,9 +678,10 @@ end
 -- sends you back to the sneaky door (you drop your bag + keycard). No alarm, the
 -- other guards keep patrolling, and you're still in the run. Only COPS jail you.
 local kickedAt = {}
-local function kickBack(player, guard)
+local function kickBack(player, guard, grabbed)
     if os.clock() < resettingUntil then sendToSafehouse(player) return end
     if player:GetAttribute("Jailed") then return end
+    if run and run.getaway then return end   -- v3.0: the crew is already escaping
     if (kickedAt[player] or 0) > os.clock() - 2 then return end   -- one kick at a time
     kickedAt[player] = os.clock()
     if not run then startRun(player, "caught") end
@@ -669,6 +702,7 @@ local function kickBack(player, guard)
             return
         end
     end
+    if grabbed then run.caught = true end   -- v3.0: a guard GRAB locks the helicopter (being spotted doesn't)
     S.loot:drop(player)
     S.security:dropKeycard(player)
     if guard then S.guards:stun(guard, 3) end   -- he doesn't grab you again on the way out
@@ -718,9 +752,11 @@ local function catchPlayer(player, by)
         triggerAlarm("guard", player)
     end
     if not run then return end
+    if run.getaway then return end   -- v3.0: already escaping (the movie is playing)
     addToCrew(player)
     local e = run.crew[player]
     if e.out or e.escaped or e.jailed then return end
+    run.caught = true   -- v3.0: nobody gets the helicopter this run
     S.loot:drop(player)
     S.security:dropKeycard(player)
     feel("sound", "fail", nil, player)
@@ -756,11 +792,194 @@ local function catchPlayer(player, by)
     pushInfo()
 end
 
+-- v3.0 LOOT-CORE §4: LootShuffle:prepare at arm / reset. The v3 LootService
+-- (has :valueOf) already does it inside arm()/reset(), so only an older
+-- LootService gets it from here — a second prepare would re-roll the shuffle.
+legacyShuffle = function(refs)
+    if S.loot and type(S.loot.valueOf) == "function" then return nil end
+    local LS = optionalService("LootShuffle")
+    if not LS or type(LS.prepare) ~= "function" then return nil end
+    local ok, active = pcall(LS.prepare, LS, refs)
+    if not ok then warn("[JobService] LootShuffle:prepare:", active) return nil end
+    if type(active) == "table" and refs then refs.activeLoot = active end
+    return nil   -- (arm/reset's 2nd arg is opts in the v3 LootService; nothing to pass)
+end
+
+-- ── v3.0 THE GETAWAY ─────────────────────────────────────────────────
+local function Getaway()
+    return S.getaway or optionalService("GetawayService")
+end
+
+local function seatedInCar(player)
+    local hum = player and player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local seat = hum and hum.SeatPart
+    return seat ~= nil and car ~= nil and car.model ~= nil and seat:IsDescendantOf(car.model)
+end
+
+-- seated / still-in-the-run crew, bags in the car
+local function getawayStatus()
+    local active = activeCrew()
+    local inCar = 0
+    for _, p in ipairs(active) do if seatedInCar(p) then inCar = inCar + 1 end end
+    local okC, c = pcall(function() return S.loot:counts() end)
+    return inCar, #active, (okC and c and c.loaded) or 0
+end
+
+syncCarAttrs = function()
+    local m = car and car.model
+    if not m or not m.Parent then return end
+    if run then
+        local inCar, need = getawayStatus()
+        local phase = "wait"
+        if run.getaway then
+            local G = Getaway()
+            phase = (G and type(G.getPhase) == "function" and G:getPhase()) or run.getaway.phase or "scene"
+            if phase == "idle" then phase = "scene" end
+        end
+        m:SetAttribute("CrewIn", inCar)
+        m:SetAttribute("CrewNeed", need)
+        m:SetAttribute("GetawayPhase", phase)
+        m:SetAttribute("GetawayLoud", run.alarm == true)
+        m:SetAttribute("HeliOk", not run.caught)
+    else
+        m:SetAttribute("CrewIn", 0)
+        m:SetAttribute("CrewNeed", 0)
+        m:SetAttribute("GetawayPhase", "")
+        m:SetAttribute("GetawayLoud", false)
+        m:SetAttribute("HeliOk", true)
+    end
+end
+
+beginGetaway = function(why, player)
+    local G = Getaway()
+    local j = job()
+    if not run or run.getaway or not car or not car.model or not G or not j then return false end
+    local crew = activeCrew()
+    if #crew == 0 then return false end
+    local thisRun = run
+    run.getaway = { phase = "vote", crew = crew, anchored = {}, why = why }
+    run.allInSince = nil
+    car:freeze(true)
+    if type(car.lockSeats) == "function" then car:lockSeats(true) end
+    -- everyone still free comes along: into a free seat, or held still where they are
+    for _, p in ipairs(crew) do
+        if not seatedInCar(p) then
+            local char = p.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local seated = false
+            if hum and hum.Health > 0 and not hum.SeatPart then
+                for _, seat in ipairs(car.seats or {}) do
+                    if not seat.Occupant then
+                        -- (Seat:Sit welds them in; SeatPart may only update a frame later)
+                        if pcall(function() seat:Sit(hum) end) then seated = true break end
+                    end
+                end
+            end
+            if not seated and hrp and not hrp.Anchored then
+                hrp.Anchored = true
+                table.insert(run.getaway.anchored, hrp)
+            end
+        end
+    end
+    local startCF = j.refs.getawayCFrame
+    if typeof(startCF) ~= "CFrame" then startCF = car.model:GetPivot() end
+    local ok, started = pcall(function()
+        return G:start({
+            crew = crew, car = car, jobId = j.cfg.id, startCFrame = startCF,
+            loud = run.alarm == true, heliAllowed = not run.caught,
+            forceRoute = JobService._forceRoute,   -- (tests)
+            onDone = function(info)
+                if run ~= thisRun then return end
+                for _, p in ipairs(crew) do
+                    local e = run.crew[p]
+                    if e and p.Parent and not e.out and not e.jailed then e.escaped = true end
+                end
+                run.getawayInfo = info
+                finish("getaway")
+            end,
+        })
+    end)
+    if not ok or not started then
+        if not ok then warn("[JobService] getaway start:", started) end
+        run.getaway = nil
+        car:freeze(false)
+        if type(car.lockSeats) == "function" then car:lockSeats(false) end
+        return false
+    end
+    feel("sound", "success")
+    notifyAll(why == "go" and player and (player.DisplayName .. " hit GO! Pick how we escape!") or "Everyone's in! Pick how we escape!", "gold", 3)
+    pcall(syncCarAttrs)
+    pushInfo()
+    return true
+end
+
+checkGetaway = function()
+    if not run or run.getaway or not car or launching then return end
+    local inCar, need, bags = getawayStatus()
+    if need > 0 and inCar >= need and (bags >= 1 or run.alarm) then
+        if not run.allInSince then
+            run.allInSince = os.clock()
+            task.delay(1.05, function() pcall(checkGetaway) end)
+            return
+        end
+        if os.clock() - run.allInSince >= 1 then beginGetaway("allin") end
+    else
+        run.allInSince = nil
+    end
+end
+
+-- the big GO! button (GetawayService forwards the remote here)
+local function onGo(player)
+    if not run or not player then return end
+    if run.getaway then return end
+    local e = run.crew[player]
+    if not e or e.out or e.escaped or e.jailed then
+        notify(player, "You're not in this heist", "white", 2)
+        return
+    end
+    if not seatedInCar(player) then
+        notify(player, "Get in the car first!", "white", 2)
+        return
+    end
+    local driverHum = car and car.driverSeat and car.driverSeat.Occupant
+    if driverHum and driverHum.Parent ~= player.Character then
+        notify(player, "The driver presses GO!", "white", 2)
+        return
+    end
+    local _, _, bags = getawayStatus()
+    if bags < 1 then
+        notify(player, "Put at least one bag in the car first!", "white", 3)
+        return
+    end
+    beginGetaway("go", player)
+end
+
+function JobService:beginGetaway(why, player)
+    return beginGetaway(why or "go", player)
+end
+
+-- (v3.0 test / integrator hooks: force an alarm or a police catch)
+function JobService:triggerAlarm(reason, player)
+    triggerAlarm(reason or "camera", player)
+end
+function JobService:catchPlayer(player, by)
+    catchPlayer(player, by or "cop")
+end
+
 finish = function(result)
     if not run then return end
     local r = run
     local j = job()
     run = nil
+    -- v3.0: a getaway still voting / playing when the run ends another way stops
+    if r.getaway then
+        local G = Getaway()
+        if G and type(G.isBusy) == "function" and G:isBusy() then pcall(G.cancel, G) end
+        for _, hrp in ipairs(r.getaway.anchored or {}) do
+            if hrp.Parent then hrp.Anchored = false end
+        end
+    end
     -- (fix v1.1) block new runs until the reset has ACTUALLY happened (it used to be
     -- skippable if someone tripped a sensor on the exact frame the cooldown ended)
     resettingUntil = math.huge
@@ -786,7 +1005,17 @@ finish = function(result)
     if S.hide and type(S.hide.unhideAll) == "function" then pcall(S.hide.unhideAll, S.hide) end
 
     local c = S.loot:counts()
-    local bags = (result == "dropoff") and S.loot:getLoaded() or {}
+    local won = result == "getaway" or result == "dropoff"
+    local bags = won and S.loot:getLoaded() or {}
+    -- v3.0 LOOT-CORE: a loaded row with no value asks LootService:valueOf
+    if won and type(S.loot.valueOf) == "function" then
+        for _, b in ipairs(bags) do
+            if type(b.value) ~= "number" then
+                local okV, v = pcall(S.loot.valueOf, S.loot, b)
+                b.value = (okV and type(v) == "number") and math.floor(v + 0.5) or 0
+            end
+        end
+    end
     local elapsed = os.clock() - r.startedAt
     local escapees = {}
     for p, e in pairs(r.crew) do
@@ -795,12 +1024,67 @@ finish = function(result)
     local total = 0
     for p in pairs(r.crew) do if p.Parent then total = total + 1 end end
 
-    local take = (result == "dropoff") and c.take or 0
+    local take = won and c.take or 0
     local stealth = not r.alarm
     local each = 0
+    local stealthAmt = 0
     if #escapees > 0 and take > 0 then
-        each = math.floor(take * (1 + (stealth and j.cfg.stealthBonus or 0)) + 0.5)
+        stealthAmt = stealth and math.floor(take * (j.cfg.stealthBonus or 0) + 0.5) or 0
+        each = take + stealthAmt
     end
+    -- v3.0 getaway bonuses (per escapee, on the bags' cash): car type + helicopter + Driver
+    local gi = r.getawayInfo
+    local getawayRows, bonusEach = {}, 0
+    -- "+5%" / "+2.5%" (a half bonus in a sneaky escape isn't always a whole number)
+    local function pctStr(f)
+        local tenths = math.floor(f * 1000 + 0.5)
+        return tenths % 10 == 0 and string.format("+%d%%", tenths // 10) or string.format("+%.1f%%", tenths / 10)
+    end
+    if gi and #escapees > 0 and take > 0 then
+        local carPct, heliPct = tonumber(gi.carPct) or 0, tonumber(gi.heliPct) or 0
+        if carPct > 0 then
+            local amt = math.floor(take * carPct + 0.5)
+            local how = gi.route == "highway" and "  (highway x2)" or ""
+            if not gi.loud then how = how .. "  (sneaky: half)" end
+            table.insert(getawayRows, { label = string.format("%s power %s%s", tostring(gi.carName or "Car"),
+                pctStr(carPct), how), amount = amt, icon = "🚗" })
+            bonusEach = bonusEach + amt
+        end
+        if heliPct > 0 then
+            local amt = math.floor(take * heliPct + 0.5)
+            table.insert(getawayRows, { label = string.format("Helicopter escape %s", pctStr(heliPct)), amount = amt, icon = "🚁" })
+            bonusEach = bonusEach + amt
+        end
+        -- v3.0 polish: Driver role "Getaway pro" → +5% for the whole crew
+        local driverPct = tonumber(gi.driverPct) or 0
+        if driverPct > 0 then
+            local amt = math.floor(take * driverPct + 0.5)
+            table.insert(getawayRows, { label = string.format("Getaway pro %s %s", gi.driverName and ("(" .. tostring(gi.driverName) .. ")") or "(Driver)",
+                pctStr(driverPct)), amount = amt, icon = "🏎" })
+            bonusEach = bonusEach + amt
+        end
+    end
+    -- v3.0 LOOT-CORE: the Boss's target (+$5,000 each), read before clearLoaded resets it
+    local targetRow = nil
+    if won and #escapees > 0 then
+        local TS = optionalService("TargetService")
+        if TS and type(TS.bonusFor) == "function" then
+            r.bags, r.escapees, r.result = bags, escapees, result
+            local okB, v = pcall(TS.bonusFor, TS, r)
+            local amt = okB and ((type(v) == "number" and v) or (type(v) == "table" and (tonumber(v.amount) or tonumber(v.bonus)))) or 0
+            if amt and amt > 0 then
+                local name = "Boss's target"
+                if type(TS.targetFor) == "function" then
+                    local okT, t = pcall(TS.targetFor, TS, r.jobId)
+                    if okT and type(t) == "table" and t.name then name = tostring(t.name) end
+                end
+                targetRow = { name = name, amount = math.floor(amt + 0.5) }
+                bonusEach = bonusEach + targetRow.amount
+                if type(TS.awardCrew) == "function" then pcall(TS.awardCrew, TS, escapees) end
+            end
+        end
+    end
+    each = each + bonusEach
     local success_pre = #escapees > 0 and take > 0
     local xpEach = Constants.XP.PER_HEIST + Constants.XP.PER_BAG * #bags + (stealth and Constants.XP.STEALTH or 0)
     local escapeeIds = {}
@@ -826,7 +1110,7 @@ finish = function(result)
         end
         S.progress:addXP(p, xpEach, "heist")
         if each > 0 then
-            notify(p, string.format("You got %s%s", UITheme.money(each), stealth and "  (+sneaky bonus)" or ""), "green", 6)
+            notify(p, string.format("You got %s%s", UITheme.money(each), stealthAmt > 0 and "  (+sneaky bonus)" or ""), "green", 6)
             -- v2.0 masks: Bandit "LUCKY" → +10% of the bags' cash, on top, for you
             local MS = optionalService("MaskService")
             if MS and type(MS.has) == "function" and take > 0 then
@@ -879,9 +1163,13 @@ finish = function(result)
     end
     broadcastState(success and "COMPLETE" or "FAILED", {
         escaped = #escapees, crewSize = total, take = take, each = each, result = result,
-        bags = bags, stealth = stealth, stealthBonus = math.max(0, each - take), grade = grade,
+        bags = bags, stealth = stealth, stealthBonus = stealthAmt, grade = grade,
         xp = xpEach, time = math.floor(elapsed), escapees = escapeeIds, jobName = j.cfg.name,
         jobId = j.cfg.id, botCrew = botCrew, jailed = jailedAtEnd,
+        -- v3.0
+        route = gi and gi.route or nil, bonusEach = bonusEach, target = targetRow,
+        getaway = gi and { route = gi.route, routeName = gi.routeName, icon = gi.icon, loud = gi.loud,
+            carName = gi.carName, carType = gi.carType, rows = getawayRows } or nil,
     })
 
     for p in pairs(r.crew) do
@@ -908,13 +1196,14 @@ finish = function(result)
         end)
     end
     S.loot:clearLoaded()
+    pcall(syncCarAttrs)
     pushInfo()
     emit("finished", result, j.cfg, j.refs)
 
     if JobService.onFinished then task.spawn(JobService.onFinished) end
     task.delay(Constants.JOB_RESET_COOLDOWN, function()
         S.security:reset()
-        S.loot:reset()
+        S.loot:reset(legacyShuffle(j.refs))
         closeVault()
         if drillModel then drillModel:Destroy() drillModel = nil end
         setDrillPrompt("Place drill", 0.8, true)
@@ -1283,7 +1572,7 @@ function JobService:selectJob(id)
     end
 
     S.security:arm(refs)
-    S.loot:arm(refs)
+    S.loot:arm(refs, legacyShuffle(refs))
     S.guards:spawnPatrols(nil, refs.guardRoutes or {})
     car = S.vehicles:spawnGetaway(refs.getawayCFrame)
     if car then S.loot:attachTrunk(car.trunk) end
@@ -1395,9 +1684,9 @@ function JobService:init(deps)
                     extra = string.format("  (%s +%s)", tostring(data.tierName or "bag"), UITheme.money(data.bonus))
                 end
                 if data.bot then
-                    notifyAll(string.format("%s (bot) put %s in the car  +%s%s", data.bot, data.kind, UITheme.money(value), extra), "green", 3)
+                    notifyAll(string.format("%s (bot) put %s in the car  +%s%s", data.bot, tostring(data.name or data.kind), UITheme.money(value), extra), "green", 3)
                 elseif player then
-                    notifyAll(string.format("%s put %s in the car  +%s%s", player.DisplayName, data.kind, UITheme.money(value), extra), "green", 3)
+                    notifyAll(string.format("%s put %s in the car  +%s%s", player.DisplayName, tostring(data.name or data.kind), UITheme.money(value), extra), "green", 3)
                 end
             end
             pushInfo()
@@ -1408,7 +1697,7 @@ function JobService:init(deps)
         onPlayerSpotted = function(player, guard) kickBack(player, guard) end,
         onPlayerCaught = function(player, guard)
             -- during the loud escape a guard grab still counts as caught (→ jail)
-            if run and run.alarm then catchPlayer(player, "guard") else kickBack(player, guard) end
+            if run and run.alarm then catchPlayer(player, "guard") else kickBack(player, guard, true) end
         end,
         onTakedown = function(player)
             startRun(player, "takedown")
@@ -1438,8 +1727,12 @@ function JobService:init(deps)
             end
             if any then finish("dropoff") end
         end,
-        onDriverChanged = function(theCar, driver)
-            if run and run.alarm and driver then S.police:chaseCar(theCar) end
+        onDriverChanged = function() end,   -- (v3.0: nobody drives; no chase)
+        onOccupantsChanged = function()
+            task.defer(function()
+                pcall(syncCarAttrs)
+                pcall(checkGetaway)
+            end)
         end,
     })
 
@@ -1458,6 +1751,13 @@ function JobService:init(deps)
             finish("busted")
         end,
     })
+
+    -- v3.0 the movie getaway (vote + cut-scene); GO! presses come back through onGo
+    S.getaway = deps.getaway or optionalService("GetawayService")
+    if S.getaway and type(S.getaway.init) == "function" then
+        local okG, errG = pcall(S.getaway.init, S.getaway, { onGo = onGo, notify = notify })
+        if not okG then warn("[JobService] GetawayService:init:", errG) end
+    end
 
     Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent").OnServerEvent:Connect(function(player, force)
         JobService:toggleReady(player, force == true)

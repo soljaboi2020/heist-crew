@@ -11,13 +11,16 @@
       LootHud        carrying pill + G to throw + keycard chip
       AbilityHud     role perks, Lookout mark (Q), guard/camera highlights
       ShopUI         gear / masks / codes / VIP (opens at the gear wall)
-      CarHud         speed, bust meter, nitro, drop-off arrow (while driving)
+      CarHud         car card + bags + crew-in-car + big GO! button (v3.0: no driving)
       BriefingUI     Boss briefing cut-scene, READY UP, drop-in fade + title  (v1.1)
       WaypointHud    on-screen markers to the next goal                       (v1.1)
       DetectionHud   "being spotted" meter + direction arrow                  (v1.1)
       PayoutScreen   end-of-heist breakdown, grade, XP, PLAY AGAIN            (v1.1)
       TipHud         first-run coaching from the Boss                         (v1.1)
       ClubFX         The Vault: dance floor, moving lights, LED equaliser      (v1.2)
+      LootMinigames  cut / dial / stuff / unscrew / drill loot mini-games     (v3.0)
+      GetawayVote    "HOW DO WE ESCAPE?" Boat / Helicopter / Highway vote    (v3.0)
+      GetawayCinematic  plays the server's getaway movie locally             (v3.0)
 
     Each module is started in its own protected call — one broken HUD can't
     stop the others from mounting.
@@ -54,9 +57,9 @@ end
 
 local ORDER = {
     "CashHud", "Notifications", "FeelFX", "HeistHud", "CrewHud",
-    "JobHud", "LootHud", "CrouchController", "AbilityHud", "ShopUI", "DailyRewardUI", "CarHud",
+    "JobHud", "LootHud", "LootMinigames", "CrouchController", "AbilityHud", "ShopUI", "DailyRewardUI", "CarHud",
     "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud",
-    "ClubFX", "PortalHud", "IntroCam",   -- v2.0
+    "ClubFX", "PortalHud", "IntroCam", "GetawayVote", "GetawayCinematic",   -- v2.0
 }
 
 for _, name in ipairs(ORDER) do

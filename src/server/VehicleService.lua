@@ -61,6 +61,21 @@
 
     SHARED WITH PoliceService: VehicleService.Kinematic (ground / obstacle
     probes + the movement step) and VehicleService.Build (part helpers).
+
+    v3.0 "THE SCORE" (getaway agent, 2026-09-25): NOBODY DRIVES ANY MORE.
+    The car stays parked in its yard; the escape is a cut-scene
+    (GetawayService / client GetawayCinematic). VehicleService.DRIVING = false
+    turns the throttle / steer / nitro / marina drop-off off (the kinematic
+    code stays: PoliceService still uses it, and flipping the flag back
+    brings driving back). Seat prompts say "Get in". Car types now pay
+    instead of going faster:
+        VehicleService.GETAWAY_BONUS = { classic 0, muscle .05, racer .08,
+                                         armored .08, monster .10, tank .12 }
+        VehicleService.bonusFor(carType) -> fraction (loud escape; stealth = half)
+        VehicleService.GETAWAY_STUNT / stuntFor(carType) -> kid line for the shop card
+    Model attributes: GetawayBonus (fraction), CarPerk = "+8% cash getaway".
+    New callback: callbacks.onOccupantsChanged(car) — any seat filled/emptied
+    (JobService: "everyone's in the car → go").
 --]]
 
 local Players = game:GetService("Players")
@@ -87,7 +102,7 @@ local TUNE = {
     FROZEN_BRAKE   = 120,
     MAX_FORWARD    = 55,
     MAX_REVERSE    = 18,
-    DRIVER_MULT    = 1.2,    -- Driver role
+    DRIVER_MULT    = 1.2,    -- Driver role (dead while DRIVING = false; v3.0 Driver perk lives in GetawayService)
     NITRO_MAX      = 85,
     NITRO_ACCEL    = 70,
     NITRO_TIME     = 2.5,
@@ -104,6 +119,29 @@ VehicleService.TUNE = TUNE
 
 local BOUNDS = { x0 = -150, x1 = 150, z0 = -150, z1 = 60 }
 VehicleService.BOUNDS = BOUNDS
+
+-- v3.0: no player driving (see header). true = the old drivable car.
+VehicleService.DRIVING = false
+
+-- v3.0: what each car type adds to the cash in a LOUD getaway (stealth = half,
+-- highway escape = double). GetawayService + CarHud + the vote cards read it.
+VehicleService.GETAWAY_BONUS = { classic = 0, muscle = 0.05, racer = 0.08, armored = 0.08, monster = 0.10, tank = 0.12 }
+-- (v3.0 polish) what each car does in the getaway movie — the shop's car cards
+-- print this under the "+x% ESCAPE CASH" pill (GetawayService.STUNTS plays it)
+VehicleService.GETAWAY_STUNT = {
+    classic = "Dodges the cops. Gets the job done.",
+    muscle  = "Nitro burst past the cops!",
+    racer   = "Leaves the cops in the dust!",
+    armored = "Cops bounce right off it!",
+    monster = "Jumps right over a police car!",
+    tank    = "Smashes through the roadblock!",
+}
+function VehicleService.stuntFor(carType)
+    return VehicleService.GETAWAY_STUNT[carType or "classic"] or VehicleService.GETAWAY_STUNT.classic
+end
+function VehicleService.bonusFor(carType)
+    return VehicleService.GETAWAY_BONUS[carType or "classic"] or 0
+end
 
 local CAR_HALF_LEN = 5.6
 local CAR_WIDTH = 4.7
@@ -834,6 +872,12 @@ local function buildCarModel(carId)
     model:SetAttribute("CarType", stats.carType)
     model:SetAttribute("CarName", stats.name)
     model:SetAttribute("CarPerk", stats.perk)
+    -- v3.0: cars pay out instead of going faster
+    local gb = VehicleService.bonusFor(stats.carType)
+    model:SetAttribute("GetawayBonus", gb)
+    if not VehicleService.DRIVING then
+        model:SetAttribute("CarPerk", gb > 0 and string.format("+%d%% escape cash", math.floor(gb * 100 + 0.5)) or "The classic")
+    end
     return {
         model = model, root = root, driverSeat = k.driverSeat, seats = k.seats, trunk = k.trunk,
         glow = k.glow, underLight = k.underLight, cabinLight = k.cabinLight,
@@ -918,6 +962,15 @@ function Car:setAlarmMode(on)
     if self.model then self.model:SetAttribute("Alarm", self.alarm) end
 end
 
+-- (v3.0) during the getaway scene nobody new gets in (the prompts hide)
+function Car:lockSeats(on)
+    self.seatsLocked = on and true or false
+    for _, seat in ipairs(self.seats or {}) do
+        local p = seat:FindFirstChild("EnterPrompt")
+        if p then p.Enabled = seat.Occupant == nil and not self.seatsLocked end
+    end
+end
+
 function Car:freeze(on)
     self.frozen = on and true or false
     if self.frozen then
@@ -959,6 +1012,7 @@ function Car:reset(cframe)
     self.v = 0
     self.frozen = false
     self.dropoffFired = false
+    self:lockSeats(false)
     self:setAlarmMode(false)
     self.model:SetAttribute("NitroUntil", 0)
     self.model:SetAttribute("NitroReadyAt", 0)
@@ -997,7 +1051,7 @@ function Car:_step(dt)
     local driver, driverHum = self:getDriver()
 
     local throttle, steer = 0, 0
-    if driverHum and not self.frozen then
+    if driverHum and not self.frozen and VehicleService.DRIVING then
         throttle, steer = self:_readInput(driver)
     end
 
@@ -1009,7 +1063,7 @@ function Car:_step(dt)
     end
     local accel = TUNE.ACCEL * sm
     local nitroUntil = tonumber(model:GetAttribute("NitroUntil")) or 0
-    local nitroOn = driverHum ~= nil and not self.frozen and now < nitroUntil
+    local nitroOn = driverHum ~= nil and not self.frozen and now < nitroUntil and VehicleService.DRIVING
     if nitroOn and throttle >= 0 then
         maxF = math.max(maxF, TUNE.NITRO_MAX * sm)
         accel = TUNE.NITRO_ACCEL * sm
@@ -1079,8 +1133,11 @@ function Car:_step(dt)
     -- drop-off
     -- (fix v1.1: the latch now re-arms when the car leaves the zone, so a joyride to
     -- the marina before the heist can't disable the drop-off for the real run)
+    -- (v3.0) no drive to the marina any more: the getaway is a cut-scene
     local d = Vector3.new(self.pos.X - DROPOFF.X, 0, self.pos.Z - DROPOFF.Z).Magnitude
-    if d <= W.DROPOFF_RADIUS then
+    if not VehicleService.DRIVING then
+        self.dropoffFired = false
+    elseif d <= W.DROPOFF_RADIUS then
         if not self.dropoffFired then
             local occ = self:getOccupants()
             if #occ > 0 then
@@ -1098,7 +1155,7 @@ end
 function Car:_wireSeat(seat, isDriver)
     local prompt = Instance.new("ProximityPrompt")
     prompt.Name = "EnterPrompt"
-    prompt.ActionText = isDriver and "Drive" or "Get in"
+    prompt.ActionText = VehicleService.DRIVING and (isDriver and "Drive" or "Get in") or (isDriver and "Get in (driver)" or "Get in")
     prompt.ObjectText = "Getaway car"
     prompt.KeyboardKeyCode = Enum.KeyCode.F    -- E is left free for the trunk / loot prompts
     prompt.GamepadKeyCode = Enum.KeyCode.ButtonY
@@ -1108,7 +1165,7 @@ function Car:_wireSeat(seat, isDriver)
     prompt.Parent = seat
 
     table.insert(self.seatConns, prompt.Triggered:Connect(function(player)
-        if self.destroyed or seat.Occupant then return end
+        if self.destroyed or seat.Occupant or self.seatsLocked then return end
         local char = player.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 or hum.SeatPart then return end
@@ -1116,11 +1173,12 @@ function Car:_wireSeat(seat, isDriver)
     end))
 
     table.insert(self.seatConns, seat:GetPropertyChangedSignal("Occupant"):Connect(function()
-        prompt.Enabled = seat.Occupant == nil
+        prompt.Enabled = seat.Occupant == nil and not self.seatsLocked
         if isDriver then
             local driver = self:getDriver()
             fire(callbacks.onDriverChanged, self, driver)
         end
+        fire(callbacks.onOccupantsChanged, self)
     end))
 end
 
@@ -1271,6 +1329,7 @@ function VehicleService:init(cb)
     callbacks.onDropoff = cb.onDropoff
     callbacks.onDriverChanged = cb.onDriverChanged
     callbacks.onTypeChanged = cb.onTypeChanged or callbacks.onTypeChanged
+    callbacks.onOccupantsChanged = cb.onOccupantsChanged
     if initialized then return end
     initialized = true
     local okP, errP = pcall(publishPreviews)
@@ -1279,6 +1338,7 @@ function VehicleService:init(cb)
     local nitroRemote = Remotes.getRemote(Remotes.NAMES.Nitro)
     nitroRemote.OnServerEvent:Connect(function(player)
         local car = currentCar
+        if not VehicleService.DRIVING then return end   -- v3.0
         if not car or car.destroyed or car.frozen then return end
         local driver = car:getDriver()
         if driver ~= player then return end

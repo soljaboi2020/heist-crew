@@ -15,6 +15,21 @@
       • KEYCARD CHIP (left of the carrying pill) while the "HasKeycard"
         attribute is true.
 
+      v3.0 "THE SCORE" (LOOT-CORE, docs/V3_SPEC.md §2):
+      • the pill shows the loot's real NAME + VALUE (LootService attributes
+        CarryName / CarryValue — jackpot, cracks and bag tier included) and
+        flag chips: HEAVY · FRAGILE 75% · JACKPOT · TARGET. Helping lift a
+        heavy one (CarryHelping) shows "HELPING  GOLDEN FLAMINGO · with Sam".
+      • TARGET CHIP (left end of the row) during a heist:
+            [🎯] TARGET  Golden Flamingo · +$5,000      → turns green "SECURED" once loaded
+        (ReplicatedStorage attributes TargetName / TargetBonus / TargetSecured,
+        shown while JobInfo.stage == "ACTIVE").
+      • JACKPOT BANNER on the drop-in (LaunchJob phase "title"):
+            "JACKPOT: the WINE CELLAR x1.5!"   (ReplicatedStorage LootJackpot / LootJackpotMult)
+      • SPINNERS: parts tagged "Spin" (attribute Spin = degrees/second, e.g. the
+        Pink Diamond's turntable) turn locally, around their own up axis, while
+        within 160 studs of the camera. Welded children turn with them.
+
     PUBLIC API:
         LootHud:start()
 --]]
@@ -24,6 +39,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local ContextActionService = game:GetService("ContextActionService")
 local UserInputService = game:GetService("UserInputService")
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -142,8 +159,10 @@ function LootHud:_buildUi()
     local bagBadge = UITheme.badge(UITheme.ICON.bag, T.gold, 40, { LayoutOrder = 1 })
     bagBadge.Parent = pill
 
-    UITheme.caption("Carrying", { LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 52), TextSize = 13 }).Parent = pill
+    local caption = UITheme.caption("Carrying", { LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, 52), TextSize = 13 })
+    caption.Parent = pill
+    self._caption = caption
     local kind = UITheme.label({ Name = "Kind", LayoutOrder = 3, AutomaticSize = Enum.AutomaticSize.X,
         Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, Text = "" })
     kind.Parent = pill
@@ -153,8 +172,29 @@ function LootHud:_buildUi()
         Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, TextColor3 = T.money, Text = "" })
     value.Parent = pill
 
+    -- v3: flag chips (HEAVY / FRAGILE 75% / JACKPOT / TARGET)
+    local flags = frame({ Name = "Flags", LayoutOrder = 6, Size = UDim2.fromOffset(0, 30), AutomaticSize = Enum.AutomaticSize.X })
+    flags.Parent = pill
+    hrow(flags, 6)
+    local function flagChip(order, text, color)
+        local chip = frame({ LayoutOrder = order, Size = UDim2.fromOffset(0, 28), AutomaticSize = Enum.AutomaticSize.X,
+            BackgroundColor3 = color, BackgroundTransparency = 0.15, Visible = false })
+        UITheme.corner(chip, 14)
+        hpad(chip, 9, 9)
+        local l = UITheme.label({ Name = "Text", AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 28),
+            Text = text, FontFace = UITheme.F.display, TextSize = 13, TextColor3 = T.bgDeep })
+        l.Parent = chip
+        chip.Parent = flags
+        return chip
+    end
+    self._flagHeavy = flagChip(1, "HEAVY", T.danger)
+    self._flagFragile = flagChip(2, "FRAGILE", T.pink)
+    self._flagJackpot = flagChip(3, "JACKPOT", T.gold)
+    self._flagTarget = flagChip(4, "TARGET", T.info)
+    self._flags = flags
+
     -- key hint chip:  [G] THROW
-    local hint = frame({ Name = "Hint", LayoutOrder = 6, Size = UDim2.fromOffset(0, 36),
+    local hint = frame({ Name = "Hint", LayoutOrder = 7, Size = UDim2.fromOffset(0, 36),
         AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = T.line, BackgroundTransparency = 0.9 })
     UITheme.corner(hint, 18)
     UITheme.stroke(hint, T.line, 0.85)
@@ -168,6 +208,26 @@ function LootHud:_buildUi()
     keycap.Parent = hint
     UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 36),
         Text = "THROW", FontFace = UITheme.F.display, TextSize = 14 }).Parent = hint
+
+    -- ── v3 target chip (left end of the row) ──
+    local target = UITheme.card({ Name = "Target", LayoutOrder = 0, Size = UDim2.fromOffset(0, 46),
+        AutomaticSize = Enum.AutomaticSize.X, radius = 23, accent = T.gold, noHighlight = true, Visible = false })
+    target.Parent = rowFrame
+    hpad(target, 6, 16)
+    hrow(target, 8)
+    local targetBadge = UITheme.badge(UITheme.ICON.target, T.gold, 34, { LayoutOrder = 1 })
+    targetBadge.Parent = target
+    local targetCap = UITheme.caption("Target", { LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X,
+        Size = UDim2.fromOffset(0, 46), TextSize = 12 })
+    targetCap.Parent = target
+    local targetName = UITheme.label({ LayoutOrder = 3, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 46),
+        Text = "", FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.gold })
+    targetName.Parent = target
+    local targetBonus = UITheme.label({ LayoutOrder = 4, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 46),
+        Text = "", FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.money })
+    targetBonus.Parent = target
+    self._target, self._targetBadge, self._targetCap = target, targetBadge, targetCap
+    self._targetName, self._targetBonus = targetName, targetBonus
 
     -- ── keycard chip (left of the carrying pill) ──
     local key = UITheme.card({ Name = "Keycard", LayoutOrder = 1, Size = UDim2.fromOffset(0, 46),
@@ -189,11 +249,12 @@ function LootHud:_buildUi()
 end
 
 function LootHud:_syncRow()
-    self._row.Visible = self._group.Visible or self._key.Visible
+    self._row.Visible = self._group.Visible or self._key.Visible or self._target.Visible
 end
 
 -- ── input hint (G / Y / hidden on touch) ──
 function LootHud:_renderHint(inputType)
+    self._lastInput = inputType
     if GAMEPAD[inputType] then
         self._hint.Visible = true
         self._keycap.Text = "Y"
@@ -236,8 +297,15 @@ end
 -- ── renders ──
 function LootHud:_renderCarry()
     local kindId = localPlayer:GetAttribute("CarryingLoot")
+    local helping = localPlayer:GetAttribute("CarryHelping")
     local carrying = type(kindId) == "string" and kindId ~= ""
     self:_setBound(carrying)
+    if not carrying and type(helping) == "string" and helping ~= "" then
+        -- v3: lifting the other side of someone's heavy loot
+        self:_renderHelping(helping)
+        return
+    end
+    self._caption.Text = "CARRYING"
 
     local token = {}
     self._carryToken = token
@@ -245,10 +313,13 @@ function LootHud:_renderCarry()
     if carrying then
         local def = Constants.LOOT[kindId]
         local color = def and UITheme.rgb(def.color) or T.text
-        self._kind.Text = string.upper(kindId)
+        local name = localPlayer:GetAttribute("CarryName") or (def and def.name) or kindId
+        self._kind.Text = string.upper(tostring(name))
         self._kind.TextColor3 = color
         UITheme.setBadge(self._bagBadge, UITheme.ICON.bag, color)
-        self._value.Text = def and UITheme.money(def.value) or ""
+        local v = tonumber(localPlayer:GetAttribute("CarryValue")) or (def and def.value)
+        self._value.Text = v and UITheme.money(v) or ""
+        self:_renderFlags()
         if not g.Visible or g.GroupTransparency > 0.5 then
             g.Visible = true
             g.GroupTransparency = 1
@@ -267,6 +338,80 @@ function LootHud:_renderCarry()
             end
         end)
     end
+end
+
+-- v3: HEAVY / FRAGILE nn% / JACKPOT / TARGET chips + the throw hint only when you can throw it
+function LootHud:_renderFlags()
+    local heavy = localPlayer:GetAttribute("CarryHeavy") == true
+    local fragile = localPlayer:GetAttribute("CarryFragile") == true
+    local integ = tonumber(localPlayer:GetAttribute("CarryIntegrity")) or 1
+    self._flagHeavy.Visible = heavy
+    local partner = localPlayer:GetAttribute("CarryPartner")
+    self._flagHeavy:FindFirstChild("Text").Text = (heavy and type(partner) == "string" and partner ~= "") and ("HEAVY · with " .. partner) or "HEAVY"
+    self._flagFragile.Visible = fragile
+    self._flagFragile:FindFirstChild("Text").Text = integ < 0.999 and string.format("CRACKED %d%%", math.floor(integ * 100 + 0.5))
+        or "FRAGILE · walk slow (C)"
+    self._flagJackpot.Visible = localPlayer:GetAttribute("CarryJackpot") == true
+    self._flagTarget.Visible = localPlayer:GetAttribute("CarryTarget") == true
+    local canThrow = not heavy or localPlayer:GetAttribute("Role") == "Muscle"
+    if not canThrow then self._hint.Visible = false else self:_renderHint(self._lastInput or UserInputService:GetLastInputType()) end
+end
+
+function LootHud:_renderHelping(itemName)
+    local token = {}
+    self._carryToken = token
+    local g = self._group
+    self._caption.Text = "HELPING"
+    self._kind.Text = string.upper(itemName)
+    self._kind.TextColor3 = T.gold
+    UITheme.setBadge(self._bagBadge, "💪", T.gold)
+    local partner = localPlayer:GetAttribute("CarryPartner")
+    self._value.Text = (type(partner) == "string" and partner ~= "") and ("with " .. partner) or ""
+    self._flagHeavy.Visible = true
+    self._flagHeavy:FindFirstChild("Text").Text = "HEAVY · stay close!"
+    self._flagFragile.Visible, self._flagJackpot.Visible, self._flagTarget.Visible = false, false, false
+    self._hint.Visible = false
+    if not g.Visible or g.GroupTransparency > 0.5 then
+        g.Visible = true
+        g.GroupTransparency = 1
+        self._scale.Scale = 0.85
+    end
+    self:_syncRow()
+    tween(g, 0.25, { GroupTransparency = 0 })
+    tween(self._scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+end
+
+-- v3: the Boss's target, while a heist is running
+function LootHud:_renderTarget()
+    local name = ReplicatedStorage:GetAttribute("TargetName")
+    local show = self._stage == "ACTIVE" and type(name) == "string" and name ~= ""
+    local wasVisible = self._target.Visible
+    self._target.Visible = show
+    if show then
+        local secured = ReplicatedStorage:GetAttribute("TargetSecured") == true
+        local bonus = tonumber(ReplicatedStorage:GetAttribute("TargetBonus")) or 5000
+        self._targetCap.Text = secured and "SECURED" or "TARGET"
+        self._targetName.Text = name
+        self._targetName.TextColor3 = secured and T.money or T.gold
+        self._targetBonus.Text = "+" .. UITheme.money(bonus)
+        UITheme.setBadge(self._targetBadge, secured and UITheme.ICON.check or UITheme.ICON.target, secured and T.money or T.gold)
+        if self._target:FindFirstChild("Stroke") then self._target.Stroke.Color = secured and T.money or T.gold end
+    end
+    if show ~= wasVisible then self:_syncRow() end
+end
+
+-- v3: "JACKPOT: the WINE CELLAR x1.5!" right after the drop-in title
+function LootHud:_jackpotBanner()
+    local room = ReplicatedStorage:GetAttribute("LootJackpot")
+    if type(room) ~= "string" or room == "" then return end
+    local mult = tonumber(ReplicatedStorage:GetAttribute("LootJackpotMult")) or 1.5
+    local text = string.format("JACKPOT: the %s x%s!", room, (mult % 1 == 0) and tostring(math.floor(mult)) or tostring(mult))
+    local FeelFX = script.Parent:FindFirstChild("FeelFX")
+    local ok = false
+    if FeelFX then
+        ok = pcall(function() require(FeelFX):banner(text, "gold", false) end)
+    end
+    if not ok then warn("[HEIST CREW] LootHud: no FeelFX banner for the jackpot") end
 end
 
 function LootHud:_renderKeycard()
@@ -289,19 +434,80 @@ function LootHud:_renderKeycard()
     end
 end
 
+-- v3: client-side turntables (tag "Spin", attribute Spin = deg/s)
+local SPIN_RANGE = 160
+function LootHud:_spinStep(dt, camPos)
+    for _, p in ipairs(CollectionService:GetTagged("Spin")) do
+        if p:IsA("BasePart") and p:IsDescendantOf(workspace) then
+            local rate = tonumber(p:GetAttribute("Spin")) or 0
+            if rate ~= 0 and (p.Position - camPos).Magnitude <= SPIN_RANGE then
+                p.CFrame = p.CFrame * CFrame.Angles(0, math.rad(rate * dt), 0)
+            end
+        end
+    end
+end
+
+function LootHud:_startSpinners()
+    RunService.RenderStepped:Connect(function(dt)
+        local cam = workspace.CurrentCamera
+        if cam then self:_spinStep(dt, cam.CFrame.Position) end
+    end)
+end
+
 function LootHud:start()
     self:_buildUi()
+    pcall(function() self:_startSpinners() end)
     self:_renderHint(UserInputService:GetLastInputType())
     self:_renderCarry()
     self:_renderKeycard()
 
     localPlayer:GetAttributeChangedSignal("CarryingLoot"):Connect(function() self:_renderCarry() end)
+    -- v3: live value / cracks / lifting partner
+    for _, a in ipairs({ "CarryValue", "CarryIntegrity", "CarryPartner", "CarryName" }) do
+        localPlayer:GetAttributeChangedSignal(a):Connect(function()
+            if localPlayer:GetAttribute("CarryingLoot") then
+                local v = tonumber(localPlayer:GetAttribute("CarryValue"))
+                if v then self._value.Text = UITheme.money(v) end
+                local n = localPlayer:GetAttribute("CarryName")
+                if type(n) == "string" then self._kind.Text = string.upper(n) end
+                self:_renderFlags()
+            end
+        end)
+    end
+    localPlayer:GetAttributeChangedSignal("CarryHelping"):Connect(function() self:_renderCarry() end)
+    for _, a in ipairs({ "TargetName", "TargetSecured", "TargetBonus" }) do
+        ReplicatedStorage:GetAttributeChangedSignal(a):Connect(function() self:_renderTarget() end)
+    end
     localPlayer:GetAttributeChangedSignal("HasKeycard"):Connect(function() self:_renderKeycard() end)
     UserInputService.LastInputTypeChanged:Connect(function(t)
         if t == Enum.UserInputType.MouseMovement or t == Enum.UserInputType.MouseWheel then
             t = Enum.UserInputType.Keyboard
         end
         self:_renderHint(t)
+    end)
+
+    -- v3: heist stage (target chip) + drop-in (jackpot banner)
+    task.spawn(function()
+        local info = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")
+        if info then
+            info.OnClientEvent:Connect(function(payload)
+                if type(payload) ~= "table" then return end
+                if payload.stage ~= self._stage then
+                    self._stage = payload.stage
+                    self:_renderTarget()
+                end
+            end)
+        end
+    end)
+    task.spawn(function()
+        local launch = Remotes.getRemote(Remotes.NAMES.LaunchJob, "RemoteEvent")
+        if launch then
+            launch.OnClientEvent:Connect(function(payload)
+                if type(payload) == "table" and payload.phase == "title" then
+                    task.delay(2.8, function() self:_jackpotBanner() end)
+                end
+            end)
+        end
     end)
 
     task.spawn(function()
