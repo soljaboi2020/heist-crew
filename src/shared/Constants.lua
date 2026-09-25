@@ -13,8 +13,11 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "0.7.0"
+Constants.VERSION      = "0.7.1"
 Constants.STUDIO_NAME  = "Malachi Builds"
+
+-- ───── Dev switches ─────
+Constants.DEV_TEST_PAD = false   -- the +$50 green test pad (dev only)
 
 -- ───── Crew settings ─────
 Constants.MAX_CREW_SIZE = 4

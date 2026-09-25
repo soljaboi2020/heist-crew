@@ -143,6 +143,98 @@
     "assetId": 80739081378107,
     "moderation": "Approved"
   },
+  "factory/conveyor-corner": {
+    "assetId": 128422384755367,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-cross": {
+    "assetId": 140270684986115,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-junction-t": {
+    "assetId": 71335798628989,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long": {
+    "assetId": 92144495469037,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-part-end": {
+    "assetId": 80509716298238,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-part-middle": {
+    "assetId": 136889100301232,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-sides": {
+    "assetId": 105623110026385,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-sides-part-end": {
+    "assetId": 138783173926153,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-sides-part-middle": {
+    "assetId": 87528657970616,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-stripe": {
+    "assetId": 139369567607028,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-stripe-sides": {
+    "assetId": 87746301515666,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-stripe-sides-part-end": {
+    "assetId": 137320833487471,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-long-stripe-sides-part-middle": {
+    "assetId": 80985726095623,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-sides": {
+    "assetId": 108422660706315,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-sides-cross": {
+    "assetId": 100297970629338,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-sides-junction-t": {
+    "assetId": 113634875352661,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-corner": {
+    "assetId": 117028721288422,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-cross": {
+    "assetId": 75928199468995,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-junction-t": {
+    "assetId": 104298586552937,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-part-end": {
+    "assetId": 107938097965308,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-part-middle": {
+    "assetId": 91932285619806,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-sides-cross": {
+    "assetId": 102795048863117,
+    "moderation": "Approved"
+  },
+  "factory/conveyor-stripe-sides-junction-t": {
+    "assetId": 108653924342993,
+    "moderation": "Approved"
+  },
   "furniture/bathroomCabinet": {
     "assetId": 132463685358398,
     "moderation": "Approved"

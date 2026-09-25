@@ -3,7 +3,7 @@
     ────────────────────────────────────────────────
     v0.7.0 (2026-09-25). The "what am I, what do I do" layer:
 
-      • ROLE CARD (top-left, under Roblox's buttons) — your crew role with its
+      • ROLE CARD (bottom-left — top-left is Roblox's chat window) — your crew role with its
         colour, or a nudge to go pick one. Reads the "Role" player attribute.
       • OBJECTIVE PILL (top-centre) — always tells you the next step:
             no role          → Step on a crew pad to pick your role
@@ -49,7 +49,9 @@ function CrewHud:_buildUi()
     screen.Parent = playerGui
 
     -- ── role card ──
-    local role = UITheme.panel({ Name = "RoleCard", Position = UDim2.fromOffset(16, 72), Size = UDim2.fromOffset(230, 62), radius = 14 })
+    -- bottom-left: top-left belongs to Roblox's chat window (it covered this card)
+    local role = UITheme.panel({ Name = "RoleCard", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -16),
+        Size = UDim2.fromOffset(240, 62), radius = 14 })
     role.Parent = screen
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(0, 4, 1, -20)

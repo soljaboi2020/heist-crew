@@ -337,6 +337,19 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - Every .lua in the repo passes `luau-compile` + `luau-analyze` (no unknown globals).
   - ⏸️ **PENDING IN-STUDIO CHECK** — props loading + orientation, door, pads, TV, UI layout.
 
+- **2026-09-25** — **v0.7.1 — fixes from the first safehouse screenshots.** Safehouse, blueprint,
+  boss, TV, pads, streetlights all confirmed rendering; **factory crates came in textured** (atlas
+  fallback not needed). Fixed: ① **REAL BUG — cash $0 / no TV number**: the world build now yields
+  (NPC outfits + Kenney loads), so in Studio the player joined BEFORE `PlayerAdded` was connected
+  and their data never loaded. `init.server.lua` now also runs the join handler for players already
+  in the server. (Also explains the $0 in older screenshots.) ② role card moved bottom-left — Roblox's
+  chat window sits top-left ③ pad labels enlarged (Top-face text runs along world Z) + wall-sign
+  status shortened to "OPEN"/name with TextScaled ④ boss bubble restyled to UITheme ⑤ **test pad OFF**
+  (`Constants.DEV_TEST_PAD = false`) ⑥ `tools/clean_workspace.lua` — command-bar snippet that moves
+  hand-inserted Workspace junk (the giant desk/corridor blocking the sky) to `ServerStorage._OldInserts`.
+  ⏳ **Malachi: "the brick building gives basic, I want this game out of this world"** → art-direction
+  options pitched (Rule #12), awaiting his pick before any exterior rebuild.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

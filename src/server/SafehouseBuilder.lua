@@ -362,7 +362,9 @@ function SafehouseBuilder:_crewPads(f, refs)
         part({ Name = role.id .. "Pad", Shape = Enum.PartType.Cylinder,
             Size = Vector3.new(0.3, 4.8, 4.8), Color = Color3.fromRGB(30, 32, 38), Material = Enum.Material.DiamondPlate,
             CFrame = CFrame.new(x, FLOOR + 0.15, z) * CFrame.Angles(0, 0, math.rad(90)) }, f)
-        local label = box(role.id .. "PadLabel", x - 2, FLOOR + 0.31, z - 0.7, x + 2, FLOOR + 0.32, z + 0.7,
+        -- Top-face text runs along world Z here (seen in Malachi's screenshot),
+        -- so the long side of the label goes on Z — it was squeezed into 1.4 studs.
+        local label = box(role.id .. "PadLabel", x - 0.8, FLOOR + 0.31, z - 2.1, x + 0.8, FLOOR + 0.32, z + 2.1,
             Color3.new(), Enum.Material.SmoothPlastic, f, { Transparency = 1, CanCollide = false })
         local lg = surface(label, Enum.NormalId.Top, 40)
         text({ Text = string.upper(role.id), Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
@@ -394,8 +396,11 @@ function SafehouseBuilder:_crewPads(f, refs)
         local statusBar = frame({ Size = UDim2.new(1, -40, 0, 56), Position = UDim2.new(0, 20, 1, -76),
             BackgroundColor3 = T.bgRaised }, bg)
         UITheme.corner(statusBar, 10)
-        local status = text({ Text = "OPEN — STEP ON THE PAD", Size = UDim2.fromScale(1, 1),
-            TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = T.muted, FontFace = UITheme.F.bold, TextSize = 24 }, statusBar)
+        local status = text({ Text = "OPEN", Size = UDim2.new(1, -20, 1, -12), Position = UDim2.fromOffset(10, 6),
+            TextXAlignment = Enum.TextXAlignment.Center, TextColor3 = T.muted, FontFace = UITheme.F.bold, TextScaled = true }, statusBar)
+        local cap = Instance.new("UITextSizeConstraint")
+        cap.MaxTextSize = 30
+        cap.Parent = status
 
         refs.pads[role.id] = { hitbox = hitbox, rim = rim, light = light, status = status, statusBar = statusBar, color = col }
     end

@@ -54,6 +54,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local NpcFactory = require(script.Parent.NpcFactory)
 local SafehouseBuilder = require(script.Parent.SafehouseBuilder)
+local UITheme = require(ReplicatedStorage.Shared.UITheme)
 
 local HeistBuilder = {}
 
@@ -261,38 +262,21 @@ function HeistBuilder:_buildBoss(folder)
     -- Speech bubble above his head
     local attach = Instance.new("Attachment", head)
     attach.Position = Vector3.new(0, 3, 0)
+    -- v0.7.0: restyled to match the HUD (UITheme) — smaller, dark glass,
+    -- gold name caption, no emoji. Still the one allowed floating bubble.
     local bb = Instance.new("BillboardGui", attach)
-    bb.Size = UDim2.new(0, 280, 0, 110)
-    bb.MaxDistance = 40     -- only when you walk up to him, not across the map
+    bb.Size = UDim2.fromOffset(250, 78)
+    bb.MaxDistance = 36     -- only when you walk up to him, not across the map
     bb.AlwaysOnTop = false
     bb.LightInfluence = 0
 
-    local bg = Instance.new("Frame", bb)
-    bg.Size = UDim2.new(1, 0, 1, 0)
-    bg.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
-    bg.BackgroundTransparency = 0.1
-    bg.BorderSizePixel = 0
-    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 12)
-    local stroke = Instance.new("UIStroke", bg)
-    stroke.Color = rgb(C.GOLD)
-    stroke.Thickness = 2
-
-    local nameLabel = Instance.new("TextLabel", bg)
-    nameLabel.Size = UDim2.new(1, 0, 0.3, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = "🤵 THE BOSS"
-    nameLabel.TextColor3 = rgb(C.GOLD)
-    nameLabel.Font = Enum.Font.GothamBlack
-    nameLabel.TextScaled = true
-
-    local lineLabel = Instance.new("TextLabel", bg)
-    lineLabel.Size = UDim2.new(0.9, 0, 0.6, 0)
-    lineLabel.Position = UDim2.new(0.05, 0, 0.32, 0)
-    lineLabel.BackgroundTransparency = 1
-    lineLabel.Text = "Crack that vault, kid.\nDon't get caught."
-    lineLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lineLabel.Font = Enum.Font.GothamBold
-    lineLabel.TextScaled = true
+    local bg = UITheme.panel({ Size = UDim2.fromScale(1, 1), transparency = 0.12, radius = 14 })
+    bg.Parent = bb
+    UITheme.caption("The Boss", { Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -32, 0, 14),
+        TextColor3 = UITheme.C.gold, TextSize = 12 }).Parent = bg
+    UITheme.label({ Text = "Crack that vault, kid. Don't get caught.", Position = UDim2.fromOffset(16, 26),
+        Size = UDim2.new(1, -32, 0, 42), TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 17,
+        TextYAlignment = Enum.TextYAlignment.Top }).Parent = bg
 end
 
 -- ──────────────────────────────────────────────

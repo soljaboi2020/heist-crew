@@ -54,10 +54,17 @@ HeistService:init(refs, GuardService, EconomyService)
 CrewService:init(refs.safehouse, PlayerDataService)
 
 -- 4. Spawn the test cash pad (still useful for quick economy testing)
-TestPad:spawn()
+-- v0.7.1: the +$50 test pad is OFF — it was a dev-only cash tester and a big
+-- glowing neon slab in the middle of the street. Flip DEV_TEST_PAD to use it.
+if Constants.DEV_TEST_PAD then TestPad:spawn() end
 
 -- 5. Player join/leave flow (unchanged from Phase 1)
-Players.PlayerAdded:Connect(function(player)
+-- 2026-09-25 FIX: building the world yields (NPC outfits + Kenney models load
+-- over the network), so in Studio the player has usually ALREADY joined by the
+-- time this line runs. PlayerAdded doesn't fire for people already here, so
+-- their data never loaded — cash showed $0 and the TV had no number for them.
+-- Handle anyone already in the server as well as future joins.
+local function onPlayerAdded(player)
     print(string.format("[HEIST CREW] %s joined the crew 💼", player.Name))
     PlayerDataService:loadPlayer(player)
     EconomyService:fireCashUpdate(player)   -- sets the Cash attribute + leaderstats right away
@@ -69,7 +76,12 @@ Players.PlayerAdded:Connect(function(player)
 
     player.CharacterAdded:Connect(syncCash)
     if player.Character then task.spawn(syncCash) end
-end)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+for _, player in ipairs(Players:GetPlayers()) do
+    task.spawn(onPlayerAdded, player)
+end
 
 Players.PlayerRemoving:Connect(function(player)
     print(string.format("[HEIST CREW] %s left the crew", player.Name))

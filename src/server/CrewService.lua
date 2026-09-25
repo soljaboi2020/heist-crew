@@ -53,7 +53,7 @@ local function paintPad(roleId)
         pad.statusBar.BackgroundColor3 = pad.color
         TweenService:Create(pad.light, TweenInfo.new(0.4), { Brightness = 2.2, Range = 12 }):Play()
     else
-        pad.status.Text = "OPEN — STEP ON THE PAD"
+        pad.status.Text = "OPEN"
         pad.status.TextColor3 = UITheme.C.muted
         pad.statusBar.BackgroundColor3 = UITheme.C.bgRaised
         TweenService:Create(pad.light, TweenInfo.new(0.4), { Brightness = 0.6, Range = 9 }):Play()
