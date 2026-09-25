@@ -16,12 +16,20 @@
         LVL 4                 320 / 1,600 XP
         ▬▬▬▬▬▬▬───────────────────────────
 
-    Collapses to "Job: VILLA ROSA · ready" + the level line while the job is
+    Collapses to "Next heist: VILLA ROSA" + the level line while the job is
     IDLE. Everything animates: steps pop when they complete, the take rolls
     up, the XP bar slides, and a LEVEL UP flash plays when Level goes up.
 
+    v2.0: works for every job in Constants.JOBS (mart / villa / jewelry / bank —
+    the server only sends the steps a job has). A red JAIL box shows while
+    you're in a cell ("In jail — a teammate can break you out  0:24"), and your
+    crew sees "Bob is in jail — go break them out!". Bot crewmates are listed
+    under the job name.
+
     Listens to:
-        JobInfo remote (spec §5)  ·  player attributes Level / XP / XPNext
+        JobInfo remote (spec §5, + v2 fields jailed = {names}, bots = {names})
+        Jail remote { jailed, freeAt }  ·  player attribute Jailed
+        player attributes Level / XP / XPNext
         ReplicatedStorage attribute ActiveJob (fallback before the first JobInfo)
 
     PUBLIC API:
@@ -250,7 +258,47 @@ function JobHud:_buildUi()
     name.Parent = card
 
     -- 3. steps
-    local steps = frame({ Name = "Steps", LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 0),
+    -- 3. v2.0 notes: jail box / crew-in-jail line / bot crew line
+    local notes = frame({ Name = "Notes", LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y, Visible = false })
+    notes.Parent = card
+    local nl = Instance.new("UIListLayout")
+    nl.SortOrder = Enum.SortOrder.LayoutOrder
+    nl.Padding = UDim.new(0, 4)
+    nl.Parent = notes
+    local jailBox = frame({ Name = "JailBox", LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.danger, BackgroundTransparency = 0.8, Visible = false })
+    UITheme.corner(jailBox, 10)
+    UITheme.stroke(jailBox, T.danger, 0.4)
+    local jp = Instance.new("UIPadding")
+    jp.PaddingLeft = UDim.new(0, 10)
+    jp.PaddingRight = UDim.new(0, 10)
+    jp.PaddingTop = UDim.new(0, 6)
+    jp.PaddingBottom = UDim.new(0, 6)
+    jp.Parent = jailBox
+    jailBox.Parent = notes
+    local jailTitle = UITheme.label({ Name = "Title", Size = UDim2.new(1, -44, 0, 20), Text = "IN JAIL",
+        FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.danger })
+    jailTitle.Parent = jailBox
+    local jailTimer = UITheme.label({ Name = "Timer", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0),
+        Size = UDim2.fromOffset(44, 20), TextXAlignment = Enum.TextXAlignment.Right, Text = "0:30",
+        FontFace = UITheme.F.mono, TextSize = 15, TextColor3 = T.text })
+    jailTimer.Parent = jailBox
+    local jailHint = UITheme.label({ Name = "Hint", Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, 0, 0, 16),
+        AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, Text = "A teammate can break you out!",
+        FontFace = UITheme.F.medium, TextSize = 13, TextColor3 = T.text })
+    jailHint.Parent = jailBox
+    local crewJail = UITheme.label({ Name = "CrewJail", LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16),
+        AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, RichText = true, Visible = false,
+        FontFace = UITheme.F.bold, TextSize = 13, TextColor3 = T.danger, Text = "" })
+    crewJail.Parent = notes
+    local botLine = UITheme.label({ Name = "Bots", LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 16),
+        AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, RichText = true, Visible = false,
+        FontFace = UITheme.F.medium, TextSize = 12, TextColor3 = T.muted, Text = "" })
+    botLine.Parent = notes
+
+    -- 4. steps
+    local steps = frame({ Name = "Steps", LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y })
     steps.Parent = card
     local sl = Instance.new("UIListLayout")
@@ -258,13 +306,13 @@ function JobHud:_buildUi()
     sl.Padding = UDim.new(0, 6)
     sl.Parent = steps
 
-    local takeDivider = hairline(4)
+    local takeDivider = hairline(5)
     takeDivider.Parent = card
 
-    -- 5. take + bags
-    local takeRow = frame({ Name = "Take", LayoutOrder = 5, Size = UDim2.new(1, 0, 0, 42) })
+    -- 6. take + bags
+    local takeRow = frame({ Name = "Take", LayoutOrder = 6, Size = UDim2.new(1, 0, 0, 42) })
     takeRow.Parent = card
-    UITheme.caption("Take", { Size = UDim2.new(0.6, 0, 0, 14), TextSize = 12 }).Parent = takeRow
+    UITheme.caption("Money", { Size = UDim2.new(0.6, 0, 0, 14), TextSize = 12 }).Parent = takeRow
     local take = UITheme.label({ Name = "Amount", Position = UDim2.fromOffset(0, 14), Size = UDim2.new(0.65, 0, 0, 28),
         FontFace = UITheme.F.display, TextSize = 24, TextColor3 = T.money, Text = "$0" })
     take.Parent = takeRow
@@ -275,8 +323,8 @@ function JobHud:_buildUi()
         FontFace = UITheme.F.mono, TextSize = 18, Text = "0 / 0" })
     bags.Parent = takeRow
 
-    -- 6. alarm chips
-    local chips = frame({ Name = "Chips", LayoutOrder = 6, Size = UDim2.new(1, 0, 0, 26), Visible = false })
+    -- 7. alarm chips
+    local chips = frame({ Name = "Chips", LayoutOrder = 7, Size = UDim2.new(1, 0, 0, 26), Visible = false })
     chips.Parent = card
     local cl = Instance.new("UIListLayout")
     cl.FillDirection = Enum.FillDirection.Horizontal
@@ -286,14 +334,14 @@ function JobHud:_buildUi()
     cl.Parent = chips
     local alarmChip, alarmDot, _, alarmTimer = makeChip(T.danger, "ALARM", true, 1)
     alarmChip.Parent = chips
-    local silentChip, silentDot = makeChip(T.gold, "SILENT ALARM", false, 2)
+    local silentChip, silentDot = makeChip(T.gold, "SECRET ALARM", false, 2)
     silentChip.Parent = chips
 
-    local levelDivider = hairline(7)
+    local levelDivider = hairline(8)
     levelDivider.Parent = card
 
-    -- 8. level + XP bar
-    local levelRow = frame({ Name = "Level", LayoutOrder = 8, Size = UDim2.new(1, 0, 0, 28) })
+    -- 9. level + XP bar
+    local levelRow = frame({ Name = "Level", LayoutOrder = 9, Size = UDim2.new(1, 0, 0, 28) })
     levelRow.Parent = card
     local lvl = UITheme.label({ Name = "Lvl", RichText = true, Size = UDim2.new(0.5, 0, 0, 18),
         FontFace = UITheme.F.display, TextSize = 16, Text = "" })
@@ -329,6 +377,8 @@ function JobHud:_buildUi()
     self._lvl, self._lvlScale, self._xp, self._flash, self._fill = lvl, lvlScale, xp, flash, fill
     self._rows = {}
     self._rowOrder = {}
+    self._notes, self._jailBox, self._jailTimer, self._jailHint = notes, jailBox, jailTimer, jailHint
+    self._crewJail, self._botLine = crewJail, botLine
 
     self._takeValue = Instance.new("NumberValue")
     self._takeValue.Changed:Connect(function(v)
@@ -468,10 +518,10 @@ function JobHud:_render(info)
         self._name.TextSize = 16
         self._name.FontFace = UITheme.F.bold
         if jobName then
-            self._name.Text = string.format('<font color="%s">Job:</font> %s <font color="%s">· ready</font>',
-                hex(T.muted), esc(jobName), hex(T.muted))
+            self._name.Text = string.format('<font color="%s">Next heist:</font> %s',
+                hex(T.muted), esc(jobName))
         else
-            self._name.Text = string.format('<font color="%s">No job selected</font>', hex(T.muted))
+            self._name.Text = string.format('<font color="%s">Pick a heist</font>', hex(T.muted))
         end
         self._stage.Text = "READY"
         self._stage.TextColor3 = T.muted
@@ -512,6 +562,7 @@ function JobHud:_render(info)
         self:_setSilent(false)
     end
     self._chips.Visible = active and (self._alarmOn or self._silentOn) or false
+    self:_renderNotes(info, active)
 
     -- stroke goes red while the alarm is live
     if self._cardStroke and not self._levelFlashing then
@@ -523,6 +574,75 @@ function JobHud:_render(info)
         self._cardScale.Scale = 0.96
         tween(self._cardScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
     end
+end
+
+-- ── v2.0 jail + crew notes ─────────────────────────────────────────────
+local function nameList(list)
+    local out = {}
+    for _, n in ipairs(type(list) == "table" and list or {}) do table.insert(out, esc(n)) end
+    return out
+end
+
+function JobHud:_renderNotes(info, active)
+    info = info or {}
+    local jailedMe = self._jailed == true
+    -- my own jail box
+    self._jailBox.Visible = jailedMe
+    -- teammates in jail (not me)
+    local others = {}
+    for _, n in ipairs(nameList(info.jailed)) do
+        if n ~= esc(localPlayer.DisplayName) then table.insert(others, n) end
+    end
+    if active and #others > 0 then
+        local who = table.concat(others, ", ")
+        self._crewJail.Text = string.format("%s %s in jail — go break them out!", who,
+            #others == 1 and "is" or "are")
+        self._crewJail.Visible = not jailedMe
+    else
+        self._crewJail.Visible = false
+    end
+    -- bot crewmates
+    local bots = nameList(info.bots)
+    if active and #bots > 0 then
+        self._botLine.Text = string.format('<font color="%s">Bot crew:</font> %s  <font color="%s">(E = give bag)</font>',
+            hex(T.muted), table.concat(bots, ", "), hex(T.faint))
+        self._botLine.Visible = true
+    else
+        self._botLine.Visible = false
+    end
+    self._notes.Visible = self._jailBox.Visible or self._crewJail.Visible or self._botLine.Visible
+end
+
+function JobHud:_setJailed(on, freeAt)
+    on = on == true
+    if freeAt then self._jailFreeAt = tonumber(freeAt) or 0 end
+    if on == self._jailed then
+        self:_renderNotes(self._info, self._active)
+        return
+    end
+    self._jailed = on
+    if self._jailConn then
+        self._jailConn:Disconnect()
+        self._jailConn = nil
+    end
+    if on then
+        local last = -1
+        self._jailConn = RunService.Heartbeat:Connect(function()
+            local left = math.max(0, (self._jailFreeAt or 0) - workspace:GetServerTimeNow())
+            local secs = math.ceil(left)
+            if secs ~= last then
+                last = secs
+                self._jailTimer.Text = string.format("%d:%02d", math.floor(secs / 60), secs % 60)
+                self._jailHint.Text = secs > 0 and "A teammate can break you out!"
+                    or "Nobody came… going back to the club."
+            end
+        end)
+        if self._cardScale then
+            self._cardScale.Scale = 1.04
+            tween(self._cardScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+        end
+    end
+    self:_renderNotes(self._info, self._active)
 end
 
 -- ── level / XP ─────────────────────────────────────────────────────────
@@ -608,6 +728,20 @@ function JobHud:start()
         -- only a fallback: once JobInfo is flowing it names the job itself
         if not self._info or self._info.stage ~= "ACTIVE" then self:_render(self._info) end
     end)
+
+    -- v2.0 jail state: the remote carries freeAt, the attribute is the truth
+    localPlayer:GetAttributeChangedSignal("Jailed"):Connect(function()
+        self:_setJailed(localPlayer:GetAttribute("Jailed") == true, nil)
+    end)
+    task.spawn(function()
+        local jr = Remotes.getRemote(Remotes.NAMES.Jail, "RemoteEvent")
+        if not jr then return end
+        jr.OnClientEvent:Connect(function(data)
+            if type(data) ~= "table" then return end
+            self:_setJailed(data.jailed == true, data.freeAt)
+        end)
+    end)
+    if localPlayer:GetAttribute("Jailed") then self:_setJailed(true, nil) end
 
     task.spawn(function()
         local remote = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")

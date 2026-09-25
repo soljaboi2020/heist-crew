@@ -53,10 +53,10 @@ do
 end
 
 local ORDER = {
-    "CashHud", "Notifications", "HeistHud", "CrewHud",
-    "JobHud", "LootHud", "AbilityHud", "ShopUI", "CarHud",
+    "CashHud", "Notifications", "FeelFX", "HeistHud", "CrewHud",
+    "JobHud", "LootHud", "CrouchController", "AbilityHud", "ShopUI", "DailyRewardUI", "CarHud",
     "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud",
-    "ClubFX",
+    "ClubFX", "PortalHud", "IntroCam",   -- v2.0
 }
 
 for _, name in ipairs(ORDER) do

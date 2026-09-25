@@ -33,6 +33,14 @@
         car:ejectAll()            -- unseat everyone, drop them beside the car
         car:reset(cframe)         -- eject, stop, unfreeze, re-arm drop-off, teleport
         car:destroy()
+        car:applyPaint(player|nil) -- (v2.0) body paint = that player's car color, nil = default white
+
+        VehicleService:refreshPaint()        -- (v2.0) repaint for whoever is driving right now
+
+    v2.0 CAR COLORS: whenever the driver seat changes hands the body is painted
+    with the DRIVER's equipped car color (CosmeticsService:carPaintFor); empty
+    seat / no cosmetic = the classic Vice White. CosmeticsService is required
+    lazily, so no extra wiring is needed.
 
     MODEL ATTRIBUTES (read by CarHud): Speed, BustMeter (PoliceService),
     NitroUntil, NitroReadyAt, NitroCooldown (server time / seconds).
@@ -352,6 +360,12 @@ local function buildCarModel()
     B.box(model, "Dash", -1.9, 1.55, -1.4, 1.9, 2.25, -0.95, LEATHER, Enum.Material.Fabric)
     B.box(model, "Bulkhead", -1.9, 1.55, 3.0, 1.9, 2.6, 3.2, LEATHER, Enum.Material.Fabric)
     B.box(model, "RearDeck", -2.3, 1.55, 3.2, 2.3, 2.45, 5.5, WHITE, Enum.Material.SmoothPlastic, PAINT)
+    -- (v2.0) the body panels that take the driver's car color
+    local paint = {}
+    for _, name in ipairs({ "LowerBody", "Hood", "CockpitWallL", "CockpitWallR", "RearDeck" }) do
+        local pt = model:FindFirstChild(name)
+        if pt and pt:IsA("BasePart") then table.insert(paint, pt) end
+    end
     -- engine-lid slats (the Testarossa grille)
     for i = 0, 3 do
         local z = 3.6 + i * 0.42
@@ -488,6 +502,7 @@ local function buildCarModel()
         model = model, root = root, driverSeat = driverSeat, seats = seats, trunk = trunk,
         glow = glow, underLight = underLight, cabinLight = cabinLight,
         headlights = headlights, exhausts = exhausts,
+        paint = paint,
     }
 end
 
@@ -547,6 +562,39 @@ function Car:_setGlowColor(color)
     for _, g in ipairs(self.glow) do g.Color = color end
     self.underLight.Color = color
     self.cabinLight.Color = color
+end
+
+-- (v2.0) car colors — CosmeticsService is optional and loaded on first use
+local Cosmetics = nil
+local function cosmetics()
+    if Cosmetics ~= nil then return Cosmetics or nil end
+    Cosmetics = false
+    local mod = script.Parent:FindFirstChild("CosmeticsService")
+    if mod then
+        local ok, result = pcall(require, mod)
+        if ok and type(result) == "table" then Cosmetics = result end
+    end
+    return Cosmetics or nil
+end
+
+function Car:applyPaint(player)
+    local spec = nil
+    local C = player and cosmetics()
+    if C and C.carPaintFor then
+        local ok, res = pcall(function() return C:carPaintFor(player) end)
+        if ok and type(res) == "table" then spec = res end
+    end
+    local color = spec and spec.color or WHITE
+    local mat = spec and spec.material or PAINT.Material
+    local refl = spec and spec.reflectance or PAINT.Reflectance
+    for _, pt in ipairs(self.paint or {}) do
+        if pt.Parent then
+            pt.Color = color
+            pt.Material = mat
+            pt.Reflectance = refl
+        end
+    end
+    self.model:SetAttribute("Paint", spec and spec.id or "CarClassic")
 end
 
 function Car:setAlarmMode(on)
@@ -752,6 +800,7 @@ function Car:_wireSeat(seat, isDriver)
         prompt.Enabled = seat.Occupant == nil
         if isDriver then
             local driver = self:getDriver()
+            self:applyPaint(driver)
             fire(callbacks.onDriverChanged, self, driver)
         end
     end))
@@ -770,6 +819,7 @@ local function newCar(cframe)
         cabinLight = parts.cabinLight,
         headlights = parts.headlights,
         exhausts = parts.exhausts,
+        paint = parts.paint,
         halfLen = CAR_HALF_LEN,
         width = CAR_WIDTH,
         pos = Vector3.zero,
@@ -857,6 +907,11 @@ function VehicleService:spawnGetaway(cframe)
     if currentCar then currentCar:destroy() end
     currentCar = newCar(cframe)
     return currentCar
+end
+
+function VehicleService:refreshPaint()
+    local car = self:getCar()
+    if car then car:applyPaint((car:getDriver())) end
 end
 
 function VehicleService:getCar()

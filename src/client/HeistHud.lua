@@ -197,7 +197,13 @@ function HeistHud:showResult(win, payload)
         self._rSub.Text = why or "Nobody made it to the marina."
     end
     local jobName = game:GetService("ReplicatedStorage"):GetAttribute("ActiveJob")
-    self._rCaption.Text = jobName == "jewelry" and "DIAMOND DOLLS" or "VILLA ROSA"
+    -- (v2.0) look the name up instead of assuming villa/jewelry
+    local caption = "THE JOB"
+    local okC, C = pcall(require, game:GetService("ReplicatedStorage").Shared.Constants)
+    if okC and C.JOBS then
+        for _, j in ipairs(C.JOBS) do if j.id == jobName then caption = j.name end end
+    end
+    self._rCaption.Text = caption
 
     r.Visible = true
     r.GroupTransparency = 1

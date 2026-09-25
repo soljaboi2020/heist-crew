@@ -17,6 +17,13 @@
       • hanging industrial lamps, skylights, steel columns, roof trusses
       • Kenney props (crates, sofa, laptop, speakers...) via KenneyLoader
 
+    ⚠ Since v1.2 most of the list above lives in The Vault (ClubBuilder); the
+    old functions are kept but not called. v2.0: the shop is dressed as the
+    crew's COVER BUSINESS — a real-looking "Riverside Auto Body" (_autoShop):
+    car on a 2-post lift, car with its hood up, tool wall, tyre rack, oil
+    drums, service desk + price board + OPEN sign, waiting area — with the
+    freight lift down to The Vault in the middle.
+
     STREET (z -22..-6, runs east-west) between the safehouse and the mansion:
       asphalt, dashed centre line, kerbs, sidewalks, a zebra crossing lined up
       with the garage, streetlights, and a short garden path up to the mansion.
@@ -639,7 +646,12 @@ function SafehouseBuilder:buildStreet(f)
 
     -- mansion front garden: path from the north sidewalk to the front door, hedges each side
     local pathZ0 = zc - hw - 4.6
-    local doorZ = W.MANSION_CENTER.z + W.MANSION_HALF_DEPTH
+    -- v2.0 check: the villa's front face is MANSION_CENTER.z + MANSION_HALF_DEPTH
+    -- = -67 + 29 = -38 (docs/V2_SPEC.md §1: "Front door x 0 at z -38"), so this path
+    -- runs z -38 → -26.6 — exactly the villa's front garden. VillaBuilder relies on
+    -- this path (x -4..4) + hedges (x ±5..6.4) and keeps them clear. Falls back to
+    -- -38 if the constants ever go missing.
+    local doorZ = (W.MANSION_CENTER and W.MANSION_HALF_DEPTH) and (W.MANSION_CENTER.z + W.MANSION_HALF_DEPTH) or -38
     box("FrontPath", -4, 0, doorZ, 4, 0.45, pathZ0, Color3.fromRGB(170, 164, 152), Enum.Material.Slate, f)
     for _, sx in ipairs({ -1, 1 }) do
         box("Hedge", sx * 5, 0, doorZ + 1, sx * 6.4, 2, pathZ0 - 0.5, Color3.fromRGB(44, 88, 48), Enum.Material.Grass, f)
@@ -728,6 +740,207 @@ function SafehouseBuilder:showJob(refs, cfg, jobRefs)
 end
 
 -- ──────────────────────────────────────────────
+-- 🔧 v2.0: dress the auto shop as a REAL business (it's the crew's cover).
+-- Car up on a 2-post lift (west bay), a car with its hood up (east bay), tool
+-- chests + workbench + pegboard, a tyre rack, oil drums, a service desk with
+-- a price board, a waiting area and an OPEN sign. The freight lift in the
+-- middle stays clear (x -4..4, z 18..26) and so does the lane to it from the
+-- garage door (x -9..9).
+-- ──────────────────────────────────────────────
+local function wheel(parent, x, y, z)
+    part({ Name = "Tyre", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 2.2, 2.2),
+        CFrame = CFrame.new(x, y, z), Color = Color3.fromRGB(24, 24, 26), Material = Enum.Material.Fabric }, parent)
+    part({ Name = "Rim", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.95, 1.2, 1.2),
+        CFrame = CFrame.new(x, y, z), Color = Color3.fromRGB(170, 172, 178), Material = Enum.Material.Metal }, parent)
+end
+
+-- a simple saloon car (nose north), wheels resting at `baseY`
+local function car(parent, cx, cz, baseY, color, hoodUp)
+    local m = Instance.new("Model")
+    m.Name = "CustomerCar"
+    m.Parent = parent
+    local b0 = baseY + 0.6
+    box("Body", cx - 2.8, b0, cz - 5.5, cx + 2.8, b0 + 1.8, cz + 5.5, color, Enum.Material.Metal, m, { Reflectance = 0.12 })
+    box("Cabin", cx - 2.4, b0 + 1.8, cz - 1.8, cx + 2.4, b0 + 3.4, cz + 3.2, color, Enum.Material.Metal, m)
+    box("Windshield", cx - 2.2, b0 + 1.9, cz - 1.95, cx + 2.2, b0 + 3.2, cz - 1.8, Color3.fromRGB(120, 150, 170), Enum.Material.Glass, m, { Transparency = 0.35 })
+    box("RearGlass", cx - 2.2, b0 + 1.9, cz + 3.2, cx + 2.2, b0 + 3.2, cz + 3.35, Color3.fromRGB(120, 150, 170), Enum.Material.Glass, m, { Transparency = 0.35 })
+    for _, sx in ipairs({ -1, 1 }) do
+        box("SideGlass", cx + sx * 2.4, b0 + 1.95, cz - 1.6, cx + sx * 2.45, b0 + 3.2, cz + 3, Color3.fromRGB(120, 150, 170), Enum.Material.Glass, m, { Transparency = 0.35 })
+        box("Headlight", cx + sx * 1.6 - 0.5, b0 + 0.9, cz - 5.55, cx + sx * 1.6 + 0.5, b0 + 1.3, cz - 5.5, Color3.fromRGB(240, 240, 230), Enum.Material.Glass, m)
+        box("Taillight", cx + sx * 1.8 - 0.5, b0 + 0.9, cz + 5.5, cx + sx * 1.8 + 0.5, b0 + 1.3, cz + 5.55, Color3.fromRGB(200, 30, 30), Enum.Material.Glass, m)
+        for _, wz in ipairs({ cz - 3.4, cz + 3.4 }) do wheel(m, cx + sx * 2.5, baseY + 1.1, wz) end
+    end
+    box("Bumper", cx - 2.9, b0 + 0.2, cz - 5.8, cx + 2.9, b0 + 0.7, cz - 5.5, Color3.fromRGB(40, 40, 44), Enum.Material.Metal, m)
+    box("BumperRear", cx - 2.9, b0 + 0.2, cz + 5.5, cx + 2.9, b0 + 0.7, cz + 5.8, Color3.fromRGB(40, 40, 44), Enum.Material.Metal, m)
+    if hoodUp then
+        box("Engine", cx - 2, b0 + 1, cz - 5.2, cx + 2, b0 + 1.8, cz - 2.4, Color3.fromRGB(50, 52, 58), Enum.Material.Metal, m)
+        -- hood hinged at the windshield, propped open ~60°
+        local hinge = CFrame.new(cx, b0 + 1.8, cz - 1.9)
+        part({ Name = "Hood", Size = Vector3.new(5.4, 0.15, 3.6), Color = color, Material = Enum.Material.Metal,
+            CFrame = hinge * CFrame.Angles(math.rad(-60), 0, 0) * CFrame.new(0, 0, -1.8) }, m)
+    else
+        box("Hood", cx - 2.7, b0 + 1.8, cz - 5.4, cx + 2.7, b0 + 1.9, cz - 1.8, color, Enum.Material.Metal, m)
+    end
+    return m
+end
+
+function SafehouseBuilder:_autoShop(f)
+    local yellow = Color3.fromRGB(212, 168, 44)
+    local red = Color3.fromRGB(176, 36, 36)
+    local paint = function(name, x0, z0, x1, z1)
+        box(name, x0, FLOOR, z0, x1, FLOOR + 0.02, z1, yellow, Enum.Material.SmoothPlastic, f, { CanCollide = false })
+    end
+    -- bay outlines on the floor
+    for _, bx in ipairs({ { -21, -9 }, { 9, 21 } }) do
+        paint("BayLine", bx[1], 13, bx[1] + 0.3, 30)
+        paint("BayLine", bx[2] - 0.3, 13, bx[2], 30)
+        paint("BayLine", bx[1], 29.7, bx[2], 30)
+    end
+    -- oil stains
+    for _, s in ipairs({ { -15, 20, 2.4 }, { 15, 24, 1.8 }, { -4, 12, 1.4 } }) do
+        part({ Name = "OilStain", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.02, s[3] * 2, s[3] * 2),
+            CFrame = CFrame.new(s[1], FLOOR + 0.01, s[2]) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = Color3.fromRGB(30, 30, 30), Material = Enum.Material.SmoothPlastic, Transparency = 0.55,
+            CanCollide = false }, f)
+    end
+
+    -- WEST BAY: 2-post lift with a car up on it
+    local lx, lz = -15, 22
+    for _, px in ipairs({ -20.4, -9.6 }) do
+        box("LiftColumn", px - 0.4, FLOOR, lz - 0.6, px + 0.4, 12.2, lz + 0.6, red, Enum.Material.Metal, f)
+        box("LiftColumnBase", px - 0.9, FLOOR, lz - 1, px + 0.9, FLOOR + 0.3, lz + 1, STEEL, Enum.Material.Metal, f)
+        for _, dz in ipairs({ -3.2, 3.2 }) do
+            local ax = (px < lx) and px + 0.4 or px - 0.4
+            box("LiftArm", math.min(ax, lx + (px < lx and -1.6 or 1.6)), 5.6, lz + dz - 0.25,
+                math.max(ax, lx + (px < lx and -1.6 or 1.6)), 5.9, lz + dz + 0.25, STEEL, Enum.Material.Metal, f)
+        end
+    end
+    box("LiftBeam", -20.8, 12.2, lz - 0.4, -9.2, 12.8, lz + 0.4, red, Enum.Material.Metal, f)
+    car(f, lx, lz, 5.9 - 0.6, Color3.fromRGB(40, 90, 160), false)
+    KenneyLoader.placeMany({
+        { kit = "factory", name = "cone", pos = Vector3.new(-20, FLOOR, 29), facing = Vector3.new(0, 0, -1) },
+    }, f)
+    -- drain pan under it
+    box("DrainPan", -16, FLOOR, 21, -14, FLOOR + 0.3, 23, Color3.fromRGB(30, 30, 34), Enum.Material.Metal, f)
+
+    -- EAST BAY: car on the floor, hood up, work light
+    car(f, 15, 22, FLOOR, Color3.fromRGB(200, 60, 60), true)
+    box("WorkLight", 11, FLOOR, 15.4, 11.3, FLOOR + 5, 15.7, STEEL, Enum.Material.Metal, f)
+    local head = box("WorkLightHead", 10.7, FLOOR + 5, 15.2, 11.6, FLOOR + 5.8, 15.9, Color3.fromRGB(230, 200, 60), Enum.Material.Metal, f)
+    local sl = Instance.new("SpotLight")
+    sl.Face = Enum.NormalId.Right
+    sl.Angle = 70
+    sl.Brightness = 1.6
+    sl.Range = 14
+    sl.Color = Color3.fromRGB(255, 240, 210)
+    sl.Shadows = false
+    sl.Parent = head
+
+    -- WEST WALL: workbench, pegboard with tools, red tool chests
+    box("Workbench", WEST + 0.6, FLOOR + 3.2, 30.5, WEST + 3.4, FLOOR + 3.6, 37.5, WOOD_DARK, Enum.Material.WoodPlanks, f)
+    for _, z in ipairs({ 30.8, 37.2 }) do
+        box("BenchLeg", WEST + 2.8, FLOOR, z - 0.2, WEST + 3.2, FLOOR + 3.2, z + 0.2, STEEL, Enum.Material.Metal, f)
+    end
+    box("Vise", WEST + 2.2, FLOOR + 3.6, 36, WEST + 3.2, FLOOR + 4.4, 36.8, Color3.fromRGB(60, 90, 140), Enum.Material.Metal, f)
+    box("Pegboard", WEST + 0.5, FLOOR + 4.4, 30.5, WEST + 0.65, FLOOR + 8.6, 37.5, Color3.fromRGB(150, 118, 84), Enum.Material.Wood, f)
+    local tools = {
+        { 31.4, 6.8, 0.25, 2.2 }, { 32.3, 7.0, 0.25, 1.8 }, { 33.2, 6.6, 0.3, 2.6 }, { 34.4, 7.2, 0.5, 1.2 },
+        { 35.4, 6.9, 0.25, 2.0 }, { 36.4, 7.1, 0.35, 1.6 },
+    }
+    for _, t in ipairs(tools) do
+        box("Tool", WEST + 0.65, FLOOR + t[2] - t[4] / 2, t[1] - t[3] / 2, WEST + 0.8, FLOOR + t[2] + t[4] / 2, t[1] + t[3] / 2,
+            Color3.fromRGB(70, 72, 80), Enum.Material.Metal, f, { CanCollide = false })
+    end
+    for _, z in ipairs({ 23.6, 25.9 }) do
+        box("ToolChest", WEST + 0.6, FLOOR, z - 1.1, WEST + 2.6, FLOOR + 4, z + 1.1, red, Enum.Material.Metal, f)
+        for k = 1, 4 do
+            local y = FLOOR + k * 0.9
+            box("Drawer", WEST + 2.6, y - 0.05, z - 0.9, WEST + 2.65, y + 0.05, z + 0.9, Color3.fromRGB(200, 200, 205), Enum.Material.Metal, f, { CanCollide = false })
+        end
+    end
+
+    -- EAST WALL: tyre rack
+    for _, y in ipairs({ FLOOR + 0.3, FLOOR + 3.1 }) do
+        box("RackShelf", EAST - 3, y, 15.5, EAST - 0.6, y + 0.2, 30.5, STEEL, Enum.Material.Metal, f)
+        for z = 16.3, 29.8, 1.05 do
+            part({ Name = "RackTyre", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.9, 2.4, 2.4),
+                CFrame = CFrame.new(EAST - 1.8, y + 1.4, z) * CFrame.Angles(0, math.rad(90), 0),
+                Color = Color3.fromRGB(26, 26, 28), Material = Enum.Material.Fabric }, f)
+        end
+    end
+    for _, z in ipairs({ 15.5, 30.5 }) do
+        box("RackPost", EAST - 3, FLOOR, z - 0.1, EAST - 2.8, FLOOR + 6, z + 0.1, STEEL, Enum.Material.Metal, f)
+    end
+    -- oil drums by the tyre rack
+    for i, p in ipairs({ { EAST - 2, 32 }, { EAST - 4.4, 31.8 } }) do
+        part({ Name = "OilDrum", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3, 2, 2),
+            CFrame = CFrame.new(p[1], FLOOR + 1.5, p[2]) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = (i == 1) and Color3.fromRGB(30, 80, 150) or Color3.fromRGB(170, 40, 40), Material = Enum.Material.Metal }, f)
+    end
+
+    -- SERVICE DESK (south-east): counter, computer, price board, OPEN sign
+    box("DeskCounter", 10, FLOOR, 33.5, 20, FLOOR + 3.6, 35, Color3.fromRGB(230, 226, 218), Enum.Material.Plaster, f)
+    box("DeskCounterTop", 9.8, FLOOR + 3.6, 33.3, 20.2, FLOOR + 3.9, 35.2, WOOD_DARK, Enum.Material.WoodPlanks, f)
+    box("DeskStripe", 10, FLOOR + 2.4, 33.45, 20, FLOOR + 2.8, 33.5, Color3.fromRGB(242, 160, 190), Enum.Material.SmoothPlastic, f)
+    KenneyLoader.placeMany({
+        { kit = "furniture", name = "computerScreen", pos = Vector3.new(16, FLOOR + 3.9, 34.4), facing = Vector3.new(0, 0, 1) },
+        { kit = "furniture", name = "chairDesk", pos = Vector3.new(15, FLOOR, 37), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "radio", pos = Vector3.new(11.5, FLOOR + 3.9, 34.3), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "pottedPlant", pos = Vector3.new(EAST - 3, FLOOR, SOUTH - 1.6), facing = Vector3.new(-1, 0, 0) },
+        -- waiting area (south-west of the lift)
+        { kit = "furniture", name = "benchCushion", pos = Vector3.new(-12, FLOOR, SOUTH - 1.8), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "benchCushion", pos = Vector3.new(-6, FLOOR, SOUTH - 1.8), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "tableCoffee", pos = Vector3.new(-9, FLOOR, SOUTH - 5), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "kitchenCoffeeMachine", pos = Vector3.new(-16.5, FLOOR + 3.3, SOUTH - 1.4), facing = Vector3.new(0, 0, -1) },
+        { kit = "furniture", name = "trashcan", pos = Vector3.new(-2.5, FLOOR, SOUTH - 1.5), facing = Vector3.new(0, 0, -1) },
+    }, f)
+    box("CoffeeStand", -18, FLOOR, SOUTH - 2.2, -15, FLOOR + 3.3, SOUTH - 0.6, WOOD_DARK, Enum.Material.WoodPlanks, f)
+
+    local board = box("PriceBoard", 9.5, FLOOR + 5, SOUTH - 0.6, 20.5, FLOOR + 10.5, SOUTH - 0.5, Color3.fromRGB(20, 24, 30), Enum.Material.Metal, f)
+    local pg = surface(board, Enum.NormalId.Front, 36)
+    local pbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(20, 24, 30) }, pg)
+    text({ Text = "SERVICE MENU", Position = UDim2.fromScale(0.05, 0.03), Size = UDim2.fromScale(0.9, 0.2),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = Color3.fromRGB(245, 200, 90) }, pbg)
+    for i, row in ipairs({ { "OIL CHANGE", "$29" }, { "NEW TIRES", "$59" }, { "BRAKES", "$99" }, { "PAINT & BODY", "ASK US" } }) do
+        local y = 0.26 + (i - 1) * 0.18
+        text({ Text = row[1], Position = UDim2.fromScale(0.06, y), Size = UDim2.fromScale(0.6, 0.15),
+            FontFace = UITheme.F.bold, TextScaled = true, TextColor3 = T.text }, pbg)
+        text({ Text = row[2], Position = UDim2.fromScale(0.62, y), Size = UDim2.fromScale(0.32, 0.15),
+            TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display, TextScaled = true,
+            TextColor3 = T.money }, pbg)
+    end
+    local open = box("OpenSign", 12, FLOOR + 11, SOUTH - 0.6, 18, FLOOR + 13, SOUTH - 0.5, Color3.fromRGB(12, 12, 16), Enum.Material.Metal, f)
+    local og = surface(open, Enum.NormalId.Front, 30)
+    og.Brightness = 2.4
+    text({ Text = "OPEN", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(255, 120, 150),
+        TextStrokeColor3 = Color3.fromRGB(255, 40, 100), TextStrokeTransparency = 0.2 }, og)
+    local ol = Instance.new("PointLight")
+    ol.Color = Color3.fromRGB(255, 90, 140)
+    ol.Brightness = 0.8
+    ol.Range = 8
+    ol.Parent = open
+    local deskSign = box("DeskSign", 10.5, FLOOR + 8.8, 33.2, 19.5, FLOOR + 10.2, 33.4, Color3.fromRGB(12, 12, 16), Enum.Material.Metal, f)
+    box("DeskSignCable", 14.9, FLOOR + 10.2, 33.25, 15.1, FLOOR + H, 33.35, STEEL, Enum.Material.Metal, f, { CanCollide = false })
+    local dg = surface(deskSign, Enum.NormalId.Front, 30)
+    dg.Brightness = 1.8
+    text({ Text = "SERVICE DESK", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(150, 225, 200) }, dg)
+
+    -- big painted name on the back wall — the first thing you see through the garage door
+    local name = box("ShopName", -12, FLOOR + 9.5, SOUTH - 0.6, 8, FLOOR + 13, SOUTH - 0.5, Color3.fromRGB(240, 232, 222), Enum.Material.Plaster, f)
+    local ng = surface(name, Enum.NormalId.Front, 30)
+    ng.LightInfluence = 1
+    text({ Text = "RIVERSIDE AUTO BODY", Position = UDim2.fromScale(0.03, 0.05), Size = UDim2.fromScale(0.94, 0.6),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = Color3.fromRGB(200, 60, 110) }, ng)
+    text({ Text = "FAMILY OWNED  ·  SINCE 1986", Position = UDim2.fromScale(0.1, 0.66), Size = UDim2.fromScale(0.8, 0.28),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextScaled = true,
+        TextColor3 = Color3.fromRGB(60, 110, 100) }, ng)
+end
+
+-- ──────────────────────────────────────────────
 -- 🛗 v1.2: freight lift down to The Vault
 -- ──────────────────────────────────────────────
 function SafehouseBuilder:_liftDown(f)
@@ -780,6 +993,7 @@ function SafehouseBuilder:build(folder)
     -- a freight lift down to the club. (_planningTable/_crewPads/_gearWall/
     -- _lounge are kept in this file but no longer called.)
     self:_clutter(f)
+    self:_autoShop(f)      -- v2.0: service bays, tool wall, tyre rack, service desk
     self:_liftDown(f)
 
     local street = Instance.new("Folder")

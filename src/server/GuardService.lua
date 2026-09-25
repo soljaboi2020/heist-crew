@@ -17,6 +17,17 @@
             callbacks.onPlayerCaught(player)
         GuardService:setAlarmActive(active:boolean)  -- triggers chase mode
         GuardService:reset()  -- send everyone back to patrol
+
+    v2.0 (feel agent) — sneaking (docs/V2_SPEC.md §2):
+      • player attribute Hidden   → guards can't see you, won't chase/path to
+                                    you, and can't catch you by touch
+      • player attribute Crouching → a guard's meter fills 2x slower
+      • player attribute InShadow  → 1.6x slower (stacks with crouch: 3.2x)
+      • Jailed players are ignored too.
+      • A guard whose meter on you passes NOTICE_AT stops walking, turns to look
+        at you and says "Huh?"; when he fully spots you he shouts "HEY!"
+        (short NPC speech bubble — the allowed floating-text exception).
+    GuardService.stealthFactor(player) -> (hidden:boolean, fillMultiplier:number)
 --]]
 
 local RunService = game:GetService("RunService")
@@ -27,7 +38,9 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local NpcFactory = require(script.Parent.NpcFactory)
+local Debris = game:GetService("Debris")
 
 local GuardService = {}
 
@@ -37,6 +50,59 @@ local callbacks = {
     onPlayerSpotted = function() end,
     onPlayerCaught = function() end,
 }
+
+-- ── v2.0 sneaking ──────────────────────────────────────────────
+local CROUCH_MULT = 2      -- fill time x2 while crouching
+local SHADOW_MULT = 1.6    -- fill time x1.6 in a ShadowZone (stacks)
+local NOTICE_AT   = 0.4    -- meter level where a guard stops and turns to look
+local HIDDEN_KEEP_OUT = 6  -- guards never walk to a point this close to a hidden player
+
+-- Returns (cannotBeSeen, fillTimeMultiplier)
+function GuardService.stealthFactor(player)
+    if player:GetAttribute("Hidden") or player:GetAttribute("Jailed") then return true, math.huge end
+    local m = 1
+    if player:GetAttribute("Crouching") then m = m * CROUCH_MULT end
+    if player:GetAttribute("InShadow") then m = m * SHADOW_MULT end
+    return false, m
+end
+
+local function isHidden(player)
+    return player:GetAttribute("Hidden") == true or player:GetAttribute("Jailed") == true
+end
+
+-- true if `pos` is right on top of a hidden player (don't walk into his closet)
+local function nearHidden(pos)
+    if typeof(pos) ~= "Vector3" then return false end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if isHidden(p) then
+            local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and (hrp.Position - pos).Magnitude < HIDDEN_KEEP_OUT then return true end
+        end
+    end
+    return false
+end
+
+-- Short speech bubble over a guard's head ("Huh?" / "HEY!"), gone in ~1.5 s
+local function say(guard, text, color)
+    local head = guard.head
+    if not head or not head.Parent then return end
+    local old = head:FindFirstChild("SpeechBubble")
+    if old then old:Destroy() end
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "SpeechBubble"
+    bb.Size = UDim2.fromOffset(84, 34)
+    bb.StudsOffset = Vector3.new(0, 2.4, 0)
+    bb.AlwaysOnTop = false
+    bb.MaxDistance = 80
+    bb.LightInfluence = 0
+    local panel = UITheme.panel({ Size = UDim2.fromScale(1, 1), radius = 17, transparency = 0.1 })
+    panel.Parent = bb
+    local l = UITheme.label({ Text = text, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextSize = 20, TextColor3 = color or UITheme.C.text })
+    l.Parent = panel
+    bb.Parent = head
+    Debris:AddItem(bb, 1.5)
+end
 
 -- ──────────────────────────────────────────────
 -- Build a single guard (a real R15 avatar — see NpcFactory)
@@ -100,6 +166,7 @@ local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, hea
         if not player then return end
         local hum = character:FindFirstChildOfClass("Humanoid")
         if hum and hum.SeatPart then return end   -- (fix v1.1) in the car = the police's job
+        if isHidden(player) then return end        -- (v2.0) hidden in a closet / jailed
         if guard.cooldown > 0 then return end
         if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
         guard.cooldown = 2  -- prevent multi-fire
@@ -141,6 +208,14 @@ local function walkTo(guard, target, gen, budget)
         local lastIssue = 0
         while flatDist(root.Position, point) > 2 do
             if guard.gen ~= gen or not guards[guard.name] then return false end
+            -- (v2.0) he noticed someone: stand still and look (checkVision turns him)
+            if guard.lookUntil and os.clock() < guard.lookUntil and not guard.alarmActive then
+                hum:MoveTo(root.Position)
+                lastIssue = 0
+                deadline = deadline + 0.1
+                task.wait(0.1)
+                continue
+            end
             if os.clock() > deadline or os.clock() > hardStop then return false end
             if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return false end
             -- Humanoid:MoveTo silently gives up after 8s, so keep re-issuing it
@@ -164,7 +239,7 @@ local function nearestPlayer(from, maxDist)
         local sh = Constants.WORLD.SAFEHOUSE_CENTER
         local inSafehouse = hrp and math.abs(hrp.Position.X - sh.x) < Constants.WORLD.SAFEHOUSE_HALF_WIDTH + 1
             and math.abs(hrp.Position.Z - sh.z) < Constants.WORLD.SAFEHOUSE_HALF_DEPTH + 1
-        if hum and hrp and hum.Health > 0 and not hum.SeatPart and not inSafehouse then
+        if hum and hrp and hum.Health > 0 and not hum.SeatPart and not inSafehouse and not isHidden(p) then
             local d = (hrp.Position - from).Magnitude
             if d < bestD then best, bestD = hrp.Position, d end
         end
@@ -183,8 +258,10 @@ local function runBrain(guard)
                 -- walking to one stale "last known position" and standing there.
                 guard.humanoid.WalkSpeed = Constants.GUARD_CHASE_SPEED
                 local target = nearestPlayer(guard.root.Position, 90) or guard._chaseTarget
+                if target and nearHidden(target) then target = nil end   -- (v2.0) never into a hiding spot
                 if target then
                     walkTo(guard, target, gen, 1)
+                    task.wait(0.1)   -- (v2.0 fix) already standing on the target: walkTo returns at once — don't spin
                 else
                     task.wait(0.3)
                 end
@@ -224,13 +301,15 @@ local function checkVision(guard, dt)
     rayParams.FilterDescendantsInstances = { guard.model }
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
+    local watchPos, watchV = nil, 0
     for _, player in ipairs(Players:GetPlayers()) do
         local seen = false
         local dist = math.huge
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hrp and hum and hum.Health > 0 and not hum.SeatPart and not stunned and not guard.alarmActive then
+        local cantSee, mult = GuardService.stealthFactor(player)
+        if hrp and hum and hum.Health > 0 and not hum.SeatPart and not stunned and not guard.alarmActive and not cantSee then
             local toPlayer = hrp.Position - headPos
             dist = toPlayer.Magnitude
             if dist <= Constants.GUARD_VISION_RANGE and dist > 0.1 and lookVector:Dot(toPlayer.Unit) >= cosFovHalf then
@@ -241,20 +320,37 @@ local function checkVision(guard, dt)
         local v = guard.sus[player] or 0
         if seen then
             local t = math.clamp(dist / Constants.GUARD_VISION_RANGE, 0, 1)
-            local fillTime = D.GUARD_NEAR_TIME + (D.GUARD_FAR_TIME - D.GUARD_NEAR_TIME) * t
+            local fillTime = (D.GUARD_NEAR_TIME + (D.GUARD_FAR_TIME - D.GUARD_NEAR_TIME) * t) * mult
             v = v + dt / fillTime
         else
             v = v - dt * D.DECAY
         end
         v = math.clamp(v, 0, 1)
+        local before = guard.sus[player] or 0
         guard.sus[player] = v
+        if seen and v >= NOTICE_AT then
+            if v > watchV then watchPos, watchV = hrp.Position, v end
+            if before < NOTICE_AT then say(guard, "Huh?", UITheme.C.gold) end
+        end
         if v >= 1 then
             guard.sus[player] = 0
+            say(guard, "HEY!", UITheme.C.danger)
             callbacks.onPlayerSpotted(player, guard)
         end
         local cur = frameMax[player]
         if v > 0 and (not cur or v > cur.value) then
             frameMax[player] = { value = v, from = headPos }
+        end
+    end
+
+    -- (v2.0) he noticed someone: stop and turn toward them (the brain's walk
+    -- pauses while lookUntil is in the future)
+    if watchPos and not guard.alarmActive and not stunned then
+        guard.lookUntil = os.clock() + 0.8
+        local rp = guard.root.Position
+        local flat = Vector3.new(watchPos.X, rp.Y, watchPos.Z)
+        if (flat - rp).Magnitude > 0.5 then
+            guard.root.CFrame = guard.root.CFrame:Lerp(CFrame.lookAt(rp, flat), 0.35)
         end
     end
 end
@@ -400,6 +496,8 @@ end
 function GuardService:reset()
     for _, guard in pairs(guards) do
         guard.stunnedUntil = nil
+        guard.lookUntil = nil
+        guard.sus = {}
         guard.humanoid.PlatformStand = false
         local light = guard.head and guard.head:FindFirstChildOfClass("SpotLight")
         if light then light.Enabled = true end

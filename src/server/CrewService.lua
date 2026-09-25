@@ -12,9 +12,14 @@
     ⚠️ Roles are cosmetic for now: badge, sign, roster. Role abilities are a
     separate, not-yet-approved build (Rule #12).
 
+    v2.0 AUTO-ROLE: at launch, anyone without a role gets a free one
+    (JobService calls autoAssign). If all 4 pads are taken (5+ players), the
+    extra player still gets a role — shared, not shown on a pad.
+
     PUBLIC API:
         CrewService:init(safehouseRefs, PlayerDataService)
         CrewService:getRole(player) -> string | nil
+        CrewService:autoAssign(players: {Player}?) -> { [Player] = roleId }   -- only the ones it gave a role to
 --]]
 
 local Players = game:GetService("Players")
@@ -28,6 +33,7 @@ local UITheme = require(ReplicatedStorage.Shared.UITheme)
 local CrewService = {}
 
 local holders = {}     -- roleId -> Player
+local extras = {}      -- [Player] = roleId  (v2.0 auto-role when every pad is taken)
 local spam = {}
 local refs = nil
 local PlayerData = nil
@@ -78,6 +84,7 @@ local function assign(player, roleId)
         holders[old] = nil
         paintPad(old)
     end
+    extras[player] = nil
     holders[roleId] = player
     player:SetAttribute("Role", roleId)
     paintPad(roleId)
@@ -85,6 +92,7 @@ local function assign(player, roleId)
 end
 
 local function release(player)
+    extras[player] = nil
     local old = roleOf(player)
     if old then
         holders[old] = nil
@@ -120,7 +128,36 @@ local function refreshTV()
 end
 
 function CrewService:getRole(player)
-    return roleOf(player)
+    return roleOf(player) or extras[player]
+end
+
+-- v2.0: "anyone launching with no role gets a free one" (V2_SPEC §6)
+function CrewService:autoAssign(players)
+    players = players or Players:GetPlayers()
+    local given = {}
+    for _, player in ipairs(players) do
+        if player.Parent and not player:GetAttribute("Role") and not roleOf(player) then
+            local free = {}
+            for _, role in ipairs(Constants.ROLES) do
+                local h = holders[role.id]
+                if not (h and h.Parent) then table.insert(free, role.id) end
+            end
+            if #free > 0 then
+                local roleId = free[math.random(1, #free)]
+                holders[roleId] = player
+                paintPad(roleId)
+                player:SetAttribute("Role", roleId)
+                given[player] = roleId
+            else
+                local role = Constants.ROLES[math.random(1, #Constants.ROLES)]
+                extras[player] = role.id
+                player:SetAttribute("Role", role.id)
+                given[player] = role.id
+            end
+            notify(player, "You got a free job: you're the " .. given[player] .. "!", "gold")
+        end
+    end
+    return given
 end
 
 function CrewService:init(safehouseRefs, playerDataService)

@@ -15,14 +15,31 @@
     Vault loot stays locked (prompts disabled) until JobService opens the vault.
 
     Callbacks: onEvent(kind, player, data)  kinds: "take", "smash", "load", "throw"
+        data = { kind, pos (Vector3), value, bot (bot name, for loads a bot made) }
+
+    v2.0: BOT CREW (BotService) can carry a bag for you — "Give bag" on the bot
+    moves your bag onto its back, it walks to the car and loads it. A bot load
+    counts EXACTLY like a player load (same `loaded` list, same "load" event).
+    Carried bags are passed to CosmeticsService:styleBag(player, bag) if that
+    service exists (progression agent), pcall-guarded.
+
     PUBLIC API:
         LootService:init(callbacks, ShopService)
         LootService:arm(jobRefs) / :disarm() / :reset()
         LootService:setVaultOpen(open)
         LootService:attachTrunk(trunkPart)
         LootService:drop(player)                 -- caught / left / reset
-        LootService:counts() -> { total, loaded, take, taken }
+        LootService:counts() -> { total, loaded, take, taken, cases, casesTaken, vault, vaultTaken, open, openTaken }
+        LootService:getLoaded() -> { {kind, value, bot?} }
+        LootService:remaining() -> { {pos, kind, isCase, locked} }
+        LootService:isCarrying(player) -> bool
         LootService:clearLoaded()
+        LootService.info(kind) -> { value, speed, color }   (never nil; LOOT_DEFAULT fallback)
+      v2.0 bots:
+        LootService:transferToBot(player, botModel) -> kind | nil   -- player's bag onto the bot
+        LootService:botCarrying(botModel) -> kind | nil
+        LootService:botLoad(botModel, trunkPart?) -> boolean        -- bot puts its bag in the car
+        LootService:dropBot(botModel)                               -- bot despawning: bag falls loose
 --]]
 
 local Players = game:GetService("Players")
@@ -47,8 +64,34 @@ local vaultOpen = false
 local conns = {}
 
 local DEFAULT_SPEED = 16
+local botBags = {}        -- [botModel] = { kind, bag, owner }
+local currentTrunk = nil
 
 local function track(c) table.insert(conns, c) return c end
+
+-- v2.0: any loot kind a builder names pays something (LOOT_DEFAULT), never nil
+local function info(kind)
+    return Constants.LOOT[kind] or Constants.LOOT_DEFAULT or { value = 500, speed = 13, color = { 255, 255, 255 } }
+end
+LootService.info = info
+
+-- optional sibling services (other agents' files may not exist yet)
+local optionalCache = {}
+local function optionalService(name)
+    if optionalCache[name] ~= nil then return optionalCache[name] or nil end
+    local mod = script.Parent:FindFirstChild(name)
+    local ok, result = false, nil
+    if mod then ok, result = pcall(require, mod) end
+    optionalCache[name] = (ok and type(result) == "table") and result or false
+    return optionalCache[name] or nil
+end
+local function styleBag(player, bag)
+    local C = optionalService("CosmeticsService")
+    if C and type(C.styleBag) == "function" then
+        local ok, err = pcall(C.styleBag, C, player, bag)
+        if not ok then warn("[LootService] styleBag:", err) end
+    end
+end
 
 local function hideVisual(pile, hide)
     local v = pile.visual
@@ -83,15 +126,14 @@ end
 local function carrySpeed(player, kind)
     local base = DEFAULT_SPEED + ((Shop and Shop:hasGear(player, "Sneakers")) and 2 or 0)
     if player:GetAttribute("Role") == "Muscle" then return base end
-    local target = (Constants.LOOT[kind] or {}).speed or 13
+    local target = info(kind).speed or 13
     local slow = base - target
     if Shop and Shop:hasGear(player, "Duffel") then slow = slow / 2 end
     return base - slow
 end
 
 local function makeBag(kind, cframe)
-    local info = Constants.LOOT[kind] or {}
-    local col = UITheme.rgb(info.color or { 255, 255, 255 })
+    local col = UITheme.rgb(info(kind).color or { 255, 255, 255 })
     local bag = Instance.new("Part")
     bag.Name = "LootBag"
     bag.Size = Vector3.new(2.2, 1.3, 1.2)
@@ -140,6 +182,7 @@ local function setCarrying(player, kind)
     weld.Parent = bag
     bag.Parent = char
     carriers[player] = { kind = kind, bag = bag }
+    styleBag(player, bag)
 end
 
 local function spawnLoose(kind, cframe, velocity)
@@ -163,7 +206,7 @@ local function spawnLoose(kind, cframe, velocity)
     local p = Instance.new("ProximityPrompt")
     p.Name = "PickUpBag"
     p.ActionText = "Pick up"
-    p.ObjectText = kind .. " · " .. UITheme.money((Constants.LOOT[kind] or {}).value or 0)
+    p.ObjectText = kind .. " · " .. UITheme.money(info(kind).value or 0)
     p.HoldDuration = 0.3
     p.MaxActivationDistance = 8
     p.RequiresLineOfSight = true
@@ -203,11 +246,10 @@ local function addPile(kind, visual, standCFrame, isVault, isCase, glass)
     anchor.Anchored = true
     anchor.CFrame = standCFrame + Vector3.new(0, 2.5, 0)
     anchor.Parent = refs.root
-    local info = Constants.LOOT[kind] or {}
     local p = Instance.new("ProximityPrompt")
     p.Name = isCase and "SmashCase" or "BagLoot"
     p.ActionText = isCase and "Smash & grab" or "Bag it"
-    p.ObjectText = kind .. " · " .. UITheme.money(info.value or 0)
+    p.ObjectText = kind .. " · " .. UITheme.money(info(kind).value or 0)
     p.HoldDuration = isCase and 1.2 or 1
     p.MaxActivationDistance = 7
     p.RequiresLineOfSight = true   -- (fix v1.1) no grabbing loot through walls
@@ -245,14 +287,23 @@ local function addPile(kind, visual, standCFrame, isVault, isCase, glass)
             end
         end
         setCarrying(player, kind)
-        cb.onEvent(isCase and "smash" or "take", player, { kind = kind })
+        cb.onEvent(isCase and "smash" or "take", player, { kind = kind, pos = anchor.Position, value = info(kind).value })
     end))
     table.insert(piles, pile)
 end
 
 -- ── car ──────────────────────────────────────────────────────────────
+local function loadInto(trunk, kind, player, botName)
+    local value = info(kind).value or 0
+    table.insert(loaded, { kind = kind, value = value, bot = botName })
+    local car = trunk and trunk:FindFirstAncestorOfClass("Model")
+    if car then car:SetAttribute("Bags", #loaded) end
+    cb.onEvent("load", player, { kind = kind, value = value, pos = trunk and trunk.Position, bot = botName })
+end
+
 function LootService:attachTrunk(trunk)
     if trunkPrompt then trunkPrompt:Destroy() trunkPrompt = nil end
+    currentTrunk = trunk
     if not trunk then return end
     local p = Instance.new("ProximityPrompt")
     p.Name = "LoadBag"
@@ -271,11 +322,58 @@ function LootService:attachTrunk(trunk)
         end
         local kind = c.kind
         setCarrying(player, nil)
-        table.insert(loaded, { kind = kind, value = (Constants.LOOT[kind] or {}).value or 0 })
-        local car = trunk:FindFirstAncestorOfClass("Model")
-        if car then car:SetAttribute("Bags", #loaded) end
-        cb.onEvent("load", player, { kind = kind })
+        loadInto(trunk, kind, player, nil)
     end))
+end
+
+-- ── v2.0 bot crew ────────────────────────────────────────────────────
+local function clearBotBag(botModel)
+    local b = botBags[botModel]
+    botBags[botModel] = nil
+    if b and b.bag then b.bag:Destroy() end
+    if botModel and botModel.Parent then botModel:SetAttribute("CarryingLoot", nil) end
+    return b
+end
+
+function LootService:transferToBot(player, botModel)
+    local c = carriers[player]
+    if not c or not botModel or not botModel.Parent or botBags[botModel] then return nil end
+    local torso = botModel:FindFirstChild("UpperTorso") or botModel:FindFirstChild("Torso")
+        or botModel:FindFirstChild("HumanoidRootPart")
+    if not torso then return nil end
+    local kind = c.kind
+    setCarrying(player, nil)
+    local bag = makeBag(kind, torso.CFrame * CFrame.new(0, 0, 1))
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0, weld.Part1 = torso, bag
+    weld.Parent = bag
+    bag.Parent = botModel
+    botBags[botModel] = { kind = kind, bag = bag, owner = player }
+    botModel:SetAttribute("CarryingLoot", kind)
+    styleBag(player, bag)
+    return kind
+end
+
+function LootService:botCarrying(botModel)
+    local b = botBags[botModel]
+    return b and b.kind or nil
+end
+
+function LootService:botLoad(botModel, trunk)
+    local b = botBags[botModel]
+    trunk = trunk or currentTrunk
+    if not b or not trunk or not trunk.Parent then return false end
+    clearBotBag(botModel)
+    local owner = (b.owner and b.owner.Parent) and b.owner or nil
+    loadInto(trunk, b.kind, owner, botModel:GetAttribute("BotName") or botModel.Name)
+    return true
+end
+
+function LootService:dropBot(botModel)
+    local b = clearBotBag(botModel)
+    if not b or not refs then return end
+    local root = botModel and botModel:FindFirstChild("HumanoidRootPart")
+    if root then spawnLoose(b.kind, root.CFrame * CFrame.new(0, -1, 1.5)) end
 end
 
 function LootService:counts()
@@ -286,13 +384,27 @@ function LootService:counts()
     for _, p in ipairs(piles) do if p.isCase then cases = cases + 1 end end
     local casesTaken = 0
     for _, p in ipairs(piles) do if p.isCase and p.taken then casesTaken = casesTaken + 1 end end
-    return { total = #piles, loaded = #loaded, take = take, taken = taken, cases = cases, casesTaken = casesTaken }
+    -- v2.0: split the rest into loot behind the vault/safe door and loot out in the open
+    local vault, vaultTaken, open, openTaken = 0, 0, 0, 0
+    for _, p in ipairs(piles) do
+        if not p.isCase then
+            if p.isVault then
+                vault = vault + 1
+                if p.taken then vaultTaken = vaultTaken + 1 end
+            else
+                open = open + 1
+                if p.taken then openTaken = openTaken + 1 end
+            end
+        end
+    end
+    return { total = #piles, loaded = #loaded, take = take, taken = taken, cases = cases, casesTaken = casesTaken,
+        vault = vault, vaultTaken = vaultTaken, open = open, openTaken = openTaken }
 end
 
 -- v1.1: for the payout breakdown
 function LootService:getLoaded()
     local out = {}
-    for _, l in ipairs(loaded) do table.insert(out, { kind = l.kind, value = l.value }) end
+    for _, l in ipairs(loaded) do table.insert(out, { kind = l.kind, value = l.value, bot = l.bot }) end
     return out
 end
 
@@ -339,8 +451,10 @@ function LootService:disarm()
     loose = {}
     for player in pairs(carriers) do setCarrying(player, nil) end
     carriers = {}
+    for bot in pairs(botBags) do clearBotBag(bot) end
     loaded = {}
     if trunkPrompt then trunkPrompt:Destroy() trunkPrompt = nil end
+    currentTrunk = nil
     refs = nil
 end
 
@@ -370,6 +484,7 @@ end
 function LootService:reset()
     for player in pairs(carriers) do setCarrying(player, nil) end
     carriers = {}
+    for bot in pairs(botBags) do clearBotBag(bot) end
     for _, b in ipairs(loose) do if b.Parent then b:Destroy() end end
     loose = {}
     loaded = {}

@@ -16,6 +16,16 @@
         PlayerDataService:getData(player)      → returns the cache table
         PlayerDataService:setCash(player, n)   → overwrites cash
         PlayerDataService:addCash(player, n)   → adds to cash, returns new balance
+        PlayerDataService:addLifetimeEarned(player, n) → total heist cash ever earned (leaderboard)
+        PlayerDataService:isReady(player)      → true once loaded AND the load didn't fail
+        PlayerDataService:loadFailed(player)   → true if this session will never save
+
+    v2.0 SAVE FIELDS (all migrated in for old saves — see migrate()):
+        lastDailyAt       unix seconds of the last daily-reward claim (0 = never)
+        dailyStreak       day (1..7) of the last claim; next claim is day+1 (DailyRewardService)
+        lifetimeEarned    heist cash ever paid out (LeaderboardService "TOP EARNERS")
+        cosmetics         { [itemId] = true }  owned bag skins / car colors / trails
+        equippedCosmetics { bag = id, car = id, trail = id }  (CosmeticsService)
 --]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -55,21 +65,44 @@ local function makeDefaultData()
         masks = { Bandit = true },
         mask = "Bandit",
         codes = {},             -- [CODE] = true
-        dailyDay = 0,           -- day number (os.time()//86400) of the last claim
-        dailyStreak = 0,
+        dailyDay = 0,           -- (v1.x, retired) day number of the last auto-claim
+        dailyStreak = 0,        -- v2: day 1..7 of the last claim
+        lastDailyAt = 0,        -- v2: unix seconds of the last claim
         bagsSecured = 0,
+        lifetimeEarned = 0,     -- v2: heist cash ever earned (leaderboard)
+        cosmetics = {},         -- v2: [itemId] = true
+        equippedCosmetics = {}, -- v2: { bag, car, trail }
     }
 end
 
 -- v1.0: older saves (v0.x) only had cash/level/heistsCompleted. Fill anything
 -- missing so every service can assume the full shape.
 local function migrate(data)
+    if type(data) ~= "table" then data = {} end
+    -- v2.0: daily reward moved from "calendar day index" to real timestamps.
+    -- Carry an old v1.x claim over so the streak isn't lost.
+    local oldDay = tonumber(data.dailyDay)
+    if data.lastDailyAt == nil and oldDay and oldDay > 0 then
+        data.lastDailyAt = oldDay * 86400
+    end
+    -- v2.0: the leaderboard counts lifetime earnings. Old saves never tracked
+    -- it, so seed it with what they're holding (they earned at least that).
+    if data.lifetimeEarned == nil and tonumber(data.cash) then
+        data.lifetimeEarned = math.max(0, math.floor(data.cash - Constants.STARTING_CASH))
+    end
     local defaults = makeDefaultData()
     for k, v in pairs(defaults) do
         if data[k] == nil then data[k] = v end
     end
     if type(data.masks) ~= "table" then data.masks = { Bandit = true } end
     data.masks.Bandit = true
+    for _, k in ipairs({ "gear", "codes", "cosmetics", "equippedCosmetics" }) do
+        if type(data[k]) ~= "table" then data[k] = {} end
+    end
+    for _, k in ipairs({ "lastDailyAt", "dailyStreak", "lifetimeEarned", "heistsCompleted" }) do
+        if type(data[k]) ~= "number" then data[k] = tonumber(data[k]) or 0 end
+    end
+    data.dailyStreak = math.clamp(math.floor(data.dailyStreak), 0, 7)
     return data
 end
 
@@ -127,6 +160,24 @@ function PlayerDataService:savePlayer(player)
             warn(string.format("[PlayerDataService] FAILED to save %s: %s", player.Name, tostring(err)))
         end
     end
+end
+
+function PlayerDataService:isReady(player)
+    return cache[player.UserId] ~= nil and not loadFailed[player.UserId]
+end
+
+function PlayerDataService:loadFailed(player)
+    return loadFailed[player.UserId] == true
+end
+
+-- v2.0: total heist cash ever earned (the TOP EARNERS board). Call it next to
+-- every heist payout (JobService) — NOT for codes, daily rewards or refunds.
+function PlayerDataService:addLifetimeEarned(player, amount)
+    local data = cache[player.UserId]
+    amount = tonumber(amount)
+    if not data or not amount or amount <= 0 then return data and data.lifetimeEarned or 0 end
+    data.lifetimeEarned = math.floor((tonumber(data.lifetimeEarned) or 0) + amount)
+    return data.lifetimeEarned
 end
 
 function PlayerDataService:getData(player)

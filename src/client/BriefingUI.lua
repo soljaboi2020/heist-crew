@@ -5,7 +5,12 @@
        and slowly glides over three shots (the blueprint, the TV, the garage
        door) while the Boss's lines for the selected job type out in a
        subtitle bar (Constants.JOBS[..].briefing). Skip with the button,
-       Space or gamepad B. At the end: a big READY UP button.
+       Space or gamepad B. At the end (v2.0): a card that says what to do
+       next — "Walk into the VILLA ROSA door to start" — with a GOT IT button.
+       (The old READY UP button is gone: the heist DOORS in the lobby start a
+       run now. The ReadyUp remote isn't fired from here any more.)
+       Sets the LOCAL player attribute HeardPlan = true (CrewHud's step 3,
+       WaypointHud dims the Boss marker).
     2. THE DROP-IN — when the server fires LaunchJob:
          phase "fade"  → screen fades to black (server teleports the crew)
          phase "title" → fades back in on a title card:
@@ -37,6 +42,8 @@ local SHOTS = {
     { from = Vector3.new(TB.x + 6, HF + 10, TB.z + 4), to = Vector3.new(TB.x, HF + 13, TB.z - 9), drift = Vector3.new(-6, 0, 0) },
     { from = Vector3.new(0, HF + 6, 30), to = Vector3.new(0, HF + 9, 2), drift = Vector3.new(0, 2, -5) },
     { from = Vector3.new(-2, HF + 7, 42), to = Vector3.new(-17, HF + 3, 52), drift = Vector3.new(-3, 0, 2) },
+    -- v2.0: the heist doors in the lobby (east wall, x 44, z 74..110)
+    { from = Vector3.new(22, HF + 8, 80), to = Vector3.new(44, HF + 6, 94), drift = Vector3.new(0, 0, 8) },
 }
 local LINE_TIME = 4.2
 
@@ -105,21 +112,22 @@ function BriefingUI:_build()
 
     -- READY UP card after the briefing
     local readyCard = UITheme.panel({ Name = "Ready", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -110),
-        Size = UDim2.fromOffset(460, 150), Visible = false, radius = 18, transparency = 0.08 })
+        Size = UDim2.fromOffset(470, 160), Visible = false, radius = 18, transparency = 0.08 })
     readyCard.ZIndex = 6
     readyCard.Parent = screen
     local rTitle = UITheme.label({ Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 30),
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 26, ZIndex = 7 })
     rTitle.Parent = readyCard
-    UITheme.label({ Text = "When the whole crew is ready, you roll out together.", Position = UDim2.fromOffset(0, 48),
-        Size = UDim2.new(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.medium,
-        TextSize = 15, TextColor3 = T.muted, ZIndex = 7 }).Parent = readyCard
+    local rBody = UITheme.label({ Position = UDim2.fromOffset(20, 48), Size = UDim2.new(1, -40, 0, 36),
+        TextXAlignment = Enum.TextXAlignment.Center, TextWrapped = true, FontFace = UITheme.F.medium,
+        TextSize = 15, TextColor3 = T.muted, ZIndex = 7 })
+    rBody.Parent = readyCard
     local readyBtn = Instance.new("TextButton")
     readyBtn.AnchorPoint = Vector2.new(0.5, 1)
     readyBtn.Position = UDim2.new(0.5, 0, 1, -18)
     readyBtn.Size = UDim2.fromOffset(220, 48)
     readyBtn.BackgroundColor3 = T.money
-    readyBtn.Text = "READY UP"
+    readyBtn.Text = "GOT IT"
     readyBtn.TextColor3 = T.bg
     readyBtn.FontFace = UITheme.F.display
     readyBtn.TextSize = 22
@@ -164,7 +172,7 @@ function BriefingUI:_build()
     tSub.Parent = title
 
     self._ui = { screen = screen, bars = bars, sub = sub, line = line, skip = skip, readyCard = readyCard,
-        rTitle = rTitle, readyBtn = readyBtn, later = later, black = black, title = title, tName = tName, tSub = tSub }
+        rTitle = rTitle, rBody = rBody, readyBtn = readyBtn, later = later, black = black, title = title, tName = tName, tSub = tSub }
 end
 
 function BriefingUI:_letterbox(on)
@@ -176,7 +184,8 @@ end
 function BriefingUI:_showReady()
     local u = self._ui
     local cfg = jobCfg()
-    u.rTitle.Text = "READY FOR " .. cfg.name .. "?"
+    u.rTitle.Text = "NEXT: WALK INTO A HEIST DOOR"
+    u.rBody.Text = "Go to the Heist Hall and walk into the " .. cfg.name .. " door (or any door). Friends can hop in too!"
     u.readyCard.Visible = true
 end
 
@@ -234,6 +243,7 @@ function BriefingUI:play()
     self:_letterbox(false)
     self._playing = false
     self._briefed = true
+    localPlayer:SetAttribute("HeardPlan", true)
     self:_showReady()
 end
 
@@ -291,10 +301,8 @@ end
 function BriefingUI:start()
     self:_build()
     local u = self._ui
-    local readyRemote = Remotes.getRemote(Remotes.NAMES.ReadyUp, "RemoteEvent")
-
+    -- v2.0: no more READY UP here — the heist doors start the run. GOT IT just closes the card.
     u.readyBtn.Activated:Connect(function()
-        if readyRemote then readyRemote:FireServer(true) end   -- SET ready (never toggles off)
         u.readyCard.Visible = false
     end)
     u.later.Activated:Connect(function() u.readyCard.Visible = false end)

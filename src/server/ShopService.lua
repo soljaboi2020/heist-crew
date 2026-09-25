@@ -7,16 +7,22 @@
                 while a job is running (wearMask / removeMask, called by JobService).
       • CODES — promo codes → cash, once each (Constants.CODES).
       • VIP   — game pass (Constants.GAMEPASSES.VIP). Inert while the id is 0.
-      • DAILY — login reward on join, streak day N pays DAILY_BASE * N (cap 7).
+      • COSMETICS (v2.0) — bag skins / car colors / trails. The item list and
+                the rules live in CosmeticsService; this just routes the actions
+                and ships the catalog to the client inside getState.
+      (v2.0: the daily reward moved to DailyRewardService — you press CLAIM now.)
 
     Talks to the client through the ShopAction RemoteFunction:
         action, payload -> { ok, msg, state }
+    actions: getState · buyGear{id} · buyMask{id} · equipMask{id} · redeemCode{code} · buyVIP
+             · buyCosmetic{id} · equipCosmetic{id}                                   (v2.0)
+    state.cosmetics = { catalog = {items}, owned = {ids}, equipped = {bag, car, trail} }
     Every rule is enforced HERE (price, ownership, once-per-code); the client
     only asks.
 
     PUBLIC API:
         ShopService:init(PlayerDataService, EconomyService, notifyFn)
-        ShopService:onPlayerJoined(player)       -- attributes, VIP check, daily reward
+        ShopService:onPlayerJoined(player)       -- attributes, VIP check
         ShopService:hasGear(player, id) -> bool
         ShopService:wearMask(player) / ShopService:removeMask(player)
 --]]
@@ -32,6 +38,21 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ShopService = {}
 local PlayerData, Economy = nil, nil
 local notify = function() end
+
+-- v2.0 cosmetics (bag skins / car colors / trails) — its own module, loaded
+-- defensively so a broken CosmeticsService can't take the shop down.
+local Cosmetics = nil
+do
+    local mod = script.Parent:FindFirstChild("CosmeticsService")
+    if mod then
+        local ok, result = pcall(require, mod)
+        if ok and type(result) == "table" then
+            Cosmetics = result
+        else
+            warn("[ShopService] CosmeticsService failed to load: " .. tostring(result))
+        end
+    end
+end
 
 local GEAR_BY_ID, MASK_BY_ID = {}, {}
 for _, g in ipairs(Constants.GEAR) do GEAR_BY_ID[g.id] = g end
@@ -62,11 +83,20 @@ local function stateFor(player)
     for id in pairs(d.gear) do table.insert(gear, id) end
     for id in pairs(d.masks) do table.insert(masks, id) end
     for c in pairs(d.codes) do table.insert(codes, c) end
+    local cosmetics = nil
+    if Cosmetics then
+        local ok, cs = pcall(function() return Cosmetics:stateFor(player) end)
+        if ok and type(cs) == "table" then
+            cs.catalog = Cosmetics:catalog()
+            cosmetics = cs
+        end
+    end
     return {
         cash = d.cash, gear = gear, masks = masks, mask = d.mask,
         vip = player:GetAttribute("VIP") == true,
         vipPassId = Constants.GAMEPASSES.VIP or 0,
         codesRedeemed = codes,
+        cosmetics = cosmetics,
     }
 end
 
@@ -147,6 +177,16 @@ function actions.buyVIP(player)
     return true, ""
 end
 
+function actions.buyCosmetic(player, payload)
+    if not Cosmetics then return false, "Cosmetics aren't available right now" end
+    return Cosmetics:buy(player, payload and payload.id)
+end
+
+function actions.equipCosmetic(player, payload)
+    if not Cosmetics then return false, "Cosmetics aren't available right now" end
+    return Cosmetics:equip(player, payload and payload.id)
+end
+
 -- ── masks ────────────────────────────────────────────────────────────
 local function getMaskTemplate(assetId)
     if maskTemplates[assetId] ~= nil then return maskTemplates[assetId] or nil end
@@ -190,37 +230,20 @@ function ShopService:hasGear(player, id)
     return d ~= nil and d.gear[id] == true
 end
 
--- ── daily reward ─────────────────────────────────────────────────────
-local function daily(player)
-    local d = PlayerData:getData(player)
-    if not d then return end
-    local today = math.floor(os.time() / 86400)
-    if d.dailyDay == today then return end
-    if d.dailyDay == today - 1 then
-        d.dailyStreak = math.min((d.dailyStreak or 0) + 1, 7)
-    else
-        d.dailyStreak = 1
-    end
-    d.dailyDay = today
-    local reward = Constants.DAILY_BASE * d.dailyStreak
-    Economy:addCash(player, reward, "Daily reward day " .. d.dailyStreak)
-    task.delay(3, function()
-        if player.Parent then
-            notify(player, string.format("Daily reward — day %d streak: +$%d", d.dailyStreak, reward), "green", 5)
-        end
-    end)
-end
-
 function ShopService:onPlayerJoined(player)
     syncAttributes(player)
     checkVIP(player)
-    daily(player)
 end
 
 function ShopService:init(playerDataService, economyService, notifyFn)
     PlayerData = playerDataService
     Economy = economyService
     notify = notifyFn or notify
+    -- CosmeticsService:init is idempotent — the bootstrap may also call it.
+    if Cosmetics then
+        local ok, err = pcall(function() Cosmetics:init(PlayerData, Economy, notify) end)
+        if not ok then warn("[ShopService] CosmeticsService:init failed: " .. tostring(err)) end
+    end
 
     local remote = Remotes.getRemote(Remotes.NAMES.ShopAction, "RemoteFunction")
     local busy = {}
@@ -248,7 +271,7 @@ function ShopService:init(playerDataService, economyService, notifyFn)
     end)
 
     Players.PlayerRemoving:Connect(function(p) busy[p] = nil end)
-    print("[ShopService] Gear, masks, codes, VIP + daily online 🛍")
+    print("[ShopService] Gear, masks, cosmetics, codes + VIP online 🛍")
 end
 
 return ShopService

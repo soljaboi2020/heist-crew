@@ -16,8 +16,14 @@
     for everyone else (CrewHud prompt filter). The server re-checks the role
     anyway — the client only decides what's SHOWN.
 
+    v2.0: cameras never see a player who is Hidden (HideService) or Jailed
+    (JailService), and never see bot crewmates (they're not Players, and bot
+    models are left out of the line-of-sight ray so they can't block it either).
+    Jobs with no cameras / breaker / keycard / lasers (Sunny's Mart has no
+    keycard or lasers) are fine: every system just has nothing to run.
+
     Callbacks (from JobService):
-        onEvent(kind, player)  -- "keycard", "cameras", "door", ...
+        onEvent(kind, player, data)  -- "keycard", "cameras", "door", "needKeycard"; data = { pos = Vector3 }
         onAlarm(reason, player)
     PUBLIC API:
         SecurityService:init(callbacks, ShopService)
@@ -81,6 +87,7 @@ local function aliveRoot(player)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return nil end
     if hum.SeatPart then return nil end        -- in the getaway car: not "in the building"
+    if player:GetAttribute("Hidden") or player:GetAttribute("Jailed") then return nil end   -- v2.0
     return char:FindFirstChild("HumanoidRootPart"), char
 end
 
@@ -97,7 +104,7 @@ local function cutCameras(player)
     if state.camerasCut or not refs then return end
     state.camerasCut = true
     for _, cam in ipairs(refs.cameras or {}) do setCameraLive(cam, false) end
-    cb.onEvent("cameras", player)
+    cb.onEvent("cameras", player, { pos = refs.breaker and refs.breaker.Position })
 end
 
 local function publishCameraSuspicion()
@@ -133,6 +140,7 @@ local function tickCameras(dt)
         local exclude = {}
         for _, cam in ipairs(refs.cameras or {}) do table.insert(exclude, cam.model) end
         for _, g in ipairs(CollectionService:GetTagged("Guard")) do table.insert(exclude, g) end
+        for _, b in ipairs(CollectionService:GetTagged("BotCrew")) do table.insert(exclude, b) end   -- v2.0
         camRayParams.FilterDescendantsInstances = exclude
         camRayBuilt = t
     end
@@ -214,9 +222,10 @@ local function spawnKeycard()
     p.Triggered:Connect(function(player)
         if player:GetAttribute("HasKeycard") then return end
         player:SetAttribute("HasKeycard", true)
+        local pos = card.Position
         card:Destroy()
         state.keycardPart = nil
-        cb.onEvent("keycard", player)
+        cb.onEvent("keycard", player, { pos = pos })
     end)
     state.keycardPart = card
 end
@@ -247,7 +256,7 @@ local function openDoor(i, player)
     setStatus(door, true)
     for _, p in ipairs(Players:GetPlayers()) do p:SetAttribute("HasKeycard", false) end
     if state.keycardPart then state.keycardPart:Destroy() state.keycardPart = nil end
-    cb.onEvent("door", player)
+    cb.onEvent("door", player, { pos = door.door.Position })
 end
 
 local function closeDoors()
@@ -295,7 +304,7 @@ local function tickLasers(dt)
             for _, part in ipairs(hits) do
                 local model = part:FindFirstAncestorOfClass("Model")
                 local player = model and Players:GetPlayerFromCharacter(model)
-                if player then
+                if player and not player:GetAttribute("Jailed") then
                     cb.onAlarm("laser", player)
                     break
                 end
@@ -405,6 +414,10 @@ function SecurityService:reset()
 end
 
 function SecurityService:camerasCut() return state.camerasCut end
+
+-- v2.0: what this job actually has (JobService skips steps a job doesn't have)
+function SecurityService:hasCameras() return refs ~= nil and refs.cameras ~= nil and #refs.cameras > 0 end
+function SecurityService:hasKeycardDoors() return refs ~= nil and refs.keycardDoors ~= nil and #refs.keycardDoors > 0 end
 
 function SecurityService:init(callbacks, shopService)
     cb.onEvent = callbacks.onEvent or cb.onEvent

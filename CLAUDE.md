@@ -462,6 +462,28 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   Kid rule on screen: *guard sees you → back to the door; camera sees you → alarm + police.*
   Still open from the pitch: bigger rooms · more feedback/juice · auto-role · jail/respawn instead of out.
 
+- **2026-09-25** — **🏗️ v2.0 "BIGGER"** — Malachi: *"I love all of that, do it all in one go, no stops, lock in"*
+  (after the playtest: too hard, cramped, "doesn't feel like a Roblox game", spawns "outside weird stuff").
+  Contract = **`docs/V2_SPEC.md`** (world map v2, attributes/tags, remotes, JobRefs v2, game rules, file ownership).
+  Built by 8 parallel agents + an integration tester (mock Roblox runtime in /tmp). What's in it:
+  - **4 heists:** `mart` SUNNY'S MART (NEW warm-up, 1 guard, no keycard) · `villa` (rebuilt x -42..42 z -96..-38,
+    12 rooms, loops) · `jewelry` (rebuilt x -82..-46 z -1..35) · `bank` OCEAN BANK (NEW, x 84..140 z 1..55, raised
+    floor **y 2.0**, round vault). Each has **3 ways in** (front / STAFF ONLY side door / roof ladder+hatch), drop-in
+    INSIDE a finished staff room (`refs.sneakIn`), HideSpots, ShadowZones, crawl Vents (`VentService`, reads `Exit`).
+  - **Rules:** guard → back to the door (kickBack) · camera/laser → alarm · **police → JAIL** (MiamiBuilder police
+    station, 3 cells; teammate holds E to break you out; 30 s) · auto-role at launch · **BotService** AI crewmates
+    (<3 players; "Give bag" E → bot loads the car).
+  - **Lobby:** real club entrance south of The Vault (6 spawn pads w/ ForceField, bouncer NPC, coat check, signs);
+    **4 heist doors** (PortalService: all in → 5 s, half → 15 s) replace ready-up; first-join **IntroCam** fly-over.
+  - **Feel:** FeelService/FeelFX money pops + banners + sounds · **crouch (C)** 2× slower detection · shadows 1.6× ·
+    hide (E) · guards say "Huh?" at 40% before "HEY!".
+  - **Come back:** 7-day DailyReward calendar · 19 cosmetics (bag skins / car colors / trails) · leaderboard wall.
+  - **City:** police station, direction signs to every heist, crosswalks, bus stop, alleys, rooftops,
+    AmbientService traffic (6 cars) + 10 pedestrians. Beach moved to z -100..-120, marina ring (106,-110).
+  - **`tools/check.sh`** = luau-compile syntax check of every file (binary in `~/.claude/bin/`, persists).
+  ⚠️ NOT yet played in Studio — first playtest will surface prop orientation (Kenney FRONT_YAW), ladder
+  climbability, pathfinding, balance (villa take ~$18.4k).
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

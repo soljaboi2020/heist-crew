@@ -5,14 +5,22 @@
 
       • ROLE CARD (bottom-left — top-left is Roblox's chat window) — your crew role with its
         colour, or a nudge to go pick one. Reads the "Role" player attribute.
-      • OBJECTIVE PILL (top-centre) — always tells you the next step:
-            no role          → Step on a crew pad to pick your role
-            idle             → Cross the street and crack the mansion vault
-            cracking         → Hold E on the vault — stay out of the flashlights
-            active           → the first unfinished step of the job (JobInfo)
-            alarm            → Get the car to the marina   0:42   (turns red)
-            after a run      → Head back to the safehouse
-      • TITLE CARD — "HEIST CREW" fades in and out once when you join.
+      • OBJECTIVE PILL (top-centre) — always tells you the next step.
+        v2.0 lobby, in 7-year-old words (portals replaced "ready up"):
+            Step 1 of 3  Stand on a colored circle to pick a role (you can skip this)
+            Step 2 of 3  Talk to the Boss (press F) to hear the plan
+            Step 3 of 3  Walk into a heist door to start
+            in a door    Wait here — the heist starts soon
+            countdown    Heist starting in 4!
+        then during a run:
+            active       → the first unfinished step of the job (JobInfo)
+            alarm        → Get the car to the marina   0:42   (turns red)
+            after a run  → Back to The Vault — pick your next heist
+        Reads local attributes HeardPlan (BriefingUI) and InPortal (PortalHud).
+      • TITLE CARD — "HEIST CREW" fades in and out once when you join
+        (skipped when the IntroCam fly-over plays — it has its own).
+      • PROMPT FILTER — role-only prompts (RoleOnly / RoleHide) and, v2.0,
+        prompts with HideIfJailed are hidden while YOU are Jailed.
 
     PUBLIC API:
         CrewHud:start()
@@ -123,7 +131,7 @@ function CrewHud:_renderRole()
         ui.bar.BackgroundColor3 = T.faint
         ui.name.Text = "No role yet"
         ui.name.TextColor3 = T.text
-        ui.blurb.Text = "Stand on a colored circle to pick one"
+        ui.blurb.Text = "Optional — you get one anyway"
     end
 end
 
@@ -147,6 +155,13 @@ end
 function CrewHud:_refresh()
     local info = self._info or {}
     local o = self._obj
+    if localPlayer:GetAttribute("Jailed") then
+        -- v2.0: caught by the police — a teammate can break you out
+        self._escapeUntil = nil
+        o.timer.Visible = false
+        self:_setObjective("Busted", "You're in jail — wait for a friend to break you out", true)
+        return
+    end
     if info.alarm and (info.alarmEndsAt or 0) > 0 then
         self:_startEscape(info.alarmEndsAt)
         return
@@ -154,7 +169,7 @@ function CrewHud:_refresh()
     self._escapeUntil = nil
     o.timer.Visible = false
     if self._phase == "after" then
-        self:_setObjective("Objective", "Head back to the safehouse")
+        self:_setObjective("Objective", "Back to The Vault — pick your next heist")
         return
     end
     if info.stage == "ACTIVE" then
@@ -170,15 +185,15 @@ function CrewHud:_refresh()
         self:_setObjective(mode, "Load the car and drive to the marina")
     elseif (info.launchAt or 0) > 0 then
         local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))
-        self:_setObjective("Rolling out", string.format("Everyone's ready — drop-in in %d", left))
+        self:_setObjective("Rolling out", string.format("Heist starting in %d!", left))
+    elseif localPlayer:GetAttribute("InPortal") then
+        self:_setObjective("Step 3 of 3", "Wait here — the heist starts soon")
+    elseif localPlayer:GetAttribute("HeardPlan") then
+        self:_setObjective("Step 3 of 3", "Walk into a heist door to start")
     elseif not localPlayer:GetAttribute("Role") then
-        self:_setObjective("Step 1 of 3", "Stand on a colored circle to pick your role")
-    elseif (info.readyCount or 0) > 0 then
-        self:_setObjective("Step 3 of 3", string.format("Press E at the glowing table  (%d/%d ready)",
-            info.readyCount or 0, info.playerCount or 1))
+        self:_setObjective("Step 1 of 3", "Stand on a colored circle to pick a role (you can skip this)")
     else
-        local name = info.jobName or "the job"
-        self:_setObjective("Step 2 of 3", "Talk to the Boss (F), then press E at the table · " .. name)
+        self:_setObjective("Step 2 of 3", "Talk to the Boss (press F) to hear the plan")
     end
 end
 
@@ -205,11 +220,14 @@ end
 function CrewHud:_filterPrompt(p)
     if not p:IsA("ProximityPrompt") then return end
     local only, hide = p:GetAttribute("RoleOnly"), p:GetAttribute("RoleHide")
-    if not only and not hide then return end
+    local jailHide = p:GetAttribute("HideIfJailed") == true
+    if not only and not hide and not jailHide then return end
     local role = localPlayer:GetAttribute("Role")
     local show = true
     if only then show = (role == only) end
     if hide and role == hide then show = false end
+    -- v2.0: you can't break YOURSELF out of jail — only a teammate can
+    if jailHide and localPlayer:GetAttribute("Jailed") then show = false end
     p.Enabled = show
 end
 
@@ -230,10 +248,15 @@ function CrewHud:_titleCard()
     card.Parent = self._screen
     UITheme.label({ Text = "HEIST CREW", Size = UDim2.new(1, 0, 0, 96), TextXAlignment = Enum.TextXAlignment.Center,
         FontFace = UITheme.F.display, TextSize = 92, TextStrokeTransparency = 0.7, TextStrokeColor3 = Color3.new() }).Parent = card
-    UITheme.label({ Text = "PICK A ROLE  ·  PLAN THE JOB  ·  GET PAID", Position = UDim2.fromOffset(0, 100),
+    UITheme.label({ Text = "PICK A ROLE  ·  HEAR THE PLAN  ·  WALK IN A HEIST DOOR", Position = UDim2.fromOffset(0, 100),
         Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
         TextSize = 18, TextColor3 = T.gold, TextStrokeTransparency = 0.7, TextStrokeColor3 = Color3.new() }).Parent = card
-    task.delay(1, function()
+    task.delay(1.5, function()
+        -- v2.0: the IntroCam fly-over has its own title card (and destroys this one)
+        if localPlayer:GetAttribute("IntroPlaying") or localPlayer:GetAttribute("IntroCamDone") or not card.Parent then
+            if card.Parent then card:Destroy() end
+            return
+        end
         TweenService:Create(card, TweenInfo.new(0.8), { GroupTransparency = 0 }):Play()
         task.wait(3.2)
         local out = TweenService:Create(card, TweenInfo.new(1), { GroupTransparency = 1 })
@@ -256,6 +279,14 @@ function CrewHud:start()
         self:_filterAll()
     end)
     self:_filterAll()
+    -- v2.0: lobby steps follow the Boss briefing / standing in a heist door / jail
+    for _, attr in ipairs({ "HeardPlan", "InPortal" }) do
+        localPlayer:GetAttributeChangedSignal(attr):Connect(function() self:_refresh() end)
+    end
+    localPlayer:GetAttributeChangedSignal("Jailed"):Connect(function()
+        self:_refresh()
+        self:_filterAll()
+    end)
     -- keep the heist clock / launch countdown ticking between JobInfo pushes
     task.spawn(function()
         while true do

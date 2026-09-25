@@ -13,7 +13,7 @@ local Constants = {}
 
 -- ───── Game identity ─────
 Constants.GAME_NAME    = "Heist Crew"
-Constants.VERSION      = "1.2.0"
+Constants.VERSION      = "2.0.0"
 Constants.STUDIO_NAME  = "Malachi Builds"
 
 -- ───── Dev switches ─────
@@ -168,19 +168,42 @@ Constants.ROLES = {
 }
 
 
--- ───── Jobs (v1.0) ─────
--- Each job has a builder (geometry → JobRefs, see docs/V1_SPEC.md) and is run
--- by JobService. Only the SELECTED job is armed; the other shows CLOSED.
+-- ───── Jobs (v1.0, v2.0 "BIGGER") ─────
+-- Each job has a builder (geometry → JobRefs, see docs/V1_SPEC.md §4 + V2_SPEC.md §4)
+-- and is run by JobService. Only the SELECTED job is armed; the others show CLOSED.
+-- Order here = order in the club (portals, "pick heist" cycling): easy → hard.
+--   vaultNoun  what the drill goes on ("Vault" / "Safe") — HUD + prompts
+--   doorLabel  the keycard-door step, if the job has keycard doors
+--   drillTime  seconds the drill needs (no jams counted)
+-- (v2.0) Every briefing is written so a 7-year-old gets it. Keep it that way.
 Constants.JOBS = {
+    {
+        id = "mart", name = "SUNNY'S MART", tagline = "A little corner store. Your first job!",
+        difficulty = 1, unlockLevel = 1, guards = 1,
+        alarmTimer = 90,
+        stealthBonus = 0.25,
+        vaultNoun = "Safe", drillTime = 12,
+        warmup = true,
+        briefing = {
+            "This is Sunny's Mart. It's a little store, so it's a great first job!",
+            "You start inside, by the back door. There is 1 guard. If he sees you, you go back to the door. Just sneak back in!",
+            "There is 1 camera. If the camera sees you, the alarm goes off and the police come!",
+            "Press C to crouch. Dark spots make you harder to see. Hold E on a closet or a big box to hide inside.",
+            "Grab the cash from the registers. Then put the drill on the safe in the back office.",
+            "Put the money bags in the car and drive to the boats (the marina). If nobody sees you, you get extra cash!",
+        },
+    },
     {
         id = "villa", name = "VILLA ROSA", tagline = "Beachfront villa. Stealth pays.",
         difficulty = 2, unlockLevel = 1, guards = 3,
         alarmTimer = 90,           -- seconds to get the loaded car to the marina once the alarm trips
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
+        vaultNoun = "Vault", doorLabel = "Open the locked vault door", drillTime = 24,
         briefing = {
             "This job is Villa Rosa. It's a rich guy's beach house. He's on vacation, but his vault is full of money!",
             "There are 3 guards with flashlights. If a guard sees you, you get sent back to the door. Just sneak back in!",
             "There are also 3 cameras. If a camera sees you, the alarm goes off and the police come!",
+            "Press C to crouch. Dark spots make you harder to see. Hold E on a closet to hide. Crawl through vents to sneak past!",
             "Tip: find the breaker box in the security room. Use it to turn the cameras off.",
             "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
             "Red lasers blink on and off. Walk through when they turn off.",
@@ -190,17 +213,58 @@ Constants.JOBS = {
     },
     {
         id = "jewelry", name = "DIAMOND DOLLS", tagline = "Smash, grab, go. Silent alarm.",
-        difficulty = 3, unlockLevel = 3, guards = 2,
+        difficulty = 3, unlockLevel = 1, guards = 2,
         alarmTimer = 75,
         stealthBonus = 0.15,
         silentAlarmDelay = 45,     -- first smashed case starts a hidden clock; police roll after this
+        vaultNoun = "Safe", doorLabel = "Open the back room door", drillTime = 20,
         briefing = {
-            "This job is Diamond Dolls. It's a jewelry store with 8 glass cases full of shiny stuff!",
+            "This job is Diamond Dolls. It's a jewelry store with glass cases full of shiny stuff!",
+            "If a guard sees you, you go back to the door. If a camera sees you, the alarm goes off and the police come!",
             "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
-            "If a guard sees you, you go back to the door. Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
+            "Press C to crouch. Dark spots and hiding spots (hold E) help you sneak.",
+            "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
             "Put the bags in the car and drive to the boats (the marina) before the timer runs out!",
         },
     },
+    {
+        id = "bank", name = "OCEAN BANK", tagline = "The big one. The biggest vault in Miami.",
+        difficulty = 4, unlockLevel = 1, guards = 4,
+        alarmTimer = 120,
+        stealthBonus = 0.3,
+        vaultNoun = "Vault", doorLabel = "Open the vault hallway door", drillTime = 30,
+        briefing = {
+            "This is Ocean Bank. It has the biggest vault in Miami, full of gold and money!",
+            "There are 4 guards. If a guard sees you, you go back to the door. Just sneak back in!",
+            "There are lots of cameras. If a camera sees you, the alarm goes off and the police come!",
+            "Press C to crouch. Dark spots make you harder to see. Hold E on a hiding spot to hide. Vents are secret shortcuts!",
+            "Find the breaker box to turn the cameras off. Find the keycard to open the vault hallway.",
+            "Red lasers blink on and off. Walk through when they turn off.",
+            "Put the drill on the big round vault. If it gets stuck, hold E to fix it.",
+            "If the police catch you, you go to jail! A friend can break you out. Then load the car and drive to the marina!",
+        },
+    },
+}
+
+-- (v2.0) Jail: a cop grabbing you puts you in a cell at the police station.
+Constants.JAIL = {
+    TIME          = 30,    -- seconds before you're released to the club (out of this run)
+    BREAKOUT_HOLD = 2,     -- seconds a teammate holds E at your cell door
+}
+
+-- (v2.0) Portals in the club: stand in one to pick that heist and get ready.
+Constants.PORTAL = {
+    ALL_COUNTDOWN  = 5,    -- everyone in the server is in the same portal
+    HALF_COUNTDOWN = 15,   -- at least half of the server is
+}
+
+-- (v2.0) Bot crewmates when the crew is small.
+Constants.BOTS = {
+    CREW_TARGET   = 3,     -- bots fill the crew up to this many (real players + bots)
+    MAX           = 2,
+    FOLLOW_DIST   = 6,     -- studs behind their player
+    CATCH_UP_DIST = 60,    -- further than this = teleport to their player
+    NAMES         = { "Rex", "Pip", "Nova", "Taco" },
 }
 
 -- Loot kinds. value = cash added to the crew's take when the bag is secured.
@@ -211,13 +275,20 @@ Constants.LOOT = {
     Diamonds = { value = 2500, speed = 12, color = {125, 211, 252} },
     Jewels   = { value = 900,  speed = 14, color = {244, 114, 182} },
     Art      = { value = 2000, speed = 11, color = {196, 181, 253} },
+    -- v2.0 new jobs
+    Register = { value = 400,  speed = 15, color = {134, 239, 172} },   -- mart cash register
+    Lottery  = { value = 300,  speed = 15, color = {253, 186, 116} },   -- mart scratch tickets
+    Bonds    = { value = 3000, speed = 12, color = {165, 243, 252} },   -- bank bearer bonds
+    GoldBars = { value = 4000, speed = 9,  color = {250, 204, 21} },    -- bank vault gold
 }
+-- Anything a builder names that isn't listed above still pays this (never $0).
+Constants.LOOT_DEFAULT = { value = 500, speed = 13, color = {226, 232, 240} }
 
 -- Security tuning (SecurityService)
 Constants.SECURITY = {
     CAMERA_RANGE        = 32,
     CAMERA_HALF_ANGLE   = 24,     -- degrees
-    CAMERA_DETECT_TIME  = 0.7,    -- seconds in view before the alarm trips
+    CAMERA_DETECT_TIME  = 1.6,   -- v2.0: was 0.7 (too harsh for a kid game; the jewelry vent exit was in view)    -- seconds in view before the alarm trips
     BREAKER_HOLD        = 3,      -- seconds to cut the cameras (Hacker: 1)
     HACK_DOOR_HOLD      = 4,      -- Hacker opens keycard doors without a card
     LASER_CHECK_RATE    = 0.08,
@@ -286,8 +357,6 @@ Constants.CODES = {
     VILLAROSA = 1500,
 }
 
--- ───── Daily reward: day N of a streak pays DAILY_BASE * N (caps at 7) ─────
-Constants.DAILY_BASE = 500
 
 -- ───── Monetization ─────
 -- ⚠️ 0 = NOT CREATED YET. Malachi creates these in the Creator Dashboard

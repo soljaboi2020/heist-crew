@@ -8,16 +8,25 @@
         MiamiBuilder:skinSafehouse()      pastel stucco + neon sign on the HQ
         _buildBoss()                      the Boss at the planning table
         MiamiBuilder:build()              deco hotels, palms, beach, ocean, marina
-        VillaBuilder:build()              job 1 — Villa Rosa
-        JewelryBuilder:build()            job 2 — Diamond Dolls
+        MartBuilder:build()               job — Sunny's Mart (v2.0 warm-up)
+        VillaBuilder:build()              job — Villa Rosa
+        JewelryBuilder:build()            job — Diamond Dolls
+        BankBuilder:build()               job — Ocean Bank (v2.0 the big one)
 
     Every builder runs inside pcall: a bug in one of them logs loudly and the
     rest of the world still builds, instead of the whole server dying.
     The old v0.x mansion / vault / box car / round trees / plaza are gone
     (see git history before v1.0 if you ever need them).
 
+    v2.0: MiamiBuilder:build RETURNS { jail = { cells = {{inside, door}}, release } }
+    (police station) — passed through as world.jail for JailService. If the club
+    returns hub.spawnPads (4+ SpawnLocations), those are the spawns; otherwise
+    the old single invisible SpawnLocation at SPAWN_POSITION is used.
+
     PUBLIC API:
-        HeistBuilder:build() -> { heistFolder, safehouse = refs, jobs = { villa = JobRefs, jewelry = JobRefs } }
+        HeistBuilder:build() -> { heistFolder, safehouse = refs, hub = refs,
+                                  jobs = { mart?, villa?, jewelry?, bank? = JobRefs },
+                                  jail = { cells, release } | nil }
 --]]
 
 local Workspace = game:GetService("Workspace")
@@ -231,6 +240,8 @@ function HeistBuilder:build()
     local Miami = optional("MiamiBuilder")
     local Villa = optional("VillaBuilder")
     local Jewelry = optional("JewelryBuilder")
+    local Mart = optional("MartBuilder")
+    local Bank = optional("BankBuilder")
 
     if Miami and Miami.applyLighting then
         run("Miami lighting", Miami.applyLighting, Miami)
@@ -247,13 +258,42 @@ function HeistBuilder:build()
     local worldFolder = Instance.new("Folder")
     worldFolder.Name = "Miami"
     worldFolder.Parent = heistFolder
-    if Miami and Miami.build then run("Miami world", Miami.build, Miami, worldFolder) end
+    local miamiRefs = nil
+    if Miami and Miami.build then miamiRefs = run("Miami world", Miami.build, Miami, worldFolder) end
+    local jail = type(miamiRefs) == "table" and miamiRefs.jail or nil
+    if jail and (type(jail.cells) ~= "table" or #jail.cells == 0) then
+        warn("[HeistBuilder] Miami returned a jail with no cells — jail disabled")
+        jail = nil
+    end
 
     local jobs = {}
+    if Mart then jobs.mart = run("Sunny's Mart", Mart.build, Mart, heistFolder) end
     if Villa then jobs.villa = run("Villa Rosa", Villa.build, Villa, heistFolder) end
     if Jewelry then jobs.jewelry = run("Diamond Dolls", Jewelry.build, Jewelry, heistFolder) end
+    if Bank then jobs.bank = run("Ocean Bank", Bank.build, Bank, heistFolder) end
 
-    -- Spawn: invisible pad inside the safehouse, facing north toward the table
+    -- v2.0: the club's own spawn pads (V2_SPEC §7) win. Every OTHER SpawnLocation
+    -- in the place is disabled (fix v1.1.1 — Roblox picks at random).
+    local pads = {}
+    for _, sp in ipairs(type(hub.spawnPads) == "table" and hub.spawnPads or {}) do
+        if typeof(sp) == "Instance" and sp:IsA("SpawnLocation") then pads[sp] = true end
+    end
+    if next(pads) then
+        for _, d in ipairs(Workspace:GetDescendants()) do
+            if d:IsA("SpawnLocation") and not pads[d] then
+                d.Enabled = false
+                print("[HeistBuilder] disabled extra spawn:", d:GetFullName())
+            end
+        end
+        for sp in pairs(pads) do
+            sp.Enabled = true
+            sp.Neutral = true
+        end
+        print("[HeistBuilder] World built ✨  jobs:", self:_jobList(jobs), " spawn pads:", #hub.spawnPads, " jail:", jail and #jail.cells or 0)
+        return { heistFolder = heistFolder, safehouse = safehouse, hub = hub, jobs = jobs, jail = jail }
+    end
+
+    -- Fallback: invisible pad inside the club, facing north toward the table
     local spawn = Workspace:FindFirstChild("SpawnLocation")
     if not spawn then
         for _, child in ipairs(Workspace:GetDescendants()) do
@@ -284,8 +324,16 @@ function HeistBuilder:build()
     spawn.Material = Enum.Material.SmoothPlastic
     spawn.Parent = heistFolder
 
-    print("[HeistBuilder] World built ✨  jobs:", jobs.villa and "villa" or "-", jobs.jewelry and "jewelry" or "-")
-    return { heistFolder = heistFolder, safehouse = safehouse, hub = hub, jobs = jobs }
+    print("[HeistBuilder] World built ✨  jobs:", self:_jobList(jobs), " jail:", jail and #jail.cells or 0)
+    return { heistFolder = heistFolder, safehouse = safehouse, hub = hub, jobs = jobs, jail = jail }
+end
+
+function HeistBuilder:_jobList(jobs)
+    local names = {}
+    for _, cfg in ipairs(Constants.JOBS) do
+        table.insert(names, jobs[cfg.id] and cfg.id or ("-" .. cfg.id))
+    end
+    return table.concat(names, " ")
 end
 
 return HeistBuilder

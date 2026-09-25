@@ -7,7 +7,7 @@
 
         SAFEHOUSE                               CASH $12,450   (X)
         GEAR WALL
-        [GEAR] (MASKS) (CODES) (VIP)
+        [GEAR] (MASKS) (BAGS) (CARS) (TRAILS) (CODES) (VIP)
         ─────────────────────────────────────────────────────
         card grid / code box / VIP card
         ─────────────────────────────────────────────────────
@@ -16,7 +16,11 @@
     Talks to the ShopAction RemoteFunction:
         InvokeServer(action, payload) -> { ok, msg, state }
         actions: getState · buyGear{id} · buyMask{id} · equipMask{id} · redeemCode{code}
-        state  = { cash, gear = {...}, masks = {owned ids}, mask, vip, vipPassId, codesRedeemed = {...} }
+                 · buyCosmetic{id} · equipCosmetic{id}                                 (v2.0)
+        state  = { cash, gear = {...}, masks = {owned ids}, mask, vip, vipPassId, codesRedeemed = {...},
+                   cosmetics = { catalog = {items}, owned = {ids}, equipped = {bag, car, trail} } }
+    v2.0: BAGS / CARS / TRAILS tabs are built from state.cosmetics.catalog the
+    first time the server sends it (the item list lives in CosmeticsService).
     VIP is bought with MarketplaceService:PromptGamePassPurchase (client-side);
     state is re-fetched after PromptGamePassPurchaseFinished.
 
@@ -51,6 +55,9 @@ local INVOKE_TIMEOUT = 10
 local TABS = {
     { id = "gear",  label = "GEAR" },
     { id = "masks", label = "MASKS" },
+    { id = "bag",   label = "BAGS" },     -- v2.0 cosmetics (page id = cosmetic category)
+    { id = "car",   label = "CARS" },
+    { id = "trail", label = "TRAILS" },
     { id = "codes", label = "CODES" },
     { id = "vip",   label = "VIP" },
 }
@@ -343,7 +350,7 @@ function ShopUI:_buildUi()
         UITheme.corner(b, 17)
         local st = UITheme.stroke(b, T.line, 0.86)
         local p = Instance.new("UIPadding")
-        p.PaddingLeft, p.PaddingRight = UDim.new(0, 18), UDim.new(0, 18)
+        p.PaddingLeft, p.PaddingRight = UDim.new(0, 14), UDim.new(0, 14)   -- (v2.0) 7 tabs now
         p.Parent = b
         list(b, true, 6, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center)
         if t.id == "vip" then
@@ -400,12 +407,13 @@ function ShopUI:_buildUi()
 
     self._screen, self._backdrop, self._fit, self._fitScale = screen, backdrop, fit, fitScale
     self._group, self._animScale, self._panel = group, animScale, panel
-    self._cash, self._feedback, self._hint, self._close = cash, feedback, hint, close
+    self._cash, self._fbLabel, self._hint, self._close = cash, feedback, hint, close
 
     self:_buildGear()
     self:_buildMasks()
     self:_buildCodes()
     self:_buildVip()
+    self:_buildCosmeticPlaceholders()
 end
 
 -- ── GEAR page ──────────────────────────────────────────────────────────
@@ -615,6 +623,177 @@ function ShopUI:_buildVip()
     self._vip = { title = title, note = note, ab = ab }
 end
 
+-- ── BAGS / CARS / TRAILS pages (v2.0 cosmetics) ────────────────────────
+local COSMETIC_CATS = { bag = "Bag skins", car = "Car colors", trail = "Trails" }
+
+local function c3(t, fallback)
+    if type(t) == "table" and tonumber(t[1]) and tonumber(t[2]) and tonumber(t[3]) then
+        return Color3.fromRGB(t[1], t[2], t[3])
+    end
+    return fallback
+end
+
+function ShopUI:_buildCosmeticPlaceholders()
+    self._cosCards = {}
+    self._cosLoading = {}
+    for cat in pairs(COSMETIC_CATS) do
+        local page = self._pages[cat]
+        if page then
+            self._cosLoading[cat] = UITheme.label({ Name = "Loading", Size = UDim2.new(1, 0, 0, 60),
+                Text = "Loading...", TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold,
+                TextSize = 16, TextColor3 = T.muted, Parent = page })
+        end
+    end
+end
+
+-- little picture on each card: a bag, a car, or a streak
+local function cosmeticGlyph(plate, item)
+    local col = c3(item.color, T.muted)
+    if item.category == "bag" then
+        local sack = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55),
+            Size = UDim2.fromOffset(46, 28), BackgroundColor3 = col, BackgroundTransparency = 0 })
+        UITheme.corner(sack, 9)
+        UITheme.stroke(sack, T.line, 0.75)
+        sack.Parent = plate
+        local strap = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(1, 4, 0, 5), BackgroundColor3 = T.gold, BackgroundTransparency = 0.1 })
+        UITheme.corner(strap, 2)
+        strap.Parent = sack
+        local handle = frame({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, 2),
+            Size = UDim2.fromOffset(18, 7), BackgroundTransparency = 1 })
+        UITheme.stroke(handle, col, 0, 2)
+        UITheme.corner(handle, 4)
+        handle.Parent = sack
+    elseif item.category == "car" then
+        local body = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 3),
+            Size = UDim2.fromOffset(66, 16), BackgroundColor3 = col, BackgroundTransparency = 0 })
+        UITheme.corner(body, 6)
+        body.Parent = plate
+        local cabin = frame({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.45, 0, 0, 2),
+            Size = UDim2.fromOffset(30, 10), BackgroundColor3 = col:Lerp(Color3.new(0, 0, 0), 0.35), BackgroundTransparency = 0 })
+        UITheme.corner(cabin, 5)
+        cabin.Parent = body
+        for _, x in ipairs({ 0.22, 0.78 }) do
+            local wheel = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(x, 1),
+                Size = UDim2.fromOffset(12, 12), BackgroundColor3 = Color3.fromRGB(20, 20, 24), BackgroundTransparency = 0 })
+            UITheme.corner(wheel, 6)
+            UITheme.stroke(wheel, T.line, 0.7)
+            wheel.Parent = body
+        end
+    else
+        if not item.color then
+            UITheme.label({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(100, 20), Text = "NONE", TextXAlignment = Enum.TextXAlignment.Center,
+                FontFace = UITheme.F.display, TextSize = 14, TextColor3 = T.faint, Parent = plate })
+            return
+        end
+        local streak = frame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+            Size = UDim2.new(1, -24, 0, 12), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0 })
+        UITheme.corner(streak, 6)
+        streak.Parent = plate
+        local g = Instance.new("UIGradient")
+        if item.rainbow then
+            g.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+                ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 200, 60)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 230, 120)),
+                ColorSequenceKeypoint.new(0.75, Color3.fromRGB(60, 180, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 90, 255)),
+            })
+        else
+            g.Color = ColorSequence.new(col, c3(item.color2, col))
+        end
+        g.Transparency = NumberSequence.new(0.9, 0)
+        g.Parent = streak
+    end
+end
+
+function ShopUI:_buildCosmetics(catalog)
+    self._cosBuilt = true
+    local byCat = { bag = {}, car = {}, trail = {} }
+    for _, item in ipairs(catalog) do
+        if type(item) == "table" and byCat[item.category] and type(item.id) == "string" then
+            table.insert(byCat[item.category], item)
+        end
+    end
+    for cat, items in pairs(byCat) do
+        local page = self._pages[cat]
+        if page then
+            if self._cosLoading[cat] then self._cosLoading[cat]:Destroy() end
+            grid(page, 3, 150)
+            for i, item in ipairs(items) do
+                local color = c3(item.color, T.muted)
+                local c = cardFrame(page, i)
+                c:FindFirstChildOfClass("UIPadding"):Destroy()
+                UITheme.padding(c, 10, 10)
+                local plate = frame({ Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = color, BackgroundTransparency = 0.86 })
+                UITheme.corner(plate, 10)
+                plate.Parent = c
+                cosmeticGlyph(plate, item)
+                if item.vipOnly or item.rewardOnly then
+                    local tag = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 5),
+                        Size = UDim2.fromOffset(0, 16), AutomaticSize = Enum.AutomaticSize.X,
+                        Text = item.vipOnly and "VIP" or "DAY 7", FontFace = UITheme.F.display, TextSize = 11,
+                        TextColor3 = T.bg, BackgroundColor3 = T.gold, BackgroundTransparency = 0 })
+                    UITheme.corner(tag, 8)
+                    UITheme.padding(tag, 7, 0)
+                    tag.Parent = plate
+                end
+                UITheme.label({ Position = UDim2.fromOffset(0, 56), Size = UDim2.new(1, 0, 0, 20),
+                    Text = string.upper(item.name or item.id), TextXAlignment = Enum.TextXAlignment.Center,
+                    FontFace = UITheme.F.display, TextSize = 15, TextTruncate = Enum.TextTruncate.AtEnd }).Parent = c
+                local sub = UITheme.label({ Position = UDim2.fromOffset(0, 76), Size = UDim2.new(1, 0, 0, 14),
+                    Text = item.blurb or "", TextXAlignment = Enum.TextXAlignment.Center,
+                    FontFace = UITheme.F.medium, TextSize = 12, TextColor3 = T.muted, TextTruncate = Enum.TextTruncate.AtEnd })
+                sub.Parent = c
+                local ab = actionButton(c, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.fromScale(0, 1),
+                    Size = UDim2.new(1, 0, 0, 30) })
+                ab.btn.Activated:Connect(function() self:_onCosmetic(item) end)
+                self._cosCards[item.id] = { ab = ab, def = item }
+            end
+        end
+    end
+end
+
+function ShopUI:_onCosmetic(item)
+    if self._busy then return end
+    local v = self:_view()
+    local cos = v.cos
+    if cos.equipped[item.category] == item.id then return end
+    local action
+    if cos.owned[item.id] then
+        if item.vipOnly and not v.vip then
+            self:_feedback("That one is for VIP players.", false)
+            return
+        end
+        action = "equipCosmetic"
+    else
+        if item.rewardOnly then
+            self:_feedback("Claim 7 daily rewards in a row to get " .. (item.name or "this") .. "!", false)
+            return
+        end
+        if item.vipOnly and not v.vip then
+            self:_feedback("That one is for VIP players. Check the VIP tab!", false)
+            return
+        end
+        local price = tonumber(item.price) or 0
+        if v.cash < price then
+            self:_feedback(string.format("You need %s more for %s.", UITheme.money(price - v.cash), item.name or "that"), false)
+            return
+        end
+        action = "buyCosmetic"
+    end
+    task.spawn(function()
+        local res = self:_request(action, { id = item.id }, "cos:" .. item.id)
+        if res then
+            local fallback = action == "equipCosmetic" and ((item.name or "") .. " equipped") or ("Got " .. (item.name or "it"))
+            self:_feedback(res.msg ~= "" and res.msg or (res.ok and fallback or "Couldn't do that."), res.ok == true)
+            local card = self._cosCards[item.id]
+            if res.ok and card then self:_popCard(card.ab.btn) end
+        end
+    end)
+end
+
 -- ── state + rendering ──────────────────────────────────────────────────
 function ShopUI:_view()
     -- server state when we have it, live attributes on top (they're authoritative + instant)
@@ -629,7 +808,18 @@ function ShopUI:_view()
     local mask = localPlayer:GetAttribute("Mask")
     if type(mask) ~= "string" or mask == "" then mask = s.mask end
     if mask then masks[mask] = true end
+    -- v2.0 cosmetics: server state + the live BagSkin / CarColor / Trail attributes
+    local sc = type(s.cosmetics) == "table" and s.cosmetics or {}
+    local cos = { owned = toSet(sc.owned), equipped = {} }
+    local eq = type(sc.equipped) == "table" and sc.equipped or {}
+    for cat, attr in pairs({ bag = "BagSkin", car = "CarColor", trail = "Trail" }) do
+        local a = localPlayer:GetAttribute(attr)
+        cos.equipped[cat] = (type(a) == "string" and a ~= "") and a or eq[cat]
+        if cos.equipped[cat] then cos.owned[cos.equipped[cat]] = true end
+    end
     return {
+        cos = cos,
+        catalog = type(sc.catalog) == "table" and sc.catalog or nil,
         cash = tonumber(cashAttr) or tonumber(s.cash) or 0,
         gear = gear,
         masks = masks,
@@ -688,6 +878,38 @@ function ShopUI:_render()
         end
     end
 
+    -- v2.0 cosmetics (pages are built the first time the catalog arrives)
+    if not self._cosBuilt and v.catalog then
+        self:_buildCosmetics(v.catalog)
+    elseif not self._cosBuilt and v.loaded then
+        for _, l in pairs(self._cosLoading or {}) do l.Text = "Coming soon!" end
+    end
+    for id, card in pairs(self._cosCards or {}) do
+        local item = card.def
+        local price = tonumber(item.price) or 0
+        if v.cos.equipped[item.category] == id then
+            paint(card.ab, "equipped", "EQUIPPED")
+        elseif busy then
+            paint(card.ab, "busy", self._busyKey == "cos:" .. id and "..." or (v.cos.owned[id] and "EQUIP" or UITheme.money(price)))
+        elseif v.cos.owned[id] then
+            if item.vipOnly and not v.vip then
+                paint(card.ab, "poor", "VIP ONLY")
+            else
+                paint(card.ab, "equip", "EQUIP")
+            end
+        elseif item.rewardOnly then
+            paint(card.ab, "poor", "DAILY REWARD")
+        elseif item.vipOnly and not v.vip then
+            paint(card.ab, "poor", "VIP ONLY")
+        elseif price <= 0 then
+            paint(card.ab, "claim", "CLAIM")
+        elseif v.cash >= price then
+            paint(card.ab, "buy", "BUY " .. UITheme.money(price))
+        else
+            paint(card.ab, "poor", UITheme.money(price))
+        end
+    end
+
     -- codes
     local code = self._code
     if busy then
@@ -737,7 +959,7 @@ function ShopUI:_fetchVipPrice(passId)
 end
 
 function ShopUI:_feedback(text, good)
-    local fb = self._feedback
+    local fb = self._fbLabel
     local token = {}
     self._fbToken = token
     fb.Text = text or ""
@@ -1002,7 +1224,7 @@ function ShopUI:start()
         if prompt.Name == "OpenShop" and player == localPlayer then self:open() end
     end)
 
-    for _, attr in ipairs({ "Cash", "Gear", "Mask", "VIP" }) do
+    for _, attr in ipairs({ "Cash", "Gear", "Mask", "VIP", "BagSkin", "CarColor", "Trail" }) do
         localPlayer:GetAttributeChangedSignal(attr):Connect(function()
             if self._open then self:_render() end
         end)

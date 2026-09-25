@@ -7,9 +7,10 @@
     screen (clear of every other HUD). Dismiss with the ✕ or it fades after
     a while.
 
-    Triggers: joining · first run starting · first time being spotted ·
+    Triggers: joining (after the IntroCam fly-over, if it plays) · first time
+    standing in a heist door · first run starting · first time being spotted ·
     first bag · near the car with a bag · first alarm · first time driving ·
-    reaching the vault · lasers ahead.
+    reaching the vault · lasers ahead · first time in jail.
 --]]
 
 local Players = game:GetService("Players")
@@ -24,7 +25,9 @@ local TipHud = {}
 local localPlayer = Players.LocalPlayer
 
 local TIPS = {
-    welcome = { "Welcome to The Vault!", "1. Stand on a colored circle to pick your role.  2. Talk to the Boss (press F).  3. Press E at the glowing table when you're ready." },
+    welcome = { "Welcome to The Vault!", "1. Stand on a colored circle to pick a role (you can skip this).\n2. Talk to the Boss (press F) to hear the plan.\n3. Walk into a heist door to start!" },
+    portal  = { "Heist door", "Stay in the glowing square. When your crew is in too, the heist starts!" },
+    jail    = { "Busted!", "The police got you. A friend can hold E at your cell door to break you out." },
     start   = { "You're in!", "You snuck in! Stay out of flashlights and red camera beams, or you'll get caught." },
     spotted = { "Someone sees you!", "Hide! If the meter fills up, the guard sends you back to the door." },
     bag     = { "Heavy bag!", "Bags make you slow. Take it to the car and press E at the trunk. Or press G to throw it to a friend." },
@@ -49,7 +52,7 @@ function TipHud:_build()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0, 0.5)
     card.Position = UDim2.new(0, 16, 0.5, 0)
-    card.Size = UDim2.fromOffset(300, 118)
+    card.Size = UDim2.fromOffset(320, 156)
     card.BackgroundColor3 = T.bg
     card.BackgroundTransparency = 0.12
     card.GroupTransparency = 1
@@ -68,7 +71,7 @@ function TipHud:_build()
     local head = UITheme.label({ Position = UDim2.fromOffset(26, 28), Size = UDim2.new(1, -44, 0, 22),
         FontFace = UITheme.F.display, TextSize = 19 })
     head.Parent = card
-    local body = UITheme.label({ Position = UDim2.fromOffset(26, 52), Size = UDim2.new(1, -40, 0, 56), TextWrapped = true,
+    local body = UITheme.label({ Position = UDim2.fromOffset(26, 52), Size = UDim2.new(1, -40, 0, 94), TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium, TextSize = 14, TextColor3 = T.muted })
     body.Parent = card
     local close = Instance.new("TextButton")
@@ -114,7 +117,19 @@ function TipHud:start()
     self._seen = {}
     self:_build()
 
-    task.delay(6, function() self:show("welcome") end)
+    -- v2.0: wait for the first-join fly-over (IntroCam) to finish first
+    task.delay(6, function()
+        local t0 = os.clock()
+        while localPlayer:GetAttribute("IntroPlaying") and os.clock() - t0 < 20 do task.wait(0.25) end
+        if localPlayer:GetAttribute("IntroCamDone") then task.wait(1) end
+        self:show("welcome")
+    end)
+    localPlayer:GetAttributeChangedSignal("InPortal"):Connect(function()
+        if localPlayer:GetAttribute("InPortal") then self:show("portal") end
+    end)
+    localPlayer:GetAttributeChangedSignal("Jailed"):Connect(function()
+        if localPlayer:GetAttribute("Jailed") then self:show("jail") end
+    end)
 
     task.spawn(function()
         local info = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")

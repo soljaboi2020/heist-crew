@@ -9,6 +9,10 @@
         amber → red as it fills
       • an arrow around the centre of the screen pointing at who's watching
     Break line of sight and it drains away.
+
+    v2.0 (feel agent): under the meter, tiny labels say WHY you're safer right
+    now — "sneaking" (Crouching: guards 2x slower), "in the dark" (InShadow:
+    1.6x slower), "hidden" (Hidden: guards + cameras can't see you at all).
 --]]
 
 local Players = game:GetService("Players")
@@ -37,7 +41,7 @@ function DetectionHud:start()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.62)   -- (v1.1) below the crosshair, clear of the toast stack
-    card.Size = UDim2.fromOffset(200, 44)
+    card.Size = UDim2.fromOffset(220, 58)
     card.BackgroundTransparency = 1
     card.GroupTransparency = 1
     card.Parent = screen
@@ -57,6 +61,12 @@ function DetectionHud:start()
     fill.BorderSizePixel = 0
     fill.Parent = track
     UITheme.corner(fill, 3)
+
+    -- (v2.0) why you're safer: "sneaking · in the dark" / "hidden"
+    local why = UITheme.label({ Name = "Why", Position = UDim2.fromOffset(0, 37), Size = UDim2.new(1, 0, 0, 16),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextSize = 13,
+        TextColor3 = T.info, TextStrokeTransparency = 0.6, TextStrokeColor3 = Color3.new(), Text = "" })
+    why.Parent = card
 
     local arrow = UITheme.label({ Text = "▲", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(34, 34),
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 30,
@@ -78,6 +88,16 @@ function DetectionHud:start()
         fill.BackgroundColor3 = col
         eye.TextColor3 = col
         eye.Text = shown > 0.85 and "SPOTTED!" or (c > g and "CAMERA SEES YOU" or "SPOTTING…")
+        if active then
+            local reasons = {}
+            if localPlayer:GetAttribute("Hidden") then
+                table.insert(reasons, "hidden")
+            else
+                if localPlayer:GetAttribute("Crouching") then table.insert(reasons, "sneaking") end
+                if localPlayer:GetAttribute("InShadow") then table.insert(reasons, "in the dark") end
+            end
+            why.Text = table.concat(reasons, "  ·  ")
+        end
 
         local cam = workspace.CurrentCamera
         if active and cam and typeof(from) == "Vector3" then

@@ -11,6 +11,10 @@
     Driven by HeistState "COMPLETE"/"FAILED" (payload from JobService.finish).
     Players who weren't in the car see the crew's result and "you didn't make
     it out" instead of a cut.
+
+    v2.0: bags a bot carried say so ("Gold · Rex carried it"), and every bot
+    crewmate gets a thank-you line. Words are kid-simple (Malachi's bar: a
+    7-year-old gets it).
 --]]
 
 local Players = game:GetService("Players")
@@ -30,14 +34,17 @@ local GRADE_COLOR = {
     S = Color3.fromRGB(253, 224, 71), A = T.money, B = T.info, C = T.muted, F = T.danger,
 }
 local GRADE_WORD = {
-    S = "PERFECT", A = "CLEAN", B = "MESSY", C = "EMPTY-HANDED", F = "BUSTED",
+    S = "PERFECT!", A = "SNEAKY", B = "LOUD", C = "NO LOOT", F = "BUSTED",
 }
 local TIPS = {
-    busted  = "Tip: the Driver's nitro (Shift) shakes the cruisers off. Don't stop next to them.",
-    time    = "Tip: once the alarm trips, stop looting — get everyone in the car.",
-    caught  = "Tip: watch the SPOTTING meter. Break line of sight before it fills.",
-    timeout = "Tip: talk to the Boss for the plan, and follow the markers.",
-    abandoned = "Tip: bring a crew — every role has a perk.",
+    busted  = "Tip: don't stop the car next to the police. The Driver can press Shift to go super fast!",
+    time    = "Tip: when the alarm goes off, stop grabbing stuff and get everyone in the car!",
+    caught  = "Tip: if the police catch you, a friend can break you out of jail. Stick together!",
+    timeout = "Tip: talk to the Boss (F) to hear the plan, and follow the markers.",
+    abandoned = "Tip: bring friends! Every crew job has a special power.",
+}
+local FAIL_TITLE = {
+    time = "OUT OF TIME", timeout = "TOO SLOW", caught = "CAUGHT!", busted = "BUSTED!", abandoned = "CREW LEFT",
 }
 
 local function chaChing()
@@ -128,7 +135,7 @@ function PayoutScreen:_build()
     line.BackgroundTransparency = 0.85
     line.BorderSizePixel = 0
     line.Parent = card
-    local cutCap = UITheme.caption("Your cut", { Position = UDim2.fromOffset(30, 388), Size = UDim2.fromOffset(200, 14) })
+    local cutCap = UITheme.caption("Your money", { Position = UDim2.fromOffset(30, 388), Size = UDim2.fromOffset(200, 14) })
     cutCap.Parent = card
     local cut = UITheme.label({ Position = UDim2.fromOffset(28, 404), Size = UDim2.fromOffset(300, 46),
         FontFace = UITheme.F.display, TextSize = 42, TextColor3 = T.money })
@@ -191,11 +198,11 @@ function PayoutScreen:show(win, p)
     u.gradeWord.Text = GRADE_WORD[g] or ""
     u.jobCap.Text = p.jobName or ""
     if win then
-        u.title.Text = "HEIST COMPLETE"
+        u.title.Text = "YOU DID IT!"
         u.title.TextColor3 = T.text
-        u.subtitle.Text = string.format("%d of %d made it to the marina", p.escaped or 0, math.max(p.crewSize or 0, p.escaped or 0))
+        u.subtitle.Text = string.format("%d of %d got away on the boat", p.escaped or 0, math.max(p.crewSize or 0, p.escaped or 0))
     else
-        u.title.Text = ({ time = "OUT OF TIME", timeout = "CALLED OFF" })[p.result or ""] or "BUSTED"
+        u.title.Text = FAIL_TITLE[p.result or ""] or "BUSTED!"
         u.title.TextColor3 = T.danger
         u.subtitle.Text = TIPS[p.result or ""] or TIPS.caught
     end
@@ -204,16 +211,30 @@ function PayoutScreen:show(win, p)
     local order = 0
     for _, b in ipairs(p.bags or {}) do
         order = order + 1
-        local col = Constants.LOOT[b.kind] and UITheme.rgb(Constants.LOOT[b.kind].color) or T.text
-        table.insert(rows, row(u.list, order, b.kind, UITheme.money(b.value), col))
+        local info = Constants.LOOT[b.kind] or Constants.LOOT_DEFAULT
+        local col = info and info.color and UITheme.rgb(info.color) or T.text
+        local left = tostring(b.kind or "Loot")
+        if b.bot then left = left .. "  ·  " .. tostring(b.bot) .. " carried it" end
+        table.insert(rows, row(u.list, order, left, UITheme.money(b.value or 0), col))
     end
     if win and (p.stealthBonus or 0) > 0 then
         order = order + 1
-        table.insert(rows, row(u.list, order, "Stealth bonus (no alarm)", "+" .. UITheme.money(p.stealthBonus), T.gold))
+        table.insert(rows, row(u.list, order, "Sneaky bonus (no alarm!)", "+" .. UITheme.money(p.stealthBonus), T.gold))
     end
     if win and #(p.bags or {}) == 0 then
         order = order + 1
         table.insert(rows, row(u.list, order, "The car was empty", "$0", T.muted))
+    end
+    -- v2.0 bot crew lines
+    for _, bot in ipairs(p.botCrew or {}) do
+        order = order + 1
+        local n = tonumber(bot.bags) or 0
+        local right = n > 0 and string.format("%d bag%s", n, n == 1 and "" or "s") or "helped"
+        table.insert(rows, row(u.list, order, "Bot crew: " .. tostring(bot.name or "Bot"), right, T.info))
+    end
+    if (p.jailed or 0) > 0 then
+        order = order + 1
+        table.insert(rows, row(u.list, order, "Still in jail at the end", tostring(p.jailed), T.danger))
     end
 
     u.cut.Text = "$0"
@@ -221,7 +242,7 @@ function PayoutScreen:show(win, p)
     local mins = math.floor((p.time or 0) / 60)
     u.meta.Text = string.format("%s\n%d:%02d", (win and mine) and ("+" .. tostring(p.xp or 0) .. " XP") or "", mins, (p.time or 0) % 60)
     if not mine and win then
-        u.meta.Text = "You didn't make it out\n" .. string.format("%d:%02d", mins, (p.time or 0) % 60)
+        u.meta.Text = "You didn't get away this time\n" .. string.format("%d:%02d", mins, (p.time or 0) % 60)
     end
 
     u.screen.Enabled = true

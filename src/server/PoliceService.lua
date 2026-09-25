@@ -23,6 +23,9 @@
       A cruiser stuck for > 2s is teleported to a clear spot behind the car
       (or, before a chase, straight to its parking spot).
 
+    v2.0: a cop catching you now sends you to JAIL (JobService → JailService),
+    not straight out of the run. Cops ignore Hidden / Jailed players and bots.
+
     TAGS: each cop model is tagged "Guard" (so Lookout / thermal / marks see
     them). Cruiser models are tagged "PoliceCruiser" — NOT "Guard".
 
@@ -530,7 +533,9 @@ local function nearestTarget(cop)
             local char = p.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hum and hrp and hrp:IsA("BasePart") and hum.Health > 0 and hum.SeatPart == nil then
+            -- v2.0: a player hiding in a closet (Hidden) or already in a cell (Jailed) isn't a target
+            local gone = p:GetAttribute("Hidden") or p:GetAttribute("Jailed")
+            if hum and hrp and hrp:IsA("BasePart") and hum.Health > 0 and hum.SeatPart == nil and not gone then
                 local d = (hrp.Position - from).Magnitude
                 if d < bestDist and not isWaterAt(hrp.Position) then
                     best, bestDist = hrp, d
@@ -648,6 +653,7 @@ function spawnCop(cr)
         if caughtUntil[player] and now < caughtUntil[player] then return end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 or hum.SeatPart ~= nil then return end
+        if player:GetAttribute("Jailed") or player:GetAttribute("Hidden") then return end   -- v2.0
         if not isCrew(player) then return end
         caughtUntil[player] = now + TUNE.CATCH_COOLDOWN
         fire(callbacks.onPlayerCaught, player, model)

@@ -8,6 +8,10 @@
       ClubLight  coloured point lights over the floor pulse and shift hue
       ClubSpot   moving-head spots on the stage truss sweep the room
       ClubEQ     the LED wall's equaliser bars bounce
+      MarqueeBulb (v2.0) the bulbs round THE VAULT sign over the arch chase
+      PortalGlow  (v2.0) each heist door's floor light breathes; faster and
+                  brighter while that door counts down (attribute State =
+                  idle | busy | launch | locked, set by the server)
 
     Only runs while you're down in the club (below y -10), to save work
     everywhere else.
@@ -83,6 +87,27 @@ function ClubFX:start()
                         local h = 0.15 + 0.85 * math.abs(math.sin(t * (2.2 + (i % 5) * 0.4) + i * 0.9)) * (0.6 + 0.4 * math.sin(t * 1.3))
                         bar.Size = UDim2.new(bar.Size.X.Scale, bar.Size.X.Offset, h, 0)
                     end
+                end
+            end
+        end
+        -- v2.0 lobby
+        for _, b in ipairs(CollectionService:GetTagged("MarqueeBulb")) do
+            local i = b:GetAttribute("Index") or 0
+            local on = (math.floor(t * 8) - i) % 4 ~= 0
+            b.Transparency = on and 0 or 0.75
+        end
+        for _, g in ipairs(CollectionService:GetTagged("PortalGlow")) do
+            local l = g:FindFirstChildWhichIsA("Light")
+            if l then
+                local st = g:GetAttribute("State")
+                if st == "locked" then
+                    l.Enabled = false
+                else
+                    l.Enabled = true
+                    local speed, base, amp = 2, 0.8, 0.4
+                    if st == "busy" then speed, base, amp = 3.5, 1.3, 0.5 end
+                    if st == "launch" then speed, base, amp = 9, 2, 1 end
+                    l.Brightness = base + amp * (0.5 + 0.5 * math.sin(t * speed))
                 end
             end
         end

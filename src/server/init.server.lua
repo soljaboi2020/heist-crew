@@ -32,7 +32,7 @@ print("════════════════════════�
 
 -- Create every remote up front so clients never wait on one that's made late
 for name in pairs(Remotes.NAMES) do
-    Remotes.getRemote(name, name == "ShopAction" and "RemoteFunction" or "RemoteEvent")
+    Remotes.getRemote(name, (name == "ShopAction" or name == "DailyReward") and "RemoteFunction" or "RemoteEvent")
 end
 
 local notifyRemote = Remotes.getRemote(Remotes.NAMES.Notify, "RemoteEvent")
@@ -127,10 +127,16 @@ do
     local sp = Constants.WORLD.SPAWN_POSITION
     local spawnAt = Vector3.new(sp.x, sp.y + 3.5, sp.z)
     local faceTo  = Vector3.new(Constants.WORLD.HUB_TABLE.x, sp.y + 3.5, Constants.WORLD.HUB_TABLE.z)
-    for _, player in ipairs(Players:GetPlayers()) do
+    local pads = (world.hub and world.hub.spawnPads) or {}   -- v2.0: the club entrance lobby
+    for i, player in ipairs(Players:GetPlayers()) do
         local char = player.Character
         if char and char.PrimaryPart then
-            char:PivotTo(CFrame.lookAt(spawnAt, faceTo))
+            local pad = pads[(i - 1) % math.max(#pads, 1) + 1]
+            if pad then
+                char:PivotTo(pad.CFrame + Vector3.new(0, 3.5, 0))
+            else
+                char:PivotTo(CFrame.lookAt(spawnAt, faceTo))
+            end
             print("[HEIST CREW] moved early joiner into The Vault:", player.Name)
         end
     end
@@ -188,7 +194,47 @@ Players.PlayerAdded:Connect(function() task.delay(3, refreshTrophies) end)
 Players.PlayerRemoving:Connect(function() task.defer(refreshTrophies) end)
 task.delay(3, refreshTrophies)
 
+-- ── v2.0 services (each optional: one broken file can't stop the server) ──
+local FeelService = optional("FeelService", nil)
+local HideService = optional("HideService", nil)
+local JailService = optional("JailService", nil)
+local BotService = optional("BotService", nil)
+local PortalService = optional("PortalService", nil)
+local DailyRewardService = optional("DailyRewardService", nil)
+local LeaderboardService = optional("LeaderboardService", nil)
+local CosmeticsService = optional("CosmeticsService", nil)
+local AmbientService = optional("AmbientService", nil)
+local VentService = optional("VentService", nil)
+local function safe(label, fn)
+    local ok, err = pcall(fn)
+    if not ok then warn("[HEIST CREW] " .. label .. " failed: " .. tostring(err)) end
+end
+if FeelService then safe("FeelService", function() FeelService:init() end) end
+if VentService then safe("VentService", function() VentService:init({ feel = FeelService }) end) end
+if HideService then safe("HideService", function() HideService:init({ feel = FeelService }) end) end
+if CosmeticsService then safe("CosmeticsService", function() CosmeticsService:init(PlayerDataService, EconomyService, notify) end) end
+if DailyRewardService then safe("DailyRewardService", function() DailyRewardService:init(PlayerDataService, EconomyService, notify, CosmeticsService) end) end
+if LeaderboardService then
+    safe("LeaderboardService", function()
+        LeaderboardService:init(PlayerDataService)
+        if hub.leaderboardAnchor then
+            LeaderboardService:placeBoard(hub.leaderboardAnchor, world.heistFolder or workspace)
+        end
+    end)
+end
+if AmbientService then
+    safe("AmbientService", function()
+        local f = Instance.new("Folder")
+        f.Name = "Ambient"
+        f.Parent = world.heistFolder or workspace
+        AmbientService:start(f)
+    end)
+end
+
 JobService:init({
+    crew = CrewService,
+    feel = FeelService,
+    hide = HideService,
     jobs = world.jobs,
     security = SecurityService,
     loot = LootService,
@@ -200,6 +246,24 @@ JobService:init({
     shop = ShopService,
     data = PlayerDataService,
 })
+
+if JailService then safe("JailService", function() JailService:init({ jail = world.jail, notify = notify, jobService = JobService }) end) end
+if BotService then safe("BotService", function() BotService:init({ jobService = JobService, loot = LootService }) end) end
+if PortalService then safe("PortalService", function() PortalService:init({ hub = hub, jobService = JobService, notify = notify }) end) end
+
+-- First-join fly-over (client IntroCam plays it once per join)
+do
+    local introRemote = Remotes.getRemote(Remotes.NAMES.IntroCam, "RemoteEvent")
+    local function sendIntro(player)
+        if hub.introPath and #hub.introPath > 0 then
+            task.delay(2, function()
+                if player.Parent then introRemote:FireClient(player, { points = hub.introPath }) end
+            end)
+        end
+    end
+    Players.PlayerAdded:Connect(sendIntro)
+    for _, p in ipairs(Players:GetPlayers()) do sendIntro(p) end
+end
 
 if Constants.DEV_TEST_PAD then TestPad:spawn() end
 

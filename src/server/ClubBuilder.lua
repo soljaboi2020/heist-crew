@@ -10,24 +10,51 @@
 
       NORTH  DJ stage + LED wall ("THE VAULT") + moving truss spots
              dance floor (glass tiles the client animates — ClubFX)
-      CENTRE holo planning table: blueprint + Boss + READY UP / change job
+      CENTRE holo planning table: blueprint + Boss (the plan) + "see another plan" (R)
              job screen hanging above it (next job · top earners · crew)
       WEST   the bar, VIP mezzanine above it (stairs by the stage)
              mask wall (real catalog masks on display heads) → opens the shop
       EAST   crew-role pads + signs
-      SOUTH  spawn · freight elevator up to the auto shop ·
+      SOUTH  freight elevator up to the auto shop ·
              garage bay with the ramp the getaway car rolls up at launch ·
-             trophy room (fills in as the crew pulls off heists)
+             trophy room (fills in as the crew pulls off heists) ·
+             a big ARCH (x -7..7) through to the entrance lobby
+
+    v2.0 "BIGGER" — THE ENTRANCE LOBBY + HEIST HALL (annex south of the club,
+    x -32..44, z 65..118, same floor, ceiling F+20). Malachi: spawns must "look
+    real, not just outside some weird stuff", "like most games".
+      CENTRE red carpet from the spawn medallion up to the arch, velvet ropes,
+             the bouncer + host stand, a lit "THE VAULT" marquee over the arch,
+             a hanging direction sign (BOSS / MASKS & GEAR / HEIST DOORS)
+             6 SpawnLocations on the medallion, facing north into the club
+      WEST   coat check (counter + coat rails) · leaderboard wall + lounge
+      EAST   HEIST HALL: 4 heist doors (elevator doors in the east wall), one per
+             job (mart · villa · jewelry · bank, easy → hard, north → south),
+             each with a sign (name · difficulty · players) and a glowing floor
+             zone in front — walk in to join that heist (PortalService does the rest)
 
     Returns refs in the SAME shape SafehouseBuilder used to (pads / tv /
     blueprint) so CrewService + SafehouseBuilder:showJob work unchanged, plus
     trophies / bay / prompts. Geometry only — services add the behaviour.
-    Tagged for ClubFX (client): DanceTile, ClubLight, ClubSpot, ClubEQ.
+    Tagged for ClubFX (client): DanceTile, ClubLight, ClubSpot, ClubEQ,
+    PortalGlow, MarqueeBulb.  Tagged for PortalHud: PortalZone (attr JobId).
+
+    v2 REFS (docs/V2_SPEC.md §7):
+      refs.spawnPads = { SpawnLocation × 6 }   Neutral, Enabled, Duration 5, facing north
+      refs.portals[jobId] = { zone = BasePart, setState = function(count, needed, launchIn, locked) }
+          zone     : invisible trigger box (CanCollide false, CanTouch true, Anchored),
+                     tagged "PortalZone", attribute JobId = jobId
+          setState : count (players in the zone), needed (players to launch, may be nil),
+                     launchIn (seconds left, nil/0 = not counting), locked (false | true |
+                     level number) → updates the door sign, floor glow and door leaves
+      refs.leaderboardAnchor = CFrame   (see _lobbyWest — board front faces along LookVector)
+      refs.introPath = { CFrame × 6 }   first-join camera fly-over (IntroCam.lua)
 --]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InsertService = game:GetService("InsertService")
 local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
@@ -52,6 +79,18 @@ local WALL = Color3.fromRGB(34, 30, 44)
 local PANEL = Color3.fromRGB(24, 22, 32)
 local STEEL = Color3.fromRGB(44, 47, 56)
 local WOOD = Color3.fromRGB(70, 46, 34)
+local GOLD = Color3.fromRGB(212, 170, 80)
+local VELVET = Color3.fromRGB(128, 18, 34)
+
+-- v2.0: arch in the club's south wall → the entrance lobby / heist hall annex
+local ARCH_HW, ARCH_H = 7, 11                 -- opening x -7..7, 11 tall
+local LX0, LX1 = -32, 44                      -- annex floor x
+local LZ0, LZ1 = Z1 + 1, 118                  -- annex floor z 65..118
+local LTOP = F + 20                           -- annex ceiling
+local PORTAL_Z = { 74, 86, 98, 110 }          -- heist door centres on the east wall (x 44)
+local PORTAL_ORDER = { "mart", "villa", "jewelry", "bank" }   -- easy → hard, north → south
+local PORTAL_HW, PORTAL_H = 4, 11             -- door opening 8 wide, 11 tall
+local SPAWN_XS, SPAWN_ZS = { -6, 0, 6 }, { 98, 104 }
 
 -- ── helpers (same style as SafehouseBuilder) ─────────────────────────
 local function part(props, parent)
@@ -140,13 +179,17 @@ function ClubBuilder:_shell(f)
     box("Ceiling", X0 - 1, TOP, Z0 - 1, X1 + 1, TOP + 1, Z1 + 1, Color3.fromRGB(18, 18, 24), Enum.Material.Metal, f)
     -- walls
     box("WallN", X0 - 1, F, Z0 - 1, X1 + 1, TOP, Z0, WALL, Enum.Material.Concrete, f)
-    box("WallS", X0 - 1, F, Z1, X1 + 1, TOP, Z1 + 1, WALL, Enum.Material.Concrete, f)
+    -- (v2.0) the south wall has a big arch through to the entrance lobby
+    box("WallSW", X0 - 1, F, Z1, -ARCH_HW, TOP, Z1 + 1, WALL, Enum.Material.Concrete, f)
+    box("WallSE", ARCH_HW, F, Z1, X1 + 1, TOP, Z1 + 1, WALL, Enum.Material.Concrete, f)
+    box("WallSHeader", -ARCH_HW, F + ARCH_H, Z1, ARCH_HW, TOP, Z1 + 1, WALL, Enum.Material.Concrete, f)
     box("WallW", X0 - 1, F, Z0, X0, TOP, Z1, WALL, Enum.Material.Concrete, f)
     box("WallE", X1, F, Z0, X1 + 1, TOP, Z1, WALL, Enum.Material.Concrete, f)
     -- acoustic panels (fabric) in a band around the room
     box("PanelsW", X0, F + 3, Z0 + 1, X0 + 0.3, F + 9, Z1 - 1, PANEL, Enum.Material.Fabric, f)
     box("PanelsE", X1 - 0.3, F + 3, Z0 + 1, X1, F + 9, Z1 - 1, PANEL, Enum.Material.Fabric, f)
-    box("PanelsS", X0 + 1, F + 3, Z1 - 0.3, X1 - 1, F + 9, Z1, PANEL, Enum.Material.Fabric, f)
+    box("PanelsSW", X0 + 1, F + 3, Z1 - 0.3, -ARCH_HW - 1, F + 9, Z1, PANEL, Enum.Material.Fabric, f)
+    box("PanelsSE", ARCH_HW + 1, F + 3, Z1 - 0.3, X1 - 1, F + 9, Z1, PANEL, Enum.Material.Fabric, f)
     -- ceiling trusses
     for z = Z0 + 8, Z1 - 4, 12 do
         box("Truss", X0, TOP - 1.4, z - 0.4, X1, TOP - 0.6, z + 0.4, STEEL, Enum.Material.Metal, f)
@@ -444,8 +487,12 @@ function ClubBuilder:_holoTable(f, refs)
     end
     local r = prompt(spot("ReadySpot", 2.6), "ReadyUp", "I'm ready!", "Holo table", Enum.KeyCode.E, 0.3)
     r.MaxActivationDistance = 8
+    -- (v2.0) the HEIST DOORS in the lobby are how you start now; a second "ready"
+    -- button at the table would confuse a 7-year-old. The prompt + hook are kept
+    -- (flip ClubBuilder.TABLE_READY_PROMPT to bring it back).
+    r.Enabled = ClubBuilder.TABLE_READY_PROMPT == true
     r.Triggered:Connect(function(player) if ClubBuilder.onReadyUp then ClubBuilder.onReadyUp(player) end end)
-    local n = prompt(spot("JobSpot", -2.6), "NextJob", "Pick a different heist", "Holo table", Enum.KeyCode.R, 0.4)
+    local n = prompt(spot("JobSpot", -2.6), "NextJob", "See another heist plan", "Holo table", Enum.KeyCode.R, 0.4)
     n.MaxActivationDistance = 8
     n.GamepadKeyCode = Enum.KeyCode.ButtonY
     n.Triggered:Connect(function(player) if ClubBuilder.onNextJob then ClubBuilder.onNextJob(player) end end)
@@ -796,6 +843,655 @@ function ClubBuilder:_elevator(f, refs)
     p.Triggered:Connect(function(player) if ClubBuilder.onElevator then ClubBuilder.onElevator(player, "up") end end)
 end
 
+-- ══════════════════════════════════════════════════════════════════════
+-- v2.0 "BIGGER": ENTRANCE LOBBY + HEIST HALL (annex south of the club)
+-- ══════════════════════════════════════════════════════════════════════
+local UP = Vector3.new(0, 1, 0)
+
+local function flat(v)
+    local d = Vector3.new(v.X, 0, v.Z)
+    return d.Magnitude > 1e-3 and d.Unit or Vector3.new(0, 0, -1)
+end
+
+-- Words painted on the floor, readable by someone looking along `readDir`.
+-- A Top-face SurfaceGui's "up" runs along the part's local -X and its width
+-- along local Z (that's what the v1.2.2 role-pad fix established), so local -X
+-- is pointed along the reading direction.
+local function floorText(parent, name, pos, readDir, w, h, str, color)
+    local d = flat(readDir)
+    local p = part({ Name = name, Size = Vector3.new(h, 0.05, w), CFrame = CFrame.fromMatrix(pos, -d, UP),
+        Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false }, parent)
+    local g = surface(p, Enum.NormalId.Top, 40)
+    g.Brightness = 1.6
+    text({ Text = str, Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = color }, g)
+    return p
+end
+
+-- One painted ">" chevron on the floor, tip at `tip`, pointing along `dir`.
+local function chevron(parent, tip, dir, color, len, wid)
+    local d = flat(dir)
+    local right = d:Cross(UP)
+    for _, s in ipairs({ -1, 1 }) do
+        local v = (-d + right * s).Unit
+        local c = tip + v * (len / 2)
+        part({ Name = "ArrowPaint", Size = Vector3.new(wid, 0.04, len), CFrame = CFrame.lookAt(c, c + v),
+            Color = color, Material = Enum.Material.SmoothPlastic, CanCollide = false, CanQuery = false,
+            CanTouch = false }, parent)
+    end
+end
+
+-- A floor arrow: WORDS, then three chevrons pointing along `dir`.
+local function floorArrow(parent, at, dir, readDir, label, color, textW)
+    local d = flat(dir)
+    textW = textW or 7
+    local base = Vector3.new(at.X, F + 0.09, at.Z)
+    floorText(parent, "FloorWord", base, readDir, textW, 1.6, label, color)
+    local start = (math.abs(flat(readDir):Dot(d)) > 0.7) and 1.2 or (textW / 2 + 0.6)
+    for k = 0, 2 do
+        chevron(parent, base + d * (start + 1.3 + k * 1.5), d, color, 1.7, 0.4)
+    end
+end
+
+-- Hanging sign board with a SurfaceGui on one face
+local function signBoard(parent, name, x0, y0, z0, x1, y1, z1, face, pps)
+    local b = box(name, x0, y0, z0, x1, y1, z1, Color3.fromRGB(10, 10, 14), Enum.Material.Metal, parent)
+    local g = surface(b, face, pps or 30)
+    g.Brightness = 2.2
+    return b, g
+end
+
+local function chandelier(parent, x, z, y)
+    box("ChandelierRod", x - 0.08, y + 0.4, z - 0.08, x + 0.08, LTOP, z + 0.08, GOLD, Enum.Material.Metal, parent, { CanCollide = false })
+    part({ Name = "ChandelierRing", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.3, 5.2, 5.2),
+        CFrame = CFrame.new(x, y + 0.4, z) * CFrame.Angles(0, 0, math.rad(90)), Color = GOLD,
+        Material = Enum.Material.Metal, CanCollide = false }, parent)
+    for k = 0, 7 do
+        local a = k * math.pi / 4
+        part({ Name = "ChandelierBulb", Shape = Enum.PartType.Ball, Size = Vector3.new(0.5, 0.5, 0.5),
+            Position = Vector3.new(x + math.cos(a) * 2.3, y + 0.85, z + math.sin(a) * 2.3),
+            Color = Color3.fromRGB(255, 226, 176), Material = Enum.Material.Neon, CanCollide = false }, parent)
+    end
+    local core = box("ChandelierCore", x - 0.45, y - 0.5, z - 0.45, x + 0.45, y + 0.3, z + 0.45, GOLD, Enum.Material.Metal, parent, { CanCollide = false })
+    light("PointLight", core, { Brightness = 1.3, Range = 26, Color = Color3.fromRGB(255, 214, 170), Shadows = true })
+end
+
+-- Job info for a door: Constants.JOBS first (the core agent owns it), with a
+-- fallback so the four doors always build even before mart/bank exist there.
+local JOB_FALLBACK = {
+    mart    = { id = "mart",    name = "SUNNY'S MART",  difficulty = 1, unlockLevel = 1 },
+    villa   = { id = "villa",   name = "VILLA ROSA",    difficulty = 2, unlockLevel = 1 },
+    jewelry = { id = "jewelry", name = "DIAMOND DOLLS", difficulty = 3, unlockLevel = 1 },
+    bank    = { id = "bank",    name = "OCEAN BANK",    difficulty = 4, unlockLevel = 1 },
+}
+local JOB_COLOR = {
+    mart = Color3.fromRGB(74, 222, 128), villa = PINK, jewelry = CYAN, bank = Color3.fromRGB(251, 191, 36),
+}
+local DIFF_WORD = { "EASY", "MEDIUM", "HARD", "VERY HARD" }
+
+local function jobCfg(id)
+    for _, j in ipairs(Constants.JOBS or {}) do
+        if j.id == id then return j end
+    end
+    return JOB_FALLBACK[id] or { id = id, name = string.upper(tostring(id)), difficulty = 1, unlockLevel = 1 }
+end
+
+-- HeistBuilder's v1.1.1 "switch off every other SpawnLocation" pass predates
+-- these pads: it would disable five of them and drag one to SPAWN_POSITION.
+-- Until it's pointed at refs.spawnPads, each pad quietly puts itself back.
+local function guardSpawn(s)
+    local cf, size = s.CFrame, s.Size
+    local busy = false
+    local function restore()
+        if busy then return end
+        busy = true
+        task.defer(function()
+            if s.Parent then
+                s.Enabled = true
+                s.Neutral = true
+                s.Duration = 5
+                s.Size = size
+                s.CFrame = cf
+                s.Transparency = 1
+                s.CanCollide = false
+            end
+            busy = false
+        end)
+    end
+    s:GetPropertyChangedSignal("Enabled"):Connect(function() if not s.Enabled then restore() end end)
+    s:GetPropertyChangedSignal("CFrame"):Connect(function() if s.CFrame ~= cf then restore() end end)
+end
+
+-- ──────────────────────────────────────────────
+-- 🏛 LOBBY SHELL (floor, walls, ceiling, arch, lights)
+-- ──────────────────────────────────────────────
+function ClubBuilder:_lobbyShell(f)
+    local plaster = Color3.fromRGB(62, 32, 40)
+    box("LobbyFloor", LX0, F - 1, LZ0, 16, F, LZ1, Color3.fromRGB(46, 38, 36), Enum.Material.Marble, f, { Reflectance = 0.08 })
+    box("HallFloor", 16, F - 1, LZ0, LX1, F, LZ1, Color3.fromRGB(34, 34, 40), Enum.Material.Slate, f)
+    box("LobbyCeiling", LX0 - 1, LTOP, LZ0, 51, LTOP + 1, LZ1 + 1, Color3.fromRGB(24, 22, 28), Enum.Material.Metal, f)
+    box("LobbyWallW", LX0 - 1, F, LZ0, LX0, LTOP, LZ1, plaster, Enum.Material.Plaster, f)
+    box("LobbyWallS", LX0 - 1, F, LZ1, 51, LTOP, LZ1 + 1, plaster, Enum.Material.Plaster, f)
+    -- the club's south wall is this room's north wall: plaster it on this side
+    box("LobbyCladNW", LX0, F, LZ0, -ARCH_HW - 0.8, LTOP, LZ0 + 0.2, plaster, Enum.Material.Plaster, f)
+    box("LobbyCladNE", ARCH_HW + 0.8, F, LZ0, LX1, LTOP, LZ0 + 0.2, plaster, Enum.Material.Plaster, f)
+    box("LobbyCladArch", -ARCH_HW - 0.8, F + ARCH_H + 0.8, LZ0, ARCH_HW + 0.8, LTOP, LZ0 + 0.2, plaster, Enum.Material.Plaster, f)
+    -- wood wainscot + a gold rail around the lobby part (west of the hall)
+    -- (the west wall skips z 71.3..86.7: that's the leaderboard spot — see _lobbyWest)
+    for _, zz in ipairs({ { LZ0 + 0.2, 71.3 }, { 86.7, LZ1 } }) do
+        box("WainscotW", LX0, F, zz[1], LX0 + 0.3, F + 4, zz[2], WOOD, Enum.Material.WoodPlanks, f)
+        box("RailW", LX0 + 0.3, F + 4, zz[1], LX0 + 0.45, F + 4.25, math.min(zz[2], LZ1 - 0.3), GOLD, Enum.Material.Metal, f)
+    end
+    box("WainscotS", LX0, F, LZ1 - 0.3, 16, F + 4, LZ1, WOOD, Enum.Material.WoodPlanks, f)
+    box("WainscotNW", LX0, F, LZ0 + 0.2, -ARCH_HW - 0.8, F + 4, LZ0 + 0.5, WOOD, Enum.Material.WoodPlanks, f)
+    box("RailS", LX0, F + 4, LZ1 - 0.45, 16, F + 4.25, LZ1 - 0.3, GOLD, Enum.Material.Metal, f)
+
+    -- the arch: floor under the wall thickness, then a gold frame on both faces
+    box("ArchSill", -ARCH_HW, F - 1, Z1, ARCH_HW, F, LZ0, Color3.fromRGB(46, 38, 36), Enum.Material.Marble, f)
+    for _, zz in ipairs({ { Z1 - 0.4, Z1 }, { LZ0 + 0.2, LZ0 + 0.6 } }) do
+        box("ArchPostW", -ARCH_HW - 0.8, F, zz[1], -ARCH_HW, F + ARCH_H + 0.8, zz[2], GOLD, Enum.Material.Metal, f)
+        box("ArchPostE", ARCH_HW, F, zz[1], ARCH_HW + 0.8, F + ARCH_H + 0.8, zz[2], GOLD, Enum.Material.Metal, f)
+        box("ArchLintel", -ARCH_HW, F + ARCH_H, zz[1], ARCH_HW, F + ARCH_H + 0.8, zz[2], GOLD, Enum.Material.Metal, f)
+    end
+
+    -- marble columns (west half only — the east half is the heist hall + the intro camera's path)
+    for _, c in ipairs({ { -14, 70 }, { -14, 92 } }) do
+        part({ Name = "LobbyColumn", Shape = Enum.PartType.Cylinder, Size = Vector3.new(LTOP - F, 3, 3),
+            CFrame = CFrame.new(c[1], (F + LTOP) / 2, c[2]) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = Color3.fromRGB(226, 218, 206), Material = Enum.Material.Marble }, f)
+        for _, y in ipairs({ F + 0.4, LTOP - 0.6 }) do
+            part({ Name = "ColumnBand", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 3.4, 3.4),
+                CFrame = CFrame.new(c[1], y, c[2]) * CFrame.Angles(0, 0, math.rad(90)),
+                Color = GOLD, Material = Enum.Material.Metal }, f)
+        end
+    end
+
+    -- light: warm and bright — the lobby is the SAFE place (art rule #5)
+    chandelier(f, 0, 77, LTOP - 5)
+    chandelier(f, 0, 101, LTOP - 5)
+    chandelier(f, -22, 79, LTOP - 6)
+    local fill = box("LobbyFill", -1, LTOP - 3, 91, 1, LTOP - 2.5, 93, STEEL, Enum.Material.Metal, f, { Transparency = 1, CanCollide = false })
+    light("PointLight", fill, { Brightness = 0.7, Range = 60, Color = Color3.fromRGB(255, 222, 190) })
+end
+
+-- ──────────────────────────────────────────────
+-- 🟥 LOBBY CENTRE: spawn medallion, red carpet, ropes, marquee, signs
+-- ──────────────────────────────────────────────
+function ClubBuilder:_lobbyCentre(f, refs)
+    -- red carpet from the spawn medallion, through the arch, into the club
+    box("Carpet", -4, F, 56, 4, F + 0.06, 91, VELVET, Enum.Material.Fabric, f)
+    for _, sx in ipairs({ -1, 1 }) do
+        box("CarpetEdge", sx * 4, F, 56, sx * 4.25, F + 0.07, 91, GOLD, Enum.Material.Metal, f)
+    end
+
+    -- spawn medallion: gold-rimmed dark marble disc, "THE VAULT" in the middle
+    local mz = (SPAWN_ZS[1] + SPAWN_ZS[#SPAWN_ZS]) / 2      -- 101
+    local function disc(name, dia, h, color, mat)
+        part({ Name = name, Shape = Enum.PartType.Cylinder, Size = Vector3.new(h, dia, dia),
+            CFrame = CFrame.new(0, F + h / 2, mz) * CFrame.Angles(0, 0, math.rad(90)),
+            Color = color, Material = mat, CanCollide = false, CanQuery = false }, f)
+    end
+    disc("MedallionRim", 21, 0.06, GOLD, Enum.Material.Metal)
+    disc("Medallion", 20, 0.08, Color3.fromRGB(24, 22, 30), Enum.Material.Marble)
+    disc("MedallionRing", 9, 0.1, GOLD, Enum.Material.Metal)
+    disc("MedallionCore", 8.4, 0.12, Color3.fromRGB(40, 14, 26), Enum.Material.Marble)
+    floorText(f, "MedallionWord", Vector3.new(0, F + 0.15, mz), Vector3.new(0, 0, -1), 7, 1.5, "THE VAULT", GOLD)
+
+    -- SPAWN PADS — 6 of them on the medallion, facing north into the club.
+    -- Duration 5 = Roblox's own ForceField for 5 s (spawn protection).
+    refs.spawnPads = {}
+    local i = 0
+    for _, z in ipairs(SPAWN_ZS) do
+        for _, x in ipairs(SPAWN_XS) do
+            i = i + 1
+            local pos = Vector3.new(x, F + 0.1, z)
+            local s = Instance.new("SpawnLocation")
+            s.Name = "ClubSpawn" .. i
+            s.Anchored = true
+            s.Size = Vector3.new(5, 0.2, 5)
+            s.CFrame = CFrame.lookAt(pos, pos + Vector3.new(0, 0, -1))
+            s.Transparency = 1
+            s.CanCollide = false
+            s.CanTouch = false
+            s.CanQuery = false
+            s.Material = Enum.Material.SmoothPlastic
+            s.TopSurface = Enum.SurfaceType.Smooth
+            s.BottomSurface = Enum.SurfaceType.Smooth
+            s.Neutral = true
+            s.AllowTeamChangeOnTouch = false
+            s.Duration = 5
+            s.Enabled = true
+            s:SetAttribute("ClubSpawnPad", true)
+            s.Parent = f
+            guardSpawn(s)
+            table.insert(refs.spawnPads, s)
+        end
+    end
+
+    -- velvet ropes along the carpet (gaps at z 78..82 to step off left/right)
+    local function post(x, z)
+        box("StanchionBase", x - 0.5, F, z - 0.5, x + 0.5, F + 0.2, z + 0.5, GOLD, Enum.Material.Metal, f)
+        box("Stanchion", x - 0.14, F + 0.2, z - 0.14, x + 0.14, F + 3.1, z + 0.14, GOLD, Enum.Material.Metal, f)
+        part({ Name = "StanchionTop", Shape = Enum.PartType.Ball, Size = Vector3.new(0.5, 0.5, 0.5),
+            Position = Vector3.new(x, F + 3.25, z), Color = GOLD, Material = Enum.Material.Metal }, f)
+    end
+    local function rope(a, b)
+        local mid = (a + b) / 2 - Vector3.new(0, 0.6, 0)
+        for _, seg in ipairs({ { a, mid }, { mid, b } }) do
+            local p0, p1 = seg[1], seg[2]
+            local c = (p0 + p1) / 2
+            part({ Name = "VelvetRope", Shape = Enum.PartType.Cylinder, Size = Vector3.new((p1 - p0).Magnitude, 0.28, 0.28),
+                CFrame = CFrame.lookAt(c, p1) * CFrame.Angles(0, math.rad(90), 0), Color = VELVET,
+                Material = Enum.Material.Fabric }, f)
+        end
+    end
+    for _, sx in ipairs({ -5.2, 5.2 }) do
+        for _, run in ipairs({ { 68, 71.4, 74.8, 78.2 }, { 82, 86, 90 } }) do
+            for k, z in ipairs(run) do
+                post(sx, z)
+                if k > 1 then rope(Vector3.new(sx, F + 2.9, run[k - 1]), Vector3.new(sx, F + 2.9, z)) end
+            end
+        end
+    end
+
+    -- THE VAULT marquee over the arch, facing the spawn (bulbs chase — ClubFX)
+    local sx0, sx1, sy0, sy1 = -13, 13, F + 12.2, F + 18.4
+    local sign, sg = signBoard(f, "VaultMarquee", sx0, sy0, LZ0 + 0.2, sx1, sy1, LZ0 + 0.6, Enum.NormalId.Back, 30)
+    sg.Brightness = 2.6
+    local sbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(14, 8, 20) }, sg)
+    local sgr = Instance.new("UIGradient")
+    sgr.Rotation = 90
+    sgr.Color = ColorSequence.new(Color3.fromRGB(70, 16, 60), Color3.fromRGB(14, 10, 30))
+    sgr.Parent = sbg
+    text({ Text = "THE VAULT", Position = UDim2.fromScale(0.04, 0.06), Size = UDim2.fromScale(0.92, 0.62),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = Color3.fromRGB(255, 232, 170), TextStrokeColor3 = PINK, TextStrokeTransparency = 0.1 }, sbg)
+    text({ Text = "HEIST CREW HQ  ·  MEMBERS ONLY", Position = UDim2.fromScale(0.1, 0.7), Size = UDim2.fromScale(0.8, 0.2),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextScaled = true,
+        TextColor3 = Color3.fromRGB(220, 250, 255) }, sbg)
+    light("SurfaceLight", sign, { Face = Enum.NormalId.Back, Brightness = 1.4, Range = 18, Angle = 80, Color = Color3.fromRGB(255, 190, 220) })
+    local idx = 0
+    local function bulb(x, y)
+        idx = idx + 1
+        local b = part({ Name = "MarqueeBulb", Shape = Enum.PartType.Ball, Size = Vector3.new(0.42, 0.42, 0.42),
+            Position = Vector3.new(x, y, LZ0 + 0.75), Color = Color3.fromRGB(255, 226, 170),
+            Material = Enum.Material.Neon, CanCollide = false, CanQuery = false }, f)
+        b:SetAttribute("Index", idx)
+        CollectionService:AddTag(b, "MarqueeBulb")
+    end
+    for x = sx0 + 0.4, sx1 - 0.3, 1.3 do bulb(x, sy1 - 0.35) end
+    for y = sy1 - 1.5, sy0 + 0.6, -1.2 do bulb(sx1 - 0.35, y) end
+    for x = sx1 - 0.4, sx0 + 0.3, -1.3 do bulb(x, sy0 + 0.35) end
+    for y = sy0 + 1.5, sy1 - 0.6, 1.2 do bulb(sx0 + 0.35, y) end
+
+    -- hanging direction sign between the spawn and the arch
+    local dy0, dy1, dz = F + 12.5, F + 15.5, 90
+    for _, x in ipairs({ -13, 13 }) do
+        box("SignCable", x - 0.06, dy1, dz - 0.06, x + 0.06, LTOP, dz + 0.06, STEEL, Enum.Material.Metal, f, { CanCollide = false })
+    end
+    local dir, dgBack = signBoard(f, "DirectionSign", -15, dy0, dz - 0.2, 15, dy1, dz + 0.2, Enum.NormalId.Back, 30)
+    local cells = {
+        { "▲  MASKS & GEAR", PINK }, { "▲  THE BOSS", T.gold }, { "HEIST DOORS  ▶", T.money },
+    }
+    local dbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg }, dgBack)
+    for k, c in ipairs(cells) do
+        local cell = frame({ Position = UDim2.new((k - 1) / 3, 6, 0, 8), Size = UDim2.new(1 / 3, -12, 1, -16),
+            BackgroundColor3 = T.bgRaised }, dbg)
+        UITheme.corner(cell, 10)
+        frame({ Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = c[2] }, cell)
+        text({ Text = c[1], Position = UDim2.fromOffset(10, 12), Size = UDim2.new(1, -20, 1, -20),
+            TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+            TextColor3 = c[2] }, cell)
+    end
+    -- back side, for people coming back from the club (heading south, east is on the LEFT)
+    local dgFront = surface(dir, Enum.NormalId.Front, 30)
+    dgFront.Brightness = 2.2
+    local fbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg }, dgFront)
+    text({ Text = "◀  HEIST DOORS", Position = UDim2.fromScale(0.05, 0.1), Size = UDim2.fromScale(0.9, 0.8),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = T.money }, fbg)
+    light("PointLight", dir, { Brightness = 0.8, Range = 10, Color = Color3.fromRGB(255, 230, 200) })
+
+    -- floor arrows (painted, not glowing — rule #1)
+    floorArrow(f, Vector3.new(0, 0, 86.5), Vector3.new(0, 0, -1), Vector3.new(0, 0, -1), "THE BOSS", T.gold, 5)
+    floorArrow(f, Vector3.new(-9.5, 0, 88), Vector3.new(0, 0, -1), Vector3.new(0, 0, -1), "MASKS & GEAR", PINK, 6.4)
+    floorArrow(f, Vector3.new(15, 0, 100), Vector3.new(1, 0, 0), Vector3.new(0, 0, -1), "HEISTS", T.money, 6)
+    floorArrow(f, Vector3.new(29, 0, 100), Vector3.new(1, 0, 0), Vector3.new(1, 0, 0), "HEIST DOORS", T.money, 6)
+    -- inside the club, just past the arch: the way back to the doors
+    floorArrow(f, Vector3.new(0, 0, 53), Vector3.new(0, 0, 1), Vector3.new(0, 0, 1), "HEIST DOORS", T.money, 6)
+
+    -- two-sided pylon just inside the club (east of the carpet, clear of the intro camera)
+    local py = box("WayPylon", 4.6, F, 57.7, 6.6, F + 7, 58.3, Color3.fromRGB(14, 14, 18), Enum.Material.Metal, f)
+    box("WayPylonCap", 4.5, F + 7, 57.6, 6.7, F + 7.2, 58.4, GOLD, Enum.Material.Metal, f)
+    local pyS = surface(py, Enum.NormalId.Back, 50)       -- faces south: people walking in from the lobby
+    pyS.Brightness = 2
+    local pyN = surface(py, Enum.NormalId.Front, 50)      -- faces north: people in the club
+    pyN.Brightness = 2
+    local function pylonRows(g, rows)
+        local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg }, g)
+        for k, r in ipairs(rows) do
+            local y = (k - 1) / #rows
+            frame({ Position = UDim2.new(0, 8, y, 8), Size = UDim2.new(0, 6, 1 / #rows, -16), BackgroundColor3 = r[2] }, bg)
+            text({ Text = r[1], Position = UDim2.new(0, 20, y, 6), Size = UDim2.new(1, -28, 1 / #rows, -12),
+                FontFace = UITheme.F.display, TextScaled = true, TextColor3 = r[2] }, bg)
+        end
+    end
+    pylonRows(pyS, { { "▲ BOSS", T.gold }, { "◀ MASKS", PINK }, { "▶ ROLES", T.info } })
+    pylonRows(pyN, { { "▲ HEIST", T.money }, { "   DOORS", T.money }, { "▲ STREET", T.muted } })
+end
+
+-- ──────────────────────────────────────────────
+-- 🧥 LOBBY WEST: coat check, leaderboard wall, lounge
+-- ──────────────────────────────────────────────
+function ClubBuilder:_lobbyWest(f, refs)
+    local plaster = Color3.fromRGB(62, 32, 40)
+    -- COAT CHECK (south-west corner, counter faces north)
+    box("CoatRoomWall", -18, F, 105.4, -17.4, F + 10, LZ1, plaster, Enum.Material.Plaster, f)
+    box("CoatCounter", LX0, F, 103.6, -19.6, F + 3.6, 105.4, WOOD, Enum.Material.WoodPlanks, f)
+    box("CoatCounterTop", LX0, F + 3.6, 103.4, -19.4, F + 3.9, 105.6, Color3.fromRGB(232, 226, 236), Enum.Material.Marble, f)
+    box("CoatCounterRail", LX0, F + 0.3, 103.5, -19.6, F + 0.5, 103.6, GOLD, Enum.Material.Metal, f)
+    part({ Name = "CounterBell", Shape = Enum.PartType.Ball, Size = Vector3.new(0.6, 0.6, 0.6),
+        Position = Vector3.new(-22, F + 4.1, 104.4), Color = GOLD, Material = Enum.Material.Metal }, f)
+    box("TicketStack", -26, F + 3.9, 104.1, -25.2, F + 4.2, 104.7, Color3.fromRGB(240, 200, 90), Enum.Material.SmoothPlastic, f)
+    local coatCols = {
+        Color3.fromRGB(30, 30, 34), Color3.fromRGB(120, 36, 42), Color3.fromRGB(46, 62, 96), Color3.fromRGB(150, 120, 90),
+        Color3.fromRGB(70, 70, 76), Color3.fromRGB(30, 70, 60), Color3.fromRGB(190, 170, 150),
+    }
+    for r, z in ipairs({ 109, 114 }) do
+        for _, x in ipairs({ LX0 + 1.5, -20.5 }) do
+            box("CoatRailPost", x - 0.12, F, z - 0.12, x + 0.12, F + 7.8, z + 0.12, STEEL, Enum.Material.Metal, f)
+        end
+        box("CoatRail", LX0 + 1.5, F + 7.5, z - 0.08, -20.5, F + 7.66, z + 0.08, STEEL, Enum.Material.Metal, f, { CanCollide = false })
+        local n = 0
+        for x = LX0 + 2.6, -21.4, 0.8 do
+            n = n + 1
+            local tilt = ((n * 37 + r * 11) % 7 - 3) * 0.02
+            part({ Name = "Coat", Size = Vector3.new(0.45, 3.6, 1.7),
+                CFrame = CFrame.new(x, F + 5.6, z) * CFrame.Angles(0, 0, tilt),
+                Color = coatCols[(n + r * 3) % #coatCols + 1], Material = Enum.Material.Fabric, CanCollide = false }, f)
+        end
+    end
+    local _, cg = signBoard(f, "CoatCheckSign", -29, F + 9.2, 103.6, -21, F + 11.4, 103.8, Enum.NormalId.Front, 30)
+    text({ Text = "COAT CHECK", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextScaled = true, TextColor3 = Color3.fromRGB(255, 232, 190),
+        TextStrokeColor3 = Color3.fromRGB(200, 120, 40), TextStrokeTransparency = 0.3 }, cg)
+    local lamp = box("CoatLamp", -25.4, LTOP - 6, 106.6, -24.6, LTOP - 5.6, 107.4, GOLD, Enum.Material.Metal, f, { CanCollide = false })
+    box("CoatLampRod", -25.06, LTOP - 5.6, 106.94, -24.94, LTOP, 107.06, GOLD, Enum.Material.Metal, f, { CanCollide = false })
+    light("PointLight", lamp, { Brightness = 1.1, Range = 16, Color = Color3.fromRGB(255, 205, 150) })
+
+    -- LEADERBOARD WALL (west wall, x -32): a framed 14 × 8 spot. The progression
+    -- agent's board goes in front of this backing panel.
+    local zc, yc = 79, F + 7
+    local bx = LX0 + 0.2
+    local backing = box("BoardBacking", LX0, yc - 4.2, zc - 7.2, bx, yc + 4.2, zc + 7.2, Color3.fromRGB(16, 16, 22), Enum.Material.Fabric, f)
+    for _, e in ipairs({
+        { yc - 4.5, zc - 7.5, yc - 4.2, zc + 7.5 }, { yc + 4.2, zc - 7.5, yc + 4.5, zc + 7.5 },
+        { yc - 4.2, zc - 7.5, yc + 4.2, zc - 7.2 }, { yc - 4.2, zc + 7.2, yc + 4.2, zc + 7.5 },
+    }) do
+        box("BoardFrame", LX0, e[1], e[2], bx + 0.15, e[3], e[4], GOLD, Enum.Material.Metal, f)
+    end
+    local ph = surface(backing, Enum.NormalId.Right, 20)
+    text({ Text = "TOP HEISTERS", Position = UDim2.fromScale(0, 0.35), Size = UDim2.fromScale(1, 0.3),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = T.faint }, ph)
+    for _, z in ipairs({ zc - 4, zc + 4 }) do
+        local from = Vector3.new(LX0 + 6, LTOP - 0.6, z)
+        local sp = part({ Name = "BoardSpot", Size = Vector3.new(0.6, 0.6, 0.9), Color = STEEL, Material = Enum.Material.Metal,
+            CanCollide = false, CFrame = CFrame.lookAt(from, Vector3.new(LX0, yc, z)) }, f)
+        light("SpotLight", sp, { Face = Enum.NormalId.Front, Angle = 50, Brightness = 1.6, Range = 22,
+            Color = Color3.fromRGB(255, 236, 214), Shadows = false })
+    end
+    -- CFrame at the centre of the clear 14 × 8 wall spot, 0.1 in front of the backing.
+    -- ► The board's READABLE FRONT faces along anchor.LookVector (out of the wall,
+    --   +X, into the lobby). A reader stands in front of it looking along -LookVector.
+    --   Build the board as a Part with CFrame = anchor * CFrame.new(0, 0, -thickness/2)
+    --   and put its SurfaceGui on Enum.NormalId.Front. Up = anchor.UpVector (+Y).
+    --   Clear area: 14 wide (along anchor.RightVector) × 8 tall.
+    refs.leaderboardAnchor = CFrame.lookAt(Vector3.new(bx + 0.1, yc, zc), Vector3.new(bx + 1.1, yc, zc))
+
+    -- LOUNGE facing the board (keeps x -32..-25 clear in front of it)
+    KenneyLoader.placeMany({
+        { kit = "furniture", name = "rugRectangle", pos = Vector3.new(-21.5, F, 79), facing = Vector3.new(-1, 0, 0), opts = { collide = false } },
+        { kit = "furniture", name = "loungeSofa", pos = Vector3.new(-19.5, F, 75.5), facing = Vector3.new(-1, 0, 0) },
+        { kit = "furniture", name = "loungeSofa", pos = Vector3.new(-19.5, F, 82.5), facing = Vector3.new(-1, 0, 0) },
+        { kit = "furniture", name = "tableCoffee", pos = Vector3.new(-23, F, 79), facing = Vector3.new(-1, 0, 0) },
+        { kit = "furniture", name = "pottedPlant", pos = Vector3.new(LX0 + 1.6, F, 67.5), facing = Vector3.new(1, 0, 0) },
+        { kit = "furniture", name = "pottedPlant", pos = Vector3.new(LX0 + 1.6, F, 91), facing = Vector3.new(1, 0, 0) },
+        { kit = "furniture", name = "pottedPlant", pos = Vector3.new(-10.5, F, 67.5), facing = Vector3.new(0, 0, 1) },
+        { kit = "furniture", name = "coatRackStanding", pos = Vector3.new(-18.8, F, 102.6), facing = Vector3.new(0, 0, -1) },
+    }, f)
+end
+
+-- ──────────────────────────────────────────────
+-- 🕴 BOUNCER + host stand by the arch
+-- ──────────────────────────────────────────────
+function ClubBuilder:_bouncer(f)
+    box("HostStand", 8.8, F, 72.6, 10.4, F + 3.3, 73.8, WOOD, Enum.Material.WoodPlanks, f)
+    box("HostStandTop", 8.6, F + 3.3, 72.4, 10.6, F + 3.5, 74, GOLD, Enum.Material.Metal, f)
+    box("Clipboard", 9.2, F + 3.5, 72.8, 9.9, F + 3.56, 73.5, Color3.fromRGB(235, 235, 228), Enum.Material.SmoothPlastic, f)
+    local okReq, NpcFactory = pcall(require, script.Parent.NpcFactory)
+    if not okReq or not NpcFactory then return end
+    task.spawn(function()
+        local ok, model, humanoid, root = pcall(NpcFactory.build, {
+            name = "Bouncer_NPC",
+            bodyColors = {
+                head  = Color3.fromRGB(120, 84, 60),
+                torso = Color3.fromRGB(18, 18, 22),
+                arms  = Color3.fromRGB(120, 84, 60),
+                legs  = Color3.fromRGB(22, 22, 26),
+            },
+        })
+        if not ok or not model or not humanoid or not root then
+            warn("[ClubBuilder] bouncer NPC skipped:", ok and "build returned nil" or tostring(model))
+            return
+        end
+        root.Anchored = true
+        local standAt = Vector3.new(9.6, F + humanoid.HipHeight + root.Size.Y / 2, 69.6)
+        model:PivotTo(CFrame.lookAt(standAt, Vector3.new(2, standAt.Y, 80)))
+        model.Parent = f
+        pcall(NpcFactory.animate, humanoid)
+        -- the one allowed kind of floating text: a short NPC speech bubble
+        local head = model:FindFirstChild("Head") or root
+        local att = Instance.new("Attachment")
+        att.Position = Vector3.new(0, 2.6, 0)
+        att.Parent = head
+        local bb = Instance.new("BillboardGui")
+        bb.Size = UDim2.fromOffset(230, 64)
+        bb.MaxDistance = 30
+        bb.LightInfluence = 0
+        bb.Parent = att
+        local bg = UITheme.panel({ Size = UDim2.fromScale(1, 1), transparency = 0.12, radius = 14 })
+        bg.Parent = bb
+        UITheme.caption("Bouncer", { Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 14),
+            TextColor3 = T.gold }).Parent = bg
+        UITheme.label({ Text = "Welcome in! Heist doors are over on the right.", Position = UDim2.fromOffset(14, 22),
+            Size = UDim2.new(1, -28, 0, 36), TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 15,
+            TextYAlignment = Enum.TextYAlignment.Top }).Parent = bg
+    end)
+end
+
+-- ──────────────────────────────────────────────
+-- 🚪 HEIST HALL: the east wall with 4 heist doors
+-- ──────────────────────────────────────────────
+function ClubBuilder:_portal(f, id, index, c)
+    local cfg = jobCfg(id)
+    local col = JOB_COLOR[id] or GOLD
+    local WX = LX1                                      -- wall face x 44
+    local z0, z1 = c - PORTAL_HW, c + PORTAL_HW
+    local trim = Color3.fromRGB(64, 66, 76)
+
+    -- frame round the opening + thin job-colour light strips on its inner edge
+    box("DoorPostN", WX - 0.4, F, z0 - 0.8, WX, F + PORTAL_H + 0.8, z0, trim, Enum.Material.Metal, f)
+    box("DoorPostS", WX - 0.4, F, z1, WX, F + PORTAL_H + 0.8, z1 + 0.8, trim, Enum.Material.Metal, f)
+    box("DoorLintel", WX - 0.4, F + PORTAL_H, z0, WX, F + PORTAL_H + 0.8, z1, trim, Enum.Material.Metal, f)
+    neon("DoorStripN", WX - 0.46, F, z0 - 0.22, WX - 0.4, F + PORTAL_H, z0 - 0.06, col, f)
+    neon("DoorStripS", WX - 0.46, F, z1 + 0.06, WX - 0.4, F + PORTAL_H, z1 + 0.22, col, f)
+    neon("DoorStripTop", WX - 0.46, F + PORTAL_H + 0.06, z0, WX - 0.4, F + PORTAL_H + 0.22, z1, col, f)
+
+    -- sliding elevator doors (open while the heist counts down)
+    local leaves = {}
+    for _, s in ipairs({ -1, 1 }) do
+        local zb = c + s * PORTAL_HW
+        local leaf = box("DoorLeaf", 46.6, F, c, 47.1, F + PORTAL_H, zb, Color3.fromRGB(150, 156, 168),
+            Enum.Material.Metal, f, { Reflectance = 0.15 })
+        local lg = surface(leaf, Enum.NormalId.Left, 20)
+        lg.LightInfluence = 1
+        local lbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1 }, lg)
+        frame({ Position = UDim2.fromScale(0, 0.47), Size = UDim2.new(1, 0, 0, 8), BackgroundColor3 = col }, lbg)
+        local closed = leaf.CFrame
+        table.insert(leaves, { part = leaf, closed = closed, open = closed + Vector3.new(0, 0, s * (PORTAL_HW - 0.3)) })
+    end
+    local shaft = box("ShaftLight", 48.6, F + 5, c - 0.2, 49, F + 5.4, c + 0.2, STEEL, Enum.Material.Metal, f,
+        { Transparency = 1, CanCollide = false })
+    local shaftLight = light("PointLight", shaft, { Brightness = 2.5, Range = 9, Color = col, Enabled = false })
+
+    -- the glowing floor zone in front of the door (glass + thin light edges)
+    local pad = box("PortalPad", 36.5, F, z0 + 0.2, 46.5, F + 0.06, z1 - 0.2, col, Enum.Material.Glass, f,
+        { Transparency = 0.45, CanCollide = false, CanQuery = false })
+    neon("PadEdgeW", 36.3, F, z0 + 0.2, 36.5, F + 0.07, z1 - 0.2, col, f)
+    neon("PadEdgeN", 36.3, F, z0, WX - 0.4, F + 0.07, z0 + 0.2, col, f)
+    neon("PadEdgeS", 36.3, F, z1 - 0.2, WX - 0.4, F + 0.07, z1, col, f)
+    floorText(f, "StandHere", Vector3.new(38.6, F + 0.1, c), Vector3.new(1, 0, 0), 6.4, 1.4, "WALK IN", col)
+    local glow = box("PortalGlow", 40.3, F + 1, c - 0.2, 40.7, F + 1.4, c + 0.2, STEEL, Enum.Material.Metal, f,
+        { Transparency = 1, CanCollide = false, CanQuery = false })
+    light("PointLight", glow, { Brightness = 1, Range = 11, Color = col })
+    glow:SetAttribute("State", "idle")
+    CollectionService:AddTag(glow, "PortalGlow")
+    local fixture = box("PortalDownlight", 39.4, LTOP - 0.4, c - 0.6, 40.6, LTOP, c + 0.6, STEEL, Enum.Material.Metal, f, { CanCollide = false })
+    light("SpotLight", fixture, { Face = Enum.NormalId.Bottom, Angle = 70, Brightness = 1.6, Range = 24,
+        Color = Color3.fromRGB(255, 244, 230), Shadows = false })
+
+    -- the trigger volume PortalService watches (and PortalHud finds by tag)
+    local zone = box("PortalZone_" .. id, 36, F, z0, 47, F + 8, z1, Color3.new(), Enum.Material.SmoothPlastic, f,
+        { Transparency = 1, CanCollide = false, CanTouch = true, CanQuery = false })
+    zone:SetAttribute("JobId", id)
+    CollectionService:AddTag(zone, "PortalZone")
+
+    -- the sign over the door: DOOR n · NAME · difficulty · status
+    local sign, g = signBoard(f, "DoorSign", WX - 0.5, F + 12.3, c - 5, WX - 0.3, F + 17.3, c + 5, Enum.NormalId.Left, 40)
+    g.Brightness = 1.8
+    local bg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg }, g)
+    frame({ Size = UDim2.new(1, 0, 0, 10), BackgroundColor3 = col }, bg)
+    text({ Text = string.format("DOOR %d", index), Position = UDim2.fromOffset(18, 14), Size = UDim2.fromOffset(140, 22),
+        TextColor3 = T.faint, FontFace = UITheme.F.mono, TextSize = 20 }, bg)
+    text({ Text = cfg.name or string.upper(id), Position = UDim2.fromOffset(16, 34), Size = UDim2.new(1, -32, 0, 64),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = T.text, TextStrokeColor3 = col, TextStrokeTransparency = 0.4 }, bg)
+    local d = math.clamp(math.floor(cfg.difficulty or 1), 1, 4)
+    local diffRow = frame({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 102),
+        Size = UDim2.fromOffset(300, 30), BackgroundTransparency = 1 }, bg)
+    for k = 1, 4 do
+        local dia = frame({ Size = UDim2.fromOffset(17, 17), Position = UDim2.fromOffset(14 + (k - 1) * 30, 6),
+            Rotation = 45, BackgroundColor3 = col, BackgroundTransparency = (k <= d) and 0 or 1 }, diffRow)
+        if k > d then UITheme.stroke(dia, col, 0.2, 2) end
+    end
+    text({ Text = DIFF_WORD[d], Position = UDim2.fromOffset(140, 0), Size = UDim2.fromOffset(160, 30),
+        FontFace = UITheme.F.display, TextSize = 26, TextColor3 = col }, diffRow)
+    local bar = frame({ Position = UDim2.new(0, 16, 1, -60), Size = UDim2.new(1, -32, 0, 48), BackgroundColor3 = T.bgRaised }, bg)
+    UITheme.corner(bar, 10)
+    local status = text({ Position = UDim2.fromOffset(10, 5), Size = UDim2.new(1, -20, 1, -10),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = T.text }, bar)
+    light("PointLight", sign, { Brightness = 0.9, Range = 10, Color = col })
+
+    local isOpen = false
+    local function setDoors(open)
+        if isOpen == open then return end
+        isOpen = open
+        for _, l in ipairs(leaves) do
+            TweenService:Create(l.part, TweenInfo.new(open and 1.2 or 0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+                { CFrame = open and l.open or l.closed }):Play()
+        end
+        shaftLight.Enabled = open
+    end
+
+    -- count: players in the zone · needed: players it takes to launch (nil = unknown)
+    -- launchIn: seconds until the drop-in (nil/0 = not counting) · locked: false | true | level
+    local function setState(count, needed, launchIn, locked)
+        count = math.max(0, math.floor(tonumber(count) or 0))
+        needed = tonumber(needed)
+        launchIn = tonumber(launchIn)
+        if locked then
+            local lvl = (type(locked) == "number") and locked or cfg.unlockLevel or 1
+            status.Text = string.format("LOCKED — level %d", lvl)
+            status.TextColor3 = T.danger
+            glow:SetAttribute("State", "locked")
+            pad.Transparency = 0.85
+            setDoors(false)
+        elseif launchIn and launchIn > 0 then
+            status.Text = string.format("Starting in %d…", math.ceil(launchIn))
+            status.TextColor3 = T.money
+            glow:SetAttribute("State", "launch")
+            pad.Transparency = 0.2
+            setDoors(true)
+        elseif count > 0 then
+            if needed and needed > 0 then
+                status.Text = string.format("%d / %d players", count, needed)
+            else
+                status.Text = string.format("%d player%s in", count, count == 1 and "" or "s")
+            end
+            status.TextColor3 = T.gold
+            glow:SetAttribute("State", "busy")
+            pad.Transparency = 0.3
+            setDoors(false)
+        else
+            status.Text = "Walk in to play!"
+            status.TextColor3 = T.text
+            glow:SetAttribute("State", "idle")
+            pad.Transparency = 0.45
+            setDoors(false)
+        end
+    end
+    setState(0, nil, nil, false)
+    return { zone = zone, setState = setState }
+end
+
+function ClubBuilder:_heistHall(f, refs)
+    local WX, BX = LX1, 50                              -- wall face / back of the door block
+    local block = Color3.fromRGB(30, 30, 36)
+    local zPrev = LZ0
+    for _, c in ipairs(PORTAL_Z) do
+        box("HallPier", WX, F, zPrev, BX, LTOP, c - PORTAL_HW, block, Enum.Material.Concrete, f)
+        box("DoorHeader", WX, F + PORTAL_H, c - PORTAL_HW, BX, LTOP, c + PORTAL_HW, block, Enum.Material.Concrete, f)
+        box("AlcoveFloor", WX, F - 1, c - PORTAL_HW, BX, F, c + PORTAL_HW, Color3.fromRGB(44, 44, 50), Enum.Material.DiamondPlate, f)
+        box("ShaftBack", BX - 0.6, F, c - PORTAL_HW, BX, F + PORTAL_H, c + PORTAL_HW, Color3.fromRGB(14, 14, 18), Enum.Material.Metal, f)
+        zPrev = c + PORTAL_HW
+    end
+    box("HallPier", WX, F, zPrev, BX, LTOP, LZ1, block, Enum.Material.Concrete, f)
+    -- banner along the top of the door wall
+    local _, bg = signBoard(f, "HallBanner", WX - 0.4, F + 17.8, LZ0 + 1, WX - 0.2, F + 19.6, LZ1 - 1, Enum.NormalId.Left, 24)
+    local bbg = frame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg }, bg)
+    text({ Text = "HEIST DOORS  ·  WALK IN TO START  ·  EASY  ▶  HARD", Size = UDim2.fromScale(1, 1),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
+        TextColor3 = T.money }, bbg)
+
+    refs.portals = {}
+    for i, id in ipairs(PORTAL_ORDER) do
+        local c = PORTAL_Z[i]
+        local ok, res = pcall(self._portal, self, sub(f, "Door_" .. id), id, i, c)
+        if ok then
+            refs.portals[id] = res
+        else
+            warn("[ClubBuilder] heist door " .. id .. " failed: " .. tostring(res))
+        end
+    end
+end
+
+-- ──────────────────────────────────────────────
+-- 🎥 first-join fly-over: street → auto shop lift → club → heist doors → spawn
+-- ──────────────────────────────────────────────
+function ClubBuilder:_introPath(refs)
+    local mz = (SPAWN_ZS[1] + SPAWN_ZS[#SPAWN_ZS]) / 2
+    refs.introPath = {
+        CFrame.lookAt(Vector3.new(0, 9, -27), Vector3.new(0, 12, 3)),             -- across the street: RIVERSIDE AUTO sign
+        CFrame.lookAt(Vector3.new(3, 10, 14), Vector3.new(0, 0.5, 22)),           -- in the shop, over the freight lift
+        CFrame.lookAt(Vector3.new(-24, F + 15, 12), Vector3.new(0, F + 4, 40)),   -- down in the club: bar → holo table
+        CFrame.lookAt(Vector3.new(0, F + 7, 67), Vector3.new(20, F + 5, 90)),     -- through the arch into the lobby
+        CFrame.lookAt(Vector3.new(20, F + 9, 84), Vector3.new(LX1, F + 6, 92)),   -- the heist doors
+        CFrame.lookAt(Vector3.new(0, F + 9, LZ1 - 4), Vector3.new(0, F + 3, mz - 2)), -- the spawn medallion
+    }
+end
+
 -- ──────────────────────────────────────────────
 function ClubBuilder:build(folder)
     local f = Instance.new("Folder")
@@ -813,6 +1509,13 @@ function ClubBuilder:build(folder)
         { "trophy room", function() self:_trophyRoom(sub(f, "TrophyRoom"), refs) end },
         { "garage bay", function() self:_garageBay(sub(f, "GarageBay"), refs) end },
         { "elevator", function() self:_elevator(sub(f, "Elevator"), refs) end },
+        -- v2.0: entrance lobby + heist hall
+        { "lobby shell", function() self:_lobbyShell(sub(f, "LobbyShell")) end },
+        { "lobby centre", function() self:_lobbyCentre(sub(f, "Lobby"), refs) end },
+        { "lobby west", function() self:_lobbyWest(sub(f, "LobbyWest"), refs) end },
+        { "bouncer", function() self:_bouncer(sub(f, "Bouncer")) end },
+        { "heist hall", function() self:_heistHall(sub(f, "HeistHall"), refs) end },
+        { "intro path", function() self:_introPath(refs) end },
     }
     for _, s in ipairs(steps) do
         local ok, err = pcall(s[2])

@@ -9,13 +9,23 @@
     Personal filter: if YOU are carrying a bag, only CAR (and MARINA) show —
     that's the only thing you need right then.
 
-    kinds → colour:  boss/ready gold · search/door/vault cyan · loot green ·
-                     car pink · marina cyan · optional dimmed
+    kinds → colour:  boss gold · ready/portal green (the heist doors) ·
+                     search/door/vault cyan · loot green · car pink ·
+                     marina cyan · jail red · optional dimmed
+
+    v2.0 lobby: the heist DOORS start a run now. The server's "ready" target
+    ("START HERE") points at a door; if it isn't there, we add our own
+    "HEIST DOORS" marker at the middle of the door row (PortalZone tags).
+    Standing in a door (local attribute InPortal) hides the door marker, and
+    once you've heard the Boss's plan (local attribute HeardPlan) his
+    BRIEFING marker is dimmed.
 --]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local CollectionService = game:GetService("CollectionService")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local UITheme = require(ReplicatedStorage.Shared.UITheme)
@@ -25,7 +35,7 @@ local WaypointHud = {}
 local localPlayer = Players.LocalPlayer
 
 local COLORS = {
-    boss = T.gold, ready = T.gold,
+    boss = T.gold, ready = T.money, portal = T.money, jail = T.danger,
     search = T.info, door = T.info, vault = T.info, marina = T.info,
     loot = T.money, car = Color3.fromRGB(244, 114, 182), optional = T.muted,
 }
@@ -70,6 +80,19 @@ local function makeMarker(parent)
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextSize = 18, Visible = false })
     arrow.Parent = parent
     return { frame = m, dia = dia, label = label, dist = dist, stroke = stroke, arrow = arrow }
+end
+
+-- middle of the heist-door row, a bit above head height (nil if no doors)
+local function doorRow()
+    local sum, n = Vector3.zero, 0
+    for _, z in ipairs(CollectionService:GetTagged("PortalZone")) do
+        if z:IsA("BasePart") then
+            sum = sum + z.Position
+            n = n + 1
+        end
+    end
+    if n == 0 then return nil end
+    return sum / n + Vector3.new(0, 5, 0)
 end
 
 function WaypointHud:start()
@@ -121,6 +144,33 @@ function WaypointHud:start()
             list = {}
             for _, t in ipairs(targets) do
                 if t.kind == "car" or t.kind == "marina" then table.insert(list, t) end
+            end
+        end
+        -- v2.0 lobby: heist doors instead of the table's READY UP
+        do
+            local lobby, hasDoor = false, false
+            for _, t in ipairs(list) do
+                if t.kind == "boss" then lobby = true end
+                if t.kind == "ready" or t.kind == "portal" then hasDoor = true end
+            end
+            local inPortal = localPlayer:GetAttribute("InPortal") ~= nil
+            local heard = localPlayer:GetAttribute("HeardPlan") == true
+            if lobby then
+                local out = {}
+                for _, t in ipairs(list) do
+                    if (t.kind == "ready" or t.kind == "portal") and inPortal then
+                        -- you're already standing in one
+                    elseif t.kind == "boss" and heard then
+                        table.insert(out, { pos = t.pos, label = t.label, kind = "optional" })
+                    else
+                        table.insert(out, t)
+                    end
+                end
+                if not hasDoor and not inPortal then
+                    local row = doorRow()
+                    if row then table.insert(out, { pos = row, label = "HEIST DOORS", kind = "portal" }) end
+                end
+                list = out
             end
         end
         -- the car HUD shows its own drop-off arrow; hide the car marker while seated
