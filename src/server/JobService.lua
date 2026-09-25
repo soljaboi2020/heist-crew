@@ -648,7 +648,20 @@ local function enoughReady()
 end
 
 local function dropPoints(j)
-    -- line the crew up on the sidewalk next to the getaway car
+    -- (v1.2.3) Malachi: "I should spawn in the heist, not outside". Each job has a
+    -- sneaky side door (sneakIn); the crew lands right outside it in two rows.
+    local s = j.refs.sneakIn
+    if s then
+        local out = Vector3.new(s.at.X - s.face.X, 0, s.at.Z - s.face.Z).Unit   -- away from the door
+        local pts = {}
+        for i = 1, 8 do
+            local row = (i - 1) % 4
+            local col = math.floor((i - 1) / 4)
+            table.insert(pts, s.at + s.spread * ((row - 1.5) * 2) + out * (col * 2.5))
+        end
+        return pts, s.face
+    end
+    -- fallback: line the crew up on the sidewalk next to the getaway car
     local cf = j.refs.getawayCFrame or CFrame.new(-40, 0, -18)
     local p = cf.Position
     local W = Constants.WORLD
@@ -702,13 +715,13 @@ local function launch()
 
     launchRemote:FireAllClients({ phase = "fade", jobName = j.cfg.name, tagline = j.cfg.tagline })
     task.wait(1.1)
-    local pts = dropPoints(j)
+    local pts, faceAt = dropPoints(j)
     for i, p in ipairs(Players:GetPlayers()) do
         local hrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
         unseat(p)
         local pos = pts[(i - 1) % #pts + 1]
         if hrp then
-            local faceTarget = j.refs.entryPoint or (pos + Vector3.new(0, 0, -1))
+            local faceTarget = faceAt or j.refs.entryPoint or (pos + Vector3.new(0, 0, -1))
             hrp.CFrame = CFrame.lookAt(pos, Vector3.new(faceTarget.X, pos.Y, faceTarget.Z))
         end
     end

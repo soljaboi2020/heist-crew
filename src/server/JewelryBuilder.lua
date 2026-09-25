@@ -246,7 +246,10 @@ function JewelryBuilder:_shell(f)
 
     -- exterior walls (the front is the facade, built in _facade)
     box("WallWest", X0, FLOOR, Z0, IX0, TOP, Z1, LILAC, M.Plaster, f)
-    box("WallEast", IX1, FLOOR, Z0, X1, TOP, Z1, LILAC, M.Plaster, f)
+    -- (v1.2.3) back door into the office off the east alley, z 18.3..21.7, 8 tall
+    box("WallEast", IX1, FLOOR, Z0, X1, TOP, 18.3, LILAC, M.Plaster, f)
+    box("WallEast", IX1, FLOOR, 21.7, X1, TOP, Z1, LILAC, M.Plaster, f)
+    box("BackDoorHeader", IX1, FLOOR + 8, 18.3, X1, TOP, 21.7, LILAC, M.Plaster, f)
     box("WallSouth", IX0, FLOOR, IZ1, IX1, TOP, Z1, LILAC, M.Plaster, f)
     -- coping caps on the parapet
     box("CopingW", X0 - 0.15, TOP, Z0 - 0.45, IX0 + 0.05, TOP + 0.3, Z1 + 0.15, STUCCO, M.Plaster, f)
@@ -811,6 +814,25 @@ function JewelryBuilder:_closet(f)
     return breaker, CFrame.new(PART_X + 1.0, FLOOR + 3.25, 15.7)
 end
 
+-- 🚪 BACK DOOR (v1.2.3): the sneaky way in, east alley -> office
+function JewelryBuilder:_backDoor(f)
+    local x, z0, z1, top = X1, 18.3, 21.7, FLOOR + 8
+    local STEELC = rgb(70, 74, 82)
+    box("BackDoorFrameN", x, 0, z0 - 0.3, x + 0.25, top + 0.3, z0, STEELC, M.Metal, f)
+    box("BackDoorFrameS", x, 0, z1, x + 0.25, top + 0.3, z1 + 0.3, STEELC, M.Metal, f)
+    box("BackDoorFrameTop", x, top, z0 - 0.3, x + 0.25, top + 0.3, z1 + 0.3, STEELC, M.Metal, f)
+    -- door propped open flat against the wall, north side
+    box("BackDoorLeaf", x + 0.25, FLOOR, z0 - 3.7, x + 0.45, top - 0.1, z0 - 0.3, rgb(96, 100, 110), M.DiamondPlate, f)
+    box("BackDoorStep", x, 0, z0, x + 2, FLOOR, z1, rgb(150, 146, 140), M.Concrete, f)
+    local plate = box("BackDoorPlate", x + 0.25, top + 0.5, z0 + 0.4, x + 0.35, top + 1.4, z1 - 0.4, rgb(26, 26, 30), M.Metal, f)
+    local g = surface(plate, Enum.NormalId.Right, 60, 1.3)
+    text({ Text = "STAFF ONLY", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        TextScaled = true, FontFace = UITheme.F.bold, TextColor3 = rgb(240, 70, 70) }, g)
+    local lamp = box("BackDoorLamp", x + 0.25, top + 2, (z0 + z1) / 2 - 0.3, x + 0.75, top + 2.6, (z0 + z1) / 2 + 0.3,
+        rgb(255, 214, 150), M.Neon, f, { CanCollide = false, CastShadow = false })
+    point(lamp, rgb(255, 200, 140), 0.7, 12, false)
+end
+
 function JewelryBuilder:_office(f)
     -- back office x -54..-47, z 17.5..22 — reached through the closet
     local o = Instance.new("Folder")
@@ -842,7 +864,7 @@ function JewelryBuilder:_office(f)
     KenneyLoader.placeMany({
         { kit = "furniture", name = "computerScreen", pos = Vector3.new(-53.4, FLOOR + 2.7, 19.6), facing = Vector3.new(1, 0, 0) },
         { kit = "furniture", name = "chairDesk", pos = Vector3.new(-50.9, FLOOR, 19.6), facing = Vector3.new(-1, 0, 0) },
-        { kit = "furniture", name = "bookcaseOpenLow", pos = Vector3.new(-48.1, FLOOR, 20.3), facing = Vector3.new(-1, 0, 0) },
+        { kit = "furniture", name = "bookcaseOpenLow", pos = Vector3.new(-50.6, FLOOR, 21.4), facing = Vector3.new(0, 0, -1) },   -- (v1.2.3) moved off the back door
     }, o)
 
     return CFrame.new(-52.8, FLOOR + 2.7, 21.3)
@@ -1096,6 +1118,9 @@ function JewelryBuilder:build(folder)
         id = "jewelry",
         root = f,
         entryPoint = Vector3.new(CX, 3, -4),
+        -- (v1.2.3) the crew drops in at the alley back door -> office. No guard or
+        -- camera in the office; the closet next door has the breaker.
+        sneakIn = { at = Vector3.new(-42.5, 3.5, 20), face = Vector3.new(-50, 3.5, 20), spread = Vector3.new(0, 0, 1) },
         policeStop = Vector3.new(CX - 20, 0, -14),   -- (v1.1: moved west so parked cruisers sit well clear of the getaway spot)
         getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -10), Vector3.new(-30, 0, -10)),
     }
@@ -1112,6 +1137,7 @@ function JewelryBuilder:build(folder)
     local breaker, shelfSpot = self:_closet(back)
     refs.breaker = breaker
     local deskSpot = self:_office(back)
+    self:_backDoor(back)
     self:_safeRoom(back, refs)
     refs.keycardSpots = { counterSpot, deskSpot, shelfSpot }
 

@@ -295,7 +295,10 @@ function VillaBuilder:_shell(f)
     box("DoorHeader", -5, DOOR_TOP, -38.5, 5, TOP, -37.5, STUCCO, M.Plaster, f)
     box("WallNorth", -30.5, FLOOR, -82.5, 30.5, TOP, -81.5, STUCCO, M.Plaster, f)
     box("WallWest", -30.5, FLOOR, -82.5, -29.5, TOP, -37.5, STUCCO, M.Plaster, f)
-    box("WallEast", 29.5, FLOOR, -82.5, 30.5, TOP, -37.5, STUCCO, M.Plaster, f)
+    -- (v1.2.3) east wall has a service door into the security room, z -57..-53, 8 tall
+    box("WallEast", 29.5, FLOOR, -82.5, 30.5, TOP, -57, STUCCO, M.Plaster, f)
+    box("WallEast", 29.5, FLOOR, -53, 30.5, TOP, -37.5, STUCCO, M.Plaster, f)
+    box("ServiceDoorHeader", 29.5, FLOOR + 8, -57, 30.5, TOP, -53, STUCCO, M.Plaster, f)
 
     -- ── interior walls ──
     for _, sx in ipairs({ -1, 1 }) do
@@ -333,7 +336,8 @@ function VillaBuilder:_facade(f, refs)
     box("PlinthS", 5, 0, -37.5, 30.6, 1, -37.3, PLINTH, M.Concrete, f)
     box("PlinthN", -30.7, 0, -82.7, 30.7, 1, -82.5, PLINTH, M.Concrete, f)
     box("PlinthW", -30.7, 0, -82.5, -30.5, 1, -37.5, PLINTH, M.Concrete, f)
-    box("PlinthE", 30.5, 0, -82.5, 30.7, 1, -37.5, PLINTH, M.Concrete, f)
+    box("PlinthE", 30.5, 0, -82.5, 30.7, 1, -57, PLINTH, M.Concrete, f)
+    box("PlinthE", 30.5, 0, -53, 30.7, 1, -37.5, PLINTH, M.Concrete, f)
 
     -- teal speed lines, three bands wrapping the building
     for i, y in ipairs({ 14.0, 14.7, 15.4 }) do
@@ -375,7 +379,9 @@ function VillaBuilder:_facade(f, refs)
     -- side faces
     for _, zc in ipairs({ -46, -57, -67, -76.5 }) do
         fakeWindow(f, Vector3.new(-30.5, 5.6, zc), Vector3.new(-1, 0, 0), 3, 6, zc == -57)
-        fakeWindow(f, Vector3.new(30.5, 5.6, zc), Vector3.new(1, 0, 0), 3, 6, zc == -46)
+        if zc ~= -57 then   -- (v1.2.3) the service door is there now
+            fakeWindow(f, Vector3.new(30.5, 5.6, zc), Vector3.new(1, 0, 0), 3, 6, zc == -46)
+        end
     end
     -- north (beach) face: windows + fake sliding glass doors onto the terrace
     for _, sx in ipairs({ -1, 1 }) do
@@ -1084,6 +1090,29 @@ function VillaBuilder:_security(f, props)
     return breaker
 end
 
+-- ──────────────────────────────────────────────
+-- 🚪 SERVICE DOOR (v1.2.3): the sneaky way in, east wall -> security room
+-- ──────────────────────────────────────────────
+function VillaBuilder:_serviceDoor(f)
+    local x, z0, z1, top = 30.5, -57, -53, FLOOR + 8
+    -- steel frame
+    box("DoorFrameN", x, 0, z0 - 0.3, x + 0.25, top + 0.3, z0, STEEL, M.Metal, f)
+    box("DoorFrameS", x, 0, z1, x + 0.25, top + 0.3, z1 + 0.3, STEEL, M.Metal, f)
+    box("DoorFrameTop", x, top, z0 - 0.3, x + 0.25, top + 0.3, z1 + 0.3, STEEL, M.Metal, f)
+    -- the door itself, left propped open flat against the wall (north side)
+    box("DoorLeaf", x + 0.25, FLOOR, z0 - 4.3, x + 0.45, top - 0.1, z0 - 0.3, Color3.fromRGB(92, 98, 108), M.DiamondPlate, f)
+    box("DoorStep", x, 0, z0, x + 2.2, FLOOR, z1, Color3.fromRGB(120, 116, 110), M.Concrete, f)
+    -- small "STAFF ONLY" plate above the door (text on a surface, not floating)
+    local plate = box("StaffPlate", x + 0.25, top + 0.5, z0 + 0.6, x + 0.35, top + 1.5, z1 - 0.6, Color3.fromRGB(26, 26, 30), M.Metal, f)
+    local g = surface(plate, Enum.NormalId.Right, 60, 0, 1.3)
+    text({ Text = "STAFF ONLY", Size = UDim2.fromScale(1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        TextScaled = true, FontFace = UITheme.F.bold, TextColor3 = Color3.fromRGB(240, 70, 70) }, g)
+    -- one dim caged bulb so you can find it at night
+    local lamp = box("DoorLamp", x + 0.25, top + 2.1, (z0 + z1) / 2 - 0.3, x + 0.75, top + 2.7, (z0 + z1) / 2 + 0.3,
+        Color3.fromRGB(255, 214, 150), M.Neon, f, NOSHADOW)
+    pointLight(lamp, Color3.fromRGB(255, 200, 140), 0.7, 12, false)
+end
+
 local SCULPTURE_NAMES = { "ROSA I", "L'OEUF D'OR", "VASE ROSE", "TORSION", "OCEAN EYE" }
 
 function VillaBuilder:_gallery(f, props, spots)
@@ -1217,6 +1246,7 @@ function VillaBuilder:build(folder)
     local breaker = self:_security(sub(root, "Security"), props)
     self:_gallery(sub(root, "Gallery"), props, keycardSpots)
     local cameras = self:_cameras(sub(root, "Cameras"))
+    self:_serviceDoor(sub(root, "ServiceDoor"))
 
     -- Kenney props load async and never error
     KenneyLoader.placeMany(props, sub(root, "Props"))
@@ -1240,6 +1270,10 @@ function VillaBuilder:build(folder)
         id = "villa",
         root = root,
         entryPoint = Vector3.new(0, 3, -34),
+        -- (v1.2.3) the crew drops in at the sneaky side door: east wall, into the
+        -- security room right beside the breaker. No camera covers it and Guard B's
+        -- x=20 route never looks at that corner (> 40 deg off his cone).
+        sneakIn = { at = Vector3.new(34, 3, -55), face = Vector3.new(20, 3, -55), spread = Vector3.new(0, 0, 1) },
         policeStop = Vector3.new(0, 0, -18),
         getawayCFrame = CFrame.lookAt(Vector3.new(-40, 0, -18), Vector3.new(-30, 0, -18)),
         openSign = openSign,
