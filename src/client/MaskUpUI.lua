@@ -40,7 +40,7 @@ local T = UITheme.C
 local ACTION = "HC_MaskUp"
 local KEYS = { Enum.KeyCode.M, Enum.KeyCode.ButtonL2 }
 local SOUNDS = {
-    swoosh = "rbxasset://sounds/swoosh.wav",
+    swoosh = "rbxasset://sounds/clickfast.wav",
     snap = "rbxasset://sounds/snap.mp3",
     bass = "rbxasset://sounds/bass.wav",
 }

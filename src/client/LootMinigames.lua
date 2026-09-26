@@ -53,7 +53,7 @@ local SOUNDS = {
     good    = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.7, pitch = 1.2 },
     bad     = { id = "rbxasset://sounds/electronicpingshort.wav", volume = 0.6, pitch = 0.55 },
     snap    = { id = "rbxasset://sounds/snap.mp3", volume = 0.7, pitch = 1.1 },
-    swoosh  = { id = "rbxasset://sounds/swoosh.wav", volume = 0.5, pitch = 1.1 },
+    swoosh  = { id = "rbxasset://sounds/clickfast.wav", volume = 0.5, pitch = 1.1 },
     jam     = { id = "rbxasset://sounds/bass.wav", volume = 0.7, pitch = 1.6 },
 }
 
