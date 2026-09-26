@@ -5,7 +5,7 @@
     under the objective bar (so they can never cover it): a chunky rounded
     card, a coloured accent + dot for meaning (green = money, red = danger,
     gold = heads-up), big white text. (v3.3: ONE at a time — see below.)
-    They fade + pop in and fade out as one piece (CanvasGroup).
+    They fade + pop in and fade out (v3.3.1: a plain Frame, each piece fades; CanvasGroups lagged).
 
     v3.3 "ONE POPUP AT A TIME" (Malachi: "doesn't feel like a good Roblox game"
     — three toasts + a banner + a tip at once was the worst of it):
@@ -192,17 +192,19 @@ function Notifications:_display(entry)
 
     -- only ever one toast on screen
     for _, c in ipairs(self._container:GetChildren()) do
-        if c:IsA("CanvasGroup") then c:Destroy() end
+        if c.Name == "Toast" and c:IsA("GuiObject") then c:Destroy() end
     end
 
-    local toast = Instance.new("CanvasGroup")
+    -- (v3.3.1) a plain Frame, NOT a CanvasGroup: on Malachi's PC (and in Studio captures)
+    -- a CanvasGroup's texture lagged its fade, so the toast text stayed nearly invisible
+    -- on a dark panel. Each piece now fades on its own (see fade() below).
+    local toast = Instance.new("Frame")
     toast.Name = "Toast"
     toast.LayoutOrder = self._n
     toast.AutomaticSize = Enum.AutomaticSize.X
     toast.Size = UDim2.fromOffset(0, 50)
     toast.BackgroundColor3 = Color3.new(1, 1, 1)      -- (v3.2) the gradient below carries the colour
     toast.BackgroundTransparency = 0.04
-    toast.GroupTransparency = 1
     toast.Parent = self._container
     UITheme.corner(toast, 16)
     -- v3.2: a glow of the toast's colour on the left, fading into night purple
@@ -240,8 +242,30 @@ function Notifications:_display(entry)
     local scale = Instance.new("UIScale")
     scale.Scale = 0.9
     scale.Parent = toast
-    TweenService:Create(toast, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { GroupTransparency = 0 }):Play()
+    -- remember every piece's resting transparency, start them all invisible, fade in
+    local pieces = {}
+    for _, d in ipairs(toast:GetDescendants()) do
+        if d:IsA("TextLabel") or d:IsA("TextButton") then
+            table.insert(pieces, { d, "TextTransparency", d.TextTransparency })
+            table.insert(pieces, { d, "BackgroundTransparency", d.BackgroundTransparency })
+        elseif d:IsA("GuiObject") then
+            table.insert(pieces, { d, "BackgroundTransparency", d.BackgroundTransparency })
+            if d:IsA("ImageLabel") then table.insert(pieces, { d, "ImageTransparency", d.ImageTransparency }) end
+        elseif d:IsA("UIStroke") then
+            table.insert(pieces, { d, "Transparency", d.Transparency })
+        end
+    end
+    table.insert(pieces, { toast, "BackgroundTransparency", toast.BackgroundTransparency })
+    local function fade(shown, t, dir)
+        for _, pc in ipairs(pieces) do
+            local target = shown and pc[3] or 1
+            if not shown or pc[3] < 1 then
+                TweenService:Create(pc[1], TweenInfo.new(t, Enum.EasingStyle.Quad, dir), { [pc[2]] = target }):Play()
+            end
+        end
+    end
+    for _, pc in ipairs(pieces) do pc[1][pc[2]] = 1 end
+    fade(true, 0.25, Enum.EasingDirection.Out)
     TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
         { Scale = 1 }):Play()
 
@@ -253,9 +277,7 @@ function Notifications:_display(entry)
         task.wait(0.1)
     end
     if not toast.Parent then return end
-    local out = TweenService:Create(toast, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        { GroupTransparency = 1 })
-    out:Play()
+    fade(false, 0.25, Enum.EasingDirection.In)
     task.wait(0.27)
     if toast.Parent then toast:Destroy() end
 end

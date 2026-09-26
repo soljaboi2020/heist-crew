@@ -68,6 +68,7 @@ local function notify(player, text, color, duration)
 end
 
 local function flat(v) return Vector3.new(v.X, 0, v.Z) end
+local clearSpot   -- (v3.3.1) forward-declared: teleportBehind uses it, defined further down
 
 -- ── collision groups: bots never shove / block players ───────────────
 local function setupGroups()
@@ -200,7 +201,14 @@ local function behind(player, dist)
 end
 
 local function teleportBehind(bot)
-    local pos, ownerPos = behind(bot.owner, 4)
+    local pos, ownerPos = behind(bot.owner, 3.5)
+    local hrp = rootOf(bot.owner)
+    if pos and hrp then
+        -- (v3.3.1) side-back, clear of the camera line; fall back to straight behind
+        local sideSign = (bot.side or 3) >= 0 and 1 or -1
+        local cand = pos + flat(hrp.CFrame.RightVector) * 5 * sideSign
+        if clearSpot(cand) then pos = cand end
+    end
     if pos then place(bot, pos, ownerPos) end
 end
 
@@ -362,11 +370,13 @@ local function brain(bot, gen)
                     return
                 end
                 if d > (B.FOLLOW_DIST or 6) + 2 then
-                    local goal = behind(bot.owner, B.FOLLOW_DIST or 6)
-                    -- (v2.0.1) side-by-side, not stacked on each other
-                    if goal and bot.side then
+                    -- (v3.3.1) off to the SIDE-back, not straight behind: straight behind
+                    -- is where the camera sits, so the bot filled the screen (Studio playtest)
+                    local goal = behind(bot.owner, 3.5)
+                    if goal then
                         local hrp = rootOf(bot.owner)
-                        if hrp then goal = goal + hrp.CFrame.RightVector * bot.side end
+                        local sideSign = (bot.side or 3) >= 0 and 1 or -1
+                        if hrp then goal = goal + flat(hrp.CFrame.RightVector) * 5 * sideSign end
                     end
                     bot.humanoid.WalkSpeed = d > 20 and 22 or 16
                     if goal then walk(bot, goal) end
@@ -446,7 +456,7 @@ local function makeBot(owner, name, pos, faceTo, gen)
 end
 
 -- nothing solid (walls, props) where a bot would stand; players / bots don't count
-local function clearSpot(pos)
+function clearSpot(pos)   -- assigns the forward-declared local
     local ok, hits = pcall(function()
         return Workspace:GetPartBoundsInBox(CFrame.new(pos), Vector3.new(2, 4, 2))
     end)
@@ -532,8 +542,11 @@ function BotService:spawnFor(players, refs)
         end
     end
     -- (v3.1) one toast for the whole bot crew (drop-in used to stack 2-3 toasts + banners)
-    if #names > 0 and owner then
-        notify(owner, string.format("Bot crew: %s. Hold E on a bot to hand it your bag.", table.concat(names, " & ")), "gold", 4)
+    -- (v3.3.1 fix) `owner` was the loop's local, out of scope here, so this never fired
+    if #names > 0 then
+        for _, pl in ipairs(real) do
+            notify(pl, string.format("Bot crew: %s. Hold E on a bot to hand it your bag.", table.concat(names, " & ")), "gold", 4)
+        end
     end
     if #names > 0 and Job and Job.noteBots then Job:noteBots(names) end
     return made

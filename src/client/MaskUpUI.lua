@@ -275,7 +275,24 @@ function MaskUpUI:_maskUp(payload)
             local hcf = head.CFrame
             local look = Vector3.new(hcf.LookVector.X, 0, hcf.LookVector.Z)
             look = look.Magnitude > 1e-3 and look.Unit or Vector3.new(0, 0, -1)
-            local eye = head.Position + look * 3.4 + Vector3.new(0, 0.35, 0) + hcf.RightVector * 0.6
+            -- (v3.3.1) never park the camera inside a wall / fridge / shelf: try a
+            -- few angles around the face and keep the one with the most room
+            -- (a Studio playtest put this shot inside the mart's drinks fridge)
+            local rp = RaycastParams.new()
+            rp.FilterType = Enum.RaycastFilterType.Exclude
+            rp.FilterDescendantsInstances = { char }
+            local right = Vector3.new(hcf.RightVector.X, 0, hcf.RightVector.Z)
+            right = right.Magnitude > 1e-3 and right.Unit or Vector3.new(1, 0, 0)
+            local from = head.Position + Vector3.new(0, 0.35, 0)
+            local best, bestRoom = nil, -1
+            for _, dir in ipairs({ look * 3.4 + right * 0.6, look * 3.4 - right * 0.6, (look + right).Unit * 3.4,
+                (look - right).Unit * 3.4, right * 3.4, -right * 3.4 }) do
+                local hit = workspace:Raycast(from, dir.Unit * (dir.Magnitude + 0.6), rp)
+                local room = hit and (hit.Distance - 0.6) or dir.Magnitude
+                if room >= dir.Magnitude - 0.01 then best, bestRoom = from + dir, room break end
+                if room > bestRoom then best, bestRoom = from + dir.Unit * math.max(room, 1.2), room end
+            end
+            local eye = best or (head.Position + look * 3.4 + Vector3.new(0, 0.35, 0) + hcf.RightVector * 0.6)
             shot = CFrame.lookAt(eye, head.Position + Vector3.new(0, 0.1, 0))
             cam.CameraType = Enum.CameraType.Scriptable
             TweenService:Create(cam, TweenInfo.new(snap * 0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),

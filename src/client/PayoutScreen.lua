@@ -61,7 +61,7 @@ local TIPS = {
     busted  = "Tip: when the alarm goes off, jump in the car fast and hit GO!",
     time    = "Tip: when the alarm goes off, stop grabbing stuff and get everyone in the car!",
     caught  = "Tip: if the police catch you, a friend can break you out of jail. Stick together!",
-    timeout = "Tip: talk to the Boss (F) to hear the plan, and follow the markers.",
+    timeout = "Tip: follow the gold marker and do one step at a time. When the clock turns red, get to the car!",
     abandoned = "Tip: bring friends! Every crew job has a special power.",
 }
 -- v3.0: how the crew got away
@@ -322,7 +322,8 @@ function PayoutScreen:show(win, p)
     u.grade.Text = g
     u.grade.TextColor3 = GRADE_COLOR[g] or T.text
     u.gradeRing.Color = GRADE_COLOR[g] or T.gold
-    u.gradeWord.Text = GRADE_WORD[g] or ""
+    -- (v3.3.1) a failed run says WHY under the F (it said "BUSTED" even when you just ran out of time)
+    u.gradeWord.Text = (g == "F" and p.result and FAIL_TITLE[p.result]) and FAIL_TITLE[p.result]:gsub("!", "") or GRADE_WORD[g] or ""
     u.jobCap.Text = p.jobName or ""
     if win then
         u.title.Text = "YOU DID IT!"

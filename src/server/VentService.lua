@@ -114,12 +114,23 @@ end
 
 local function attach(part)
     if not part:IsA("BasePart") or part:FindFirstChild("VentPrompt", true) then return end
+    -- (v3.3.1) attribute ExitOnly = true: this end is only an exit (no prompt here)
+    if part:GetAttribute("ExitOnly") == true then return end
     local p = Instance.new("ProximityPrompt")
     p.Name = "VentPrompt"
     p.ActionText = actionText(part)
     p.ObjectText = objectText(part)
     -- the other end may be tagged a moment later: fix the words once it exists
-    task.defer(function() if p.Parent then p.ActionText = actionText(part) end end)
+    task.defer(function()
+        -- builders set attributes right AFTER tagging, so re-check them here
+        if part:GetAttribute("ExitOnly") == true then
+            local spot = p.Parent
+            p:Destroy()
+            if spot and spot:IsA("Attachment") and spot.Name == "VentPromptSpot" then spot:Destroy() end
+            return
+        end
+        if p.Parent then p.ActionText = actionText(part) end
+    end)
     p.KeyboardKeyCode = Enum.KeyCode.E        -- (v3.3) one key: E, like every Roblox game
     p.GamepadKeyCode = Enum.KeyCode.ButtonX
     p.HoldDuration = 0.5

@@ -6,7 +6,7 @@
       1. ALARM — a red glow that breathes in from the screen edges (a soft
          vignette, not the old four solid red bars).
       2. VAULT DRILL — card in the UITheme bottomCenter slot: drill icon,
-         "DRILLING THE VAULT" + live percent, a thick gold bar (v2.1).
+         "DRILLING IT OPEN" (v3.3.1: the mart has a safe, not a vault) + live percent, a thick gold bar (v2.1).
       3. RESULT — centre card when a run ends: HEIST COMPLETE / BUSTED and how
          many of the crew got out. Pops in, holds, fades.
 
@@ -88,7 +88,7 @@ function HeistHud:_buildUi()
     badge.AnchorPoint = Vector2.new(0, 0.5)
     badge.Position = UDim2.new(0, 12, 0.5, 0)
     badge.Parent = crack
-    UITheme.label({ Text = "DRILLING THE VAULT", Position = UDim2.fromOffset(70, 10), Size = UDim2.new(1, -170, 0, 24),
+    UITheme.label({ Text = "DRILLING IT OPEN", Position = UDim2.fromOffset(70, 10), Size = UDim2.new(1, -170, 0, 24),
         FontFace = UITheme.F.display, TextSize = 19 }).Parent = crack
     local pct = UITheme.label({ Text = "0%", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 8),
         Size = UDim2.fromOffset(90, 28), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display,

@@ -719,7 +719,8 @@ local function startDrill(player)
                     setDrillPrompt("Fix drill", 1.5, true)
                     local sp = drillModel and drillModel:FindFirstChild("Sparks", true)
                     if sp then sp.Enabled = false end
-                    notifyAll("The drill got stuck — someone fix it! (hold E)", "red", 3)
+                    -- (v3.3.1) no toast: the objective bar already says "Drill stuck — hold E to fix it!"
+                    -- to the whole crew (one message per event; the toast doubled it)
                     pushInfo()
                 end
                 if d.progress >= 1 then
@@ -772,6 +773,12 @@ startRun = function(player, why, crewList)
             pcall(checkGetaway)   -- v3.0: everyone in the car → go
             pcall(syncCarAttrs)
             task.wait(1)
+        end
+    end)
+    -- (v3.3.1) one heads-up before the Boss calls it off (the HUD clock also turns red)
+    task.delay(math.max(0, Constants.HEIST_RUN_LIMIT - 60), function()
+        if run == thisRun and not run.getaway and not run.alarm then
+            notifyAll("1 minute left! Grab what you have and get to the car!", "red", 4)
         end
     end)
     task.delay(Constants.HEIST_RUN_LIMIT, function()
@@ -1415,6 +1422,16 @@ finish = function(result)
     end
     S.police:recall()
     S.guards:reset()
+    -- (v3.3.1) a failed run (too slow / crew left / busted) used to leave everyone standing
+    -- in the dark building while the HUD said "Talk to the Boss". Take them home, behind the
+    -- payout card. (Winners go home with the car below.)
+    if not won then
+        task.delay(2.5, function()
+            for p in pairs(r.crew) do
+                if p.Parent and not (r.crew[p] and r.crew[p].escaped) then sendToSafehouse(p) end
+            end
+        end)
+    end
     if car then
         car:freeze(true)
         task.delay(3, function()

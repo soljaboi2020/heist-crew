@@ -609,6 +609,26 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - Mock: slice 64 · rr_v3int 208 · tut 85 · maskup 51 · stars 74 · getaway 1401 · client 0 err.
   - ⏭️ Next: play the new mart in Studio with Malachi, then bring villa/jewelry/bank up to the same bar.
 
+- **2026-09-26** — **v3.3.1 "PLAYTEST FIXES"**: Claude played the new Sunny's Mart start to finish in Studio
+  (sidewalk → mask up → breaker → drill + jams → 2× safe cash → trunk → GO → boat → **A · $3,000**). Fixed:
+  - **E at the safe climbed to the roof**: the office end of the roof hatch is now `ExitOnly` (VentService skips
+    it; attribute re-checked deferred because builders tag before setting attributes). Golden Ticket `promptRange` 4.5.
+  - **Prompts vanished when the camera slid behind a wall** (camera out the side door → breaker E gone):
+    new client **`PromptSight`** measures line-of-sight from your HEAD, only ever loosens `RequiresLineOfSight`
+    locally when the head can see the prompt (server accepts it: verified). Through-wall grabs stay blocked.
+  - **Bots filled the screen**: they trail side-back (3.5 behind, 5 to the side), not straight behind where the
+    camera sits; new client **`BotFade`** fades a bot on the camera→you line. Old bug: the "Bot crew: …" toast
+    never fired (`owner` out of scope) → fixed.
+  - **Toasts were unreadable** (CanvasGroup + AutomaticSize texture lagged the fade) → toast is a plain Frame
+    with per-piece fades. LootHud/TipHud still use CanvasGroup+AutomaticSize: watch them.
+  - **"TOO SLOW" came with no warning**: last 90 s the clock counts DOWN in red + one "1 minute left!" call;
+    failed runs say why under the F (not "BUSTED"), a relevant tip, and send the crew home behind the card.
+  - MASK UP shot no longer parks the camera inside a fridge (raycast, picks the angle with room) · office chair
+    tucked + CCTV monitor raised (camera hugs that wall) · "DRILLING IT OPEN" (not "VAULT") · no drill-jam toast
+    doubling the objective bar · off-screen markers stay above the bottom-centre HUD.
+  - Studio MCP note: `user_keyboard_input` keys often don't reach the game; drive prompts with client
+    `prompt:InputHoldBegin()/InputHoldEnd()` and walk with server PathfindingService + `Humanoid:MoveTo`.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

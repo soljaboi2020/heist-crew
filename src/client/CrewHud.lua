@@ -442,6 +442,16 @@ function CrewHud:_refresh()
         local elapsed = math.max(0, math.floor(workspace:GetServerTimeNow() - (info.startedAt or workspace:GetServerTimeNow())))
         local mode = info.silentAlarm and "Hurry! Secret alarm!"
             or string.format("Stealth · %d:%02d", math.floor(elapsed / 60), elapsed % 60)
+        -- (v3.3.1) the run limit used to arrive with no warning ("TOO SLOW" out of nowhere):
+        -- the last 90 s the clock counts DOWN in red
+        local limit = tonumber(Constants.HEIST_RUN_LIMIT) or 0
+        local left = limit - elapsed
+        local hurry = false
+        if not info.silentAlarm and limit > 0 and left <= 90 then
+            left = math.max(0, left)
+            mode = string.format("Hurry! %d:%02d left", math.floor(left / 60), left % 60)
+            hurry = true
+        end
         local total, done, current = 0, 0, nil
         for _, step in ipairs(info.steps or {}) do
             if not step.optional then
@@ -456,13 +466,13 @@ function CrewHud:_refresh()
         -- (v3.3) a tutorial is up: the bar says exactly what the tutorial card says
         local tl = localPlayer:GetAttribute("Tutorial") and localPlayer:GetAttribute("TutorialLine")
         if type(tl) == "string" and tl ~= "" then
-            self:_setObjective(mode, tl, (current and STEP_ICON[current.id]) or I.target, info.silentAlarm == true,
+            self:_setObjective(mode, tl, (current and STEP_ICON[current.id]) or I.target, (info.silentAlarm == true or hurry),
                 { done = done, total = total })
         elseif current then
-            self:_setObjective(mode, current.label, STEP_ICON[current.id] or I.target, info.silentAlarm == true,
+            self:_setObjective(mode, current.label, STEP_ICON[current.id] or I.target, (info.silentAlarm == true or hurry),
                 { done = done, total = total })
         else
-            self:_setObjective(mode, "Get in the car and hit GO!", I.car, false, { done = done, total = total })
+            self:_setObjective(mode, "Get in the car and hit GO!", I.car, hurry, { done = done, total = total })
         end
     elseif (info.launchAt or 0) > 0 then
         local left = math.max(0, math.ceil(info.launchAt - workspace:GetServerTimeNow()))

@@ -66,6 +66,7 @@ local MAX = 3
 local NEAR = 25          -- studs: extras only inside this radius
 local FADE_FROM = 17     -- extras start fading here
 local EDGE = 70          -- px (design) from the screen edge for the off-screen arrow
+local BOTTOM_EXTRA = 80   -- (v3.3.1) extra room at the bottom for the bottom-centre HUD
 local MAIN_SIZE = 54
 local EXTRA_SIZE = 38
 
@@ -377,8 +378,11 @@ function WaypointHud:start()
                 if dir.Magnitude < 1e-3 then dir = Vector2.new(0, 1) end
                 dir = dir.Unit
                 local edge = EDGE * sc
+                -- (v3.3.1) keep clear of the bottom-centre HUD (carry pill / drill bar / car card):
+                -- the car marker was hiding under "CARRYING SAFE CASH" in a Studio playtest
+                local bottom = (EDGE + BOTTOM_EXTRA) * sc
                 local sx = (centre.X - edge) / math.max(math.abs(dir.X), 1e-3)
-                local sy = (centre.Y - edge) / math.max(math.abs(dir.Y), 1e-3)
+                local sy = ((dir.Y > 0 and (centre.Y - bottom)) or (centre.Y - edge)) / math.max(math.abs(dir.Y), 1e-3)
                 local pos = centre + dir * math.min(sx, sy)
                 m.frame.Visible = true
                 m.frame.Position = UDim2.fromOffset(pos.X, pos.Y - size * 0.5 * sc)

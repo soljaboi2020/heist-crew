@@ -1342,7 +1342,8 @@ function MartBuilder:_office(f, refs, loot)
     -- x 49..59.5, z 20..32.5. North: ticket (west) + desk (east). West wall:
     -- the roof ladder. South: the safe. E prompts: ticket stand (51.4, 22.1) ·
     -- drill point (55, 28.0) 6.6 away · SafeCash stands (53.8 / 56.2, 27.7),
-    -- ticket↔nearest 6.1. V (hatch, 49.7, 26.6) ≥ 4.2 from all of them.
+    -- ticket↔nearest 6.1 (ticket reach 4.5 so the safe always wins). The hatch end in
+    -- here (49.7, 26.6) is ExitOnly since v3.3.1: no prompt, so it can never steal E.
 
     -- walls: warm grey above a dark-teal wainscot + chair rail (same family as the shop)
     local OFFICE_WAIN = rgb(30, 86, 90)
@@ -1390,7 +1391,9 @@ function MartBuilder:_office(f, refs, loot)
         Color = SUNNY, Material = M.Plastic, CanCollide = false }, o)
 
     -- CCTV monitor over the desk (faces south into the office)
-    local mon = box("CctvMonitor", 55.4, FLOOR + 5.2, BACK_Z0 + 0.06, 58.4, FLOOR + 7.4, BACK_Z0 + 0.3, rgb(20, 20, 24), M.Metal, o)
+    -- (v3.3.1) mounted HIGH: the office is 12.5 deep, so the camera ends up hugging this
+    -- north wall at about head height + 2, and a monitor there filled a third of the screen
+    local mon = box("CctvMonitor", 55.4, FLOOR + 9.4, BACK_Z0 + 0.06, 58.4, FLOOR + 11.6, BACK_Z0 + 0.3, rgb(20, 20, 24), M.Metal, o)
     local mg = surface(mon, Enum.NormalId.Back, 50, 0.9)
     for k, label in ipairs({ "CAM 1 · REGISTER", "NO SIGNAL" }) do
         local cell = frame({ Size = UDim2.fromScale(0.47, 0.9), Position = UDim2.fromScale(0.02 + (k - 1) * 0.49, 0.05),
@@ -1398,7 +1401,7 @@ function MartBuilder:_office(f, refs, loot)
         text({ Text = label, Size = UDim2.fromScale(0.9, 0.18), Position = UDim2.fromScale(0.05, 0.05),
             TextScaled = true, FontFace = UITheme.F.mono, TextColor3 = rgb(140, 220, 200) }, cell)
     end
-    point(lightAnchor("MonitorGlow", Vector3.new(56.9, FLOOR + 5.5, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.25, 6)
+    point(lightAnchor("MonitorGlow", Vector3.new(56.9, FLOOR + 9.7, BACK_Z0 + 1.2), o), rgb(150, 200, 255), 0.25, 6)
 
     -- calendar + sticky note on the west wall, south of the ladder
     local cal = box("Calendar", BIX0 + 0.06, 5.5, 28.6, BIX0 + 0.14, 7.6, 30.2, PAPER, M.Fabric, o, nc())
@@ -1584,10 +1587,13 @@ function MartBuilder:_office(f, refs, loot)
     lit(printOn(plq, Enum.NormalId.Back, "OUR FIRST MILLIONAIRE", rgb(60, 36, 14), UITheme.F.display, 80, 1).Parent)
     local ts = Vector3.new(gx, FLOOR + 3, 22.1)
     table.insert(loot, { kind = "GoldenTicket", target = "GoldenTicket", cframe = CFrame.lookAt(ts, Vector3.new(gx, ts.Y, BACK_Z0)),
-        visual = tv, pool = "office", inVault = false })
+        visual = tv, pool = "office", inVault = false,
+        -- (v3.3.1) short reach: standing at the safe (6.4 away) must NOT show this prompt instead
+        promptRange = 4.5 })
 
     -- desk chair + monitor (Kenney, repainted after they load)
-    prop("furniture", "chairDesk", Vector3.new(57.2, FLOOR, dz1 + 0.7), Vector3.new(0, 0, -1), o,
+    -- (v3.3.1) tucked under the desk: pulled out, it sat between the camera and the safe
+    prop("furniture", "chairDesk", Vector3.new(57.2, FLOOR, dz1 - 0.3), Vector3.new(0, 0, -1), o,
         { main = { rgb(28, 26, 30), M.Fabric }, accent = { rgb(150, 154, 162), M.Metal } }, { collide = false })
     prop("furniture", "computerScreen", Vector3.new(56.6, topY, dz0 + 0.7), Vector3.new(0, 0, 1), o,
         { main = { rgb(36, 38, 44), M.Metal, 0.05 }, byName = { screen = { rgb(40, 90, 140), M.Glass, 0.2 } } })
@@ -1799,8 +1805,11 @@ function MartBuilder:build(folder)
 
     tag(hatchRoof, "Vent", { Pair = hatchInside.Name, Label = "Climb down",
         Exit = Vector3.new(55.4, ROOF_Y, 26.6) })
+    -- (v3.3.1) ExitOnly: you can drop IN from the roof, but the office end has no prompt.
+    -- Everything is on E since v3.3, and this ladder sits right behind the safe, so its
+    -- "Climb to the roof" prompt was winning over "Place drill" (found in a Studio playtest).
     tag(hatchInside, "Vent", { Pair = hatchRoof.Name, Label = "Climb to the roof",
-        Exit = Vector3.new(51.9, FLOOR, 26.6) })
+        Exit = Vector3.new(51.9, FLOOR, 26.6), ExitOnly = true })
     refs.vents = { { a = hatchRoof, b = hatchInside } }
 
     local cams = Instance.new("Folder")
