@@ -2,6 +2,15 @@
 
 > **Purpose:** Per-project context document. Read this at the start of every Heist Crew session so future Claude knows exactly where we are.
 
+> 🚫 **HQ sync #11 (2026-09-26): three code-review flags against `src/client/BriefingUI.lua` are FALSE. Don't act on them.**
+> ① *"CameraSubject set to nil if the character is missing"*: `restoreBehind()` (L61-69) guards it with
+> `if hum then cam.CameraSubject = hum end`, and it's only the fallback when `CameraFeel.restoreBehind` fails.
+> ② *"`planShots` errors on an empty `shots`"*: `loadShots()` returns `#list > 0 and list or nil` (L113),
+> and `play()` calls `shots and planShots(...)`, so `planShots` never sees an empty list in the game.
+> (Only the test hook `_planShots` could pass `{}`.) ③ *"`_hideHud` hides essential ScreenGuis"*: that's
+> deliberate (v2.2, a clean fly-through). Every hidden gui is recorded and turned back on after the
+> briefing (L468-470). Line numbers are from the working tree; the same guards are also in committed HEAD `585604e`.
+
 ---
 
 ## 📛 Project Name & Goal
