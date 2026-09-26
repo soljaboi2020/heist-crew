@@ -26,6 +26,10 @@
                      once someone has it) · door → KEYPAD · vault → DRILL · car → CAR
         fallback   → the nearest non-optional target
 
+    v3.2: the Boss marker shows his real hat picture (UITheme badge image),
+    the edge arrow is drawn (UITheme.chevron — "▲" drew as a box), bigger
+    pill text, Miami colours (heist doors teal, car pink).
+
     kinds → colour:  boss gold · ready/portal green (the heist doors) ·
                      search/door/vault cyan · loot green · car pink ·
                      marina cyan · jail red · optional dimmed
@@ -50,7 +54,7 @@ local WaypointHud = {}
 local localPlayer = Players.LocalPlayer
 
 local COLORS = {
-    boss = T.gold, ready = T.money, portal = T.money, jail = T.danger,
+    boss = T.gold, ready = T.teal, portal = T.teal, jail = T.danger,
     search = T.info, door = T.info, vault = T.info, marina = T.info,
     loot = T.money, car = T.pink, optional = T.muted,
 }
@@ -58,7 +62,7 @@ local MAX = 3
 local NEAR = 25          -- studs: extras only inside this radius
 local FADE_FROM = 17     -- extras start fading here
 local EDGE = 70          -- px (design) from the screen edge for the off-screen arrow
-local MAIN_SIZE = 50
+local MAIN_SIZE = 54
 local EXTRA_SIZE = 38
 
 -- current step id → target kinds that satisfy it (in preference order)
@@ -115,21 +119,23 @@ local function makeMarker(parent)
     tip.Parent = m
 
     local pill = UITheme.label({ Name = "Pill", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, MAIN_SIZE + 8),
-        Size = UDim2.fromOffset(0, 26), AutomaticSize = Enum.AutomaticSize.X, TextXAlignment = Enum.TextXAlignment.Center,
-        FontFace = UITheme.F.display, TextSize = 15, TextColor3 = T.text, RichText = true,
+        Size = UDim2.fromOffset(0, 28), AutomaticSize = Enum.AutomaticSize.X, TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextSize = 18, TextColor3 = T.text, RichText = true,
         BackgroundColor3 = T.bgDeep, BackgroundTransparency = 0.2 })
-    UITheme.corner(pill, 13)
+    UITheme.corner(pill, 14)
     UITheme.padding(pill, 10, 0)
     local pillStroke = UITheme.stroke(pill, T.gold, 0.4, 1.5)
     pill.Parent = m
 
-    local arrow = UITheme.label({ Text = "▲", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(34, 34),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 30,
-        TextStrokeTransparency = 0.4, TextStrokeColor3 = Color3.new(), Visible = false })
+    local arrow = UITheme.chevron(30, T.gold, 6)
+    arrow.Name = "Arrow"
+    arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+    arrow.Visible = false
     arrow.Parent = parent
     UITheme.autoScale(arrow)
 
-    return { frame = m, scale = scale, badge = badge, icon = badge:FindFirstChild("Icon"), ring = badge:FindFirstChild("Ring"),
+    return { frame = m, scale = scale, badge = badge, icon = badge:FindFirstChild("Icon"), img = badge:FindFirstChild("Img"),
+        ring = badge:FindFirstChild("Ring"),
         tip = tip, pill = pill, pillStroke = pillStroke, pulse = pulse, pulseStroke = pulseStroke, arrow = arrow }
 end
 
@@ -138,6 +144,7 @@ local function setAlpha(m, a, main)
     m.badge.BackgroundTransparency = 0.15 + 0.85 * t
     if m.ring then m.ring.Transparency = 0.05 + 0.95 * t end
     if m.icon then m.icon.TextTransparency = t end
+    if m.img then m.img.ImageTransparency = t end
     m.tip.BackgroundTransparency = main and t or 1
     m.pill.TextTransparency = t
     m.pill.BackgroundTransparency = 0.2 + 0.8 * t
@@ -328,10 +335,12 @@ function WaypointHud:start()
             local size = isMain and MAIN_SIZE or EXTRA_SIZE
             m.badge.Size = UDim2.fromOffset(size, size)
             m.badge:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, size)
-            if m.icon then
-                m.icon.Text = iconFor(t)
-                m.icon.TextSize = math.floor(size * 0.56)
+            local ic = iconFor(t)
+            if m.lastIcon ~= ic then
+                m.lastIcon = ic
+                UITheme.setBadge(m.badge, ic)
             end
+            if m.icon then m.icon.TextSize = math.floor(size * 0.56) end
             if m.ring then m.ring.Color = col end
             m.tip.BackgroundColor3 = col
             m.tip.Position = UDim2.new(0.5, 0, 0, size + 1)
@@ -372,7 +381,7 @@ function WaypointHud:start()
                 m.arrow.Visible = true
                 m.arrow.Position = UDim2.fromOffset(pos.X + dir.X * (size * 0.5 + 22) * sc, pos.Y + dir.Y * (size * 0.5 + 22) * sc)
                 m.arrow.Rotation = math.deg(math.atan2(dir.X, -dir.Y))
-                m.arrow.TextColor3 = col
+                UITheme.paintShape(m.arrow, col)
             else
                 m.frame.Visible = false
                 m.arrow.Visible = false

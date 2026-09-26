@@ -491,6 +491,8 @@ function BriefingUI:_dropIn(payload)
     elseif payload.phase == "title" then
         self:_restoreCamera()
         u.tName.Text = payload.jobName or ""
+        -- [HOOK: MaskUp] v3.2 casing: "Look around. Mask up when you're ready." (MaskUpUI shows MASKS ON later)
+        u.tSub.Text = payload.subtitle or "MASKS ON.  THE JOB IS ON."
         u.black.BackgroundTransparency = 0
         u.title.GroupTransparency = 1
         TweenService:Create(u.title, TweenInfo.new(0.6), { GroupTransparency = 0 }):Play()

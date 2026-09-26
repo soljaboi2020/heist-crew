@@ -86,6 +86,23 @@
             TargetService:bonusFor(run) → +cash per escapee (read BEFORE clearLoaded,
                 which resets it) + TargetService:awardCrew(escapees) trophies,
                 TargetService:targetFor(jobId).name → the payout row label.
+
+    v3.2 HEIST STARS + HOT STREAK (Constants.STARS / Constants.STREAK, saved by PlayerDataService):
+        Stars (only on a WIN with cash in the car): stealth (no alarm) · loot (every bag
+        of the job loaded, LootService:counts().allLoaded) · fast (drop-in → the getaway
+        started, under STARS.PAR[jobId]). Each escapee's best per job is saved.
+        Streak: an escapee with cash → +1 (cap MAX); an empty-car escapee → no change;
+        everyone else still in the crew at the finish (fail / caught / left behind) → -1.
+        Leaving the server mid-run → -1 (PlayerDataService:leftMidRun, and the saved
+        streakAtRisk flag covers a save that runs before our PlayerRemoving handler).
+        The bonus = take x PER_LEVEL x the level you came IN with, per escapee.
+        isUnlocked(id): STARS.UNLOCK[id] total stars — true if ANY player in the server
+        can open it (PlayerDataService:canOpen: stars, grandfathered unlockAll, or a failed load).
+        JobService:starsNeeded(id) -> n (0 = always open)
+        Payload (COMPLETE / FAILED) adds:
+            stars = { stealth, loot, fast, count, par, time, bagsLoaded, bagsTotal }
+            players = { [tostring(UserId)] = { streakBefore, streakAfter, streakBonus,
+                        streakPct, bestBefore, bestAfter, totalStars, pay } }
 --]]
 
 local Players = game:GetService("Players")
@@ -267,10 +284,22 @@ local function activeCrew()
     return list
 end
 
+-- [HOOK: MaskUp] v3.2 casing mode (MaskUpService): the crew drops in UNMASKED and
+-- the masks go on when someone presses MASK UP / does a crime / 60 s pass.
+local function maskUpCall(method, ...)
+    local MU = optionalService("MaskUpService")
+    if not MU or type(MU[method]) ~= "function" then return nil end
+    local ok, r = pcall(MU[method], MU, ...)
+    if not ok then warn("[JobService] MaskUpService:" .. method, r) return nil end
+    return r
+end
+
 local function addToCrew(player)
     if run and player and not run.crew[player] then
         run.crew[player] = { out = false, escaped = false, jailed = false }
-        if S.shop then S.shop:wearMask(player) end
+        if S.shop and maskUpCall("shouldDefer", player) ~= true then S.shop:wearMask(player) end   -- [HOOK: MaskUp]
+        -- v3.2: leaving before the finish costs one streak level (saved flag)
+        if S.data and type(S.data.setStreakAtRisk) == "function" then pcall(S.data.setStreakAtRisk, S.data, player, true) end
     end
 end
 
@@ -603,7 +632,10 @@ local finish   -- forward
 -- crewList (v2.0): launch passes the players who actually dropped in; any
 -- other start (walking in and grabbing something) takes everyone, as before.
 startRun = function(player, why, crewList)
-    if run then return run end
+    if run then
+        maskUpCall("crime", player, why)   -- [HOOK: MaskUp] any heist action while casing = masks on
+        return run
+    end
     if os.clock() < resettingUntil then
         if player then notify(player, "The job is resetting — give it a few seconds", "white", 2) end
         return nil
@@ -650,6 +682,7 @@ triggerAlarm = function(reason, player)
     if not j then return end
     if not run then startRun(player, "alarm") end
     if not run or run.alarm or run.getaway then return end
+    maskUpCall("crime", player, "alarm")   -- [HOOK: MaskUp] alarm while casing = masks on
     addToCrew(player)
     run.alarm = true
     run.alarmEndsAt = now() + j.cfg.alarmTimer
@@ -892,6 +925,7 @@ beginGetaway = function(why, player)
     if #crew == 0 then return false end
     local thisRun = run
     run.getaway = { phase = "vote", crew = crew, anchored = {}, why = why }
+    run.getawayAt = os.clock()   -- v3.2: the ⏱ star's clock stops when the escape starts
     run.allInSince = nil
     car:freeze(true)
     if type(car.lockSeats) == "function" then car:lockSeats(true) end
@@ -937,6 +971,7 @@ beginGetaway = function(why, player)
     if not ok or not started then
         if not ok then warn("[JobService] getaway start:", started) end
         run.getaway = nil
+        run.getawayAt = nil
         car:freeze(false)
         if type(car.lockSeats) == "function" then car:lockSeats(false) end
         return false
@@ -1121,6 +1156,54 @@ finish = function(result)
         end
     end
     each = each + bonusEach
+
+    -- v3.2 ⭐ stars (the crew's, this run) — only a win with cash in the car earns any
+    local SC = Constants.STARS or {}
+    local par = (SC.PAR and SC.PAR[r.jobId]) or SC.PAR_DEFAULT or 300
+    local runTime = (r.getawayAt or os.clock()) - r.startedAt
+    local bagsTotal = tonumber(c.total) or 0
+    local bagsLoaded = tonumber(c.loaded) or 0
+    local allLoaded = c.allLoaded == true or (bagsTotal > 0 and bagsLoaded >= bagsTotal)
+    local starOk = won and #escapees > 0 and take > 0
+    local stars = {
+        stealth = starOk and stealth or false,
+        loot = starOk and allLoaded or false,
+        fast = starOk and runTime < par or false,
+        par = par, time = math.floor(runTime), bagsLoaded = bagsLoaded, bagsTotal = bagsTotal,
+    }
+    stars.count = (stars.stealth and 1 or 0) + (stars.loot and 1 or 0) + (stars.fast and 1 or 0)
+    -- v3.2 🔥 hot streak, per player (escapees are paid on the level they came in with)
+    local ST = Constants.STREAK or {}
+    local perLevel = tonumber(ST.PER_LEVEL) or 0.10
+    local playerInfo, streakPay = {}, {}
+    local escapedSet = {}
+    for _, p in ipairs(escapees) do escapedSet[p] = true end
+    for p in pairs(r.crew) do
+        if p.Parent and S.data and type(S.data.changeStreak) == "function" then
+            local info = {}
+            local lvl = (type(S.data.getStreak) == "function" and S.data:getStreak(p)) or 0
+            local delta
+            if escapedSet[p] and won and take > 0 then
+                delta = 1
+                info.streakPct = math.floor(lvl * perLevel * 100 + 0.5)
+                info.streakBonus = math.floor(take * perLevel * lvl + 0.5)
+                streakPay[p] = info.streakBonus
+            elseif escapedSet[p] then
+                delta = 0   -- got away with an empty car: no gain, no loss
+            else
+                delta = -1  -- fail / caught / left behind
+            end
+            local okS, before, after = pcall(S.data.changeStreak, S.data, p, delta)
+            info.streakBefore = okS and before or lvl
+            info.streakAfter = okS and after or lvl
+            pcall(S.data.setStreakAtRisk, S.data, p, false)
+            if escapedSet[p] and type(S.data.recordStars) == "function" then
+                local okR, b0, b1, tot = pcall(S.data.recordStars, S.data, p, r.jobId, stars.count)
+                if okR then info.bestBefore, info.bestAfter, info.totalStars = b0, b1, tot end
+            end
+            playerInfo[tostring(p.UserId)] = info
+        end
+    end
     local success_pre = #escapees > 0 and take > 0
     local xpEach = Constants.XP.PER_HEIST + Constants.XP.PER_BAG * #bags + (stealth and Constants.XP.STEALTH or 0)
     local escapeeIds = {}
@@ -1133,11 +1216,15 @@ finish = function(result)
     local carPos = car and car.model and car.model.Parent and car.model:GetPivot().Position
     local feltCash = false
     for _, p in ipairs(escapees) do
-        if each > 0 then
-            S.economy:addCash(p, each, "Heist payout " .. r.jobId, { payout = true })
-            lifetimeEarned(p, each)
-            if feel("cash", p, each, carPos) then feltCash = true end
-            feel("big", "+" .. UITheme.money(each), { player = p, color = "money", sound = "success" })
+        -- v3.2: your own hot-streak bonus rides on top of the crew's share
+        local pay = each + (each > 0 and (streakPay[p] or 0) or 0)
+        local pi = playerInfo[tostring(p.UserId)]
+        if pi then pi.pay = pay end
+        if pay > 0 then
+            S.economy:addCash(p, pay, "Heist payout " .. r.jobId, { payout = true })
+            lifetimeEarned(p, pay)
+            if feel("cash", p, pay, carPos) then feltCash = true end
+            feel("big", "+" .. UITheme.money(pay), { player = p, color = "money", sound = "success" })
         end
         local d = S.data:getData(p)
         if d then
@@ -1146,7 +1233,7 @@ finish = function(result)
         end
         S.progress:addXP(p, xpEach, "heist")
         if each > 0 then
-            notify(p, string.format("You got %s%s", UITheme.money(each), stealthAmt > 0 and "  (+sneaky bonus)" or ""), "green", 6)
+            notify(p, string.format("You got %s%s", UITheme.money(pay), stealthAmt > 0 and "  (+sneaky bonus)" or ""), "green", 6)
             -- v2.0 masks: Bandit "LUCKY" → +10% of the bags' cash, on top, for you
             local MS = optionalService("MaskService")
             if MS and type(MS.has) == "function" and take > 0 then
@@ -1204,6 +1291,7 @@ finish = function(result)
         jobId = j.cfg.id, botCrew = botCrew, jailed = jailedAtEnd,
         -- v3.0
         route = gi and gi.route or nil, bonusEach = bonusEach, target = targetRow,
+        stars = stars, players = playerInfo,   -- v3.2
         getaway = gi and { route = gi.route, routeName = gi.routeName, icon = gi.icon, loud = gi.loud,
             carName = gi.carName, carType = gi.carType, rows = getawayRows } or nil,
     })
@@ -1392,10 +1480,13 @@ local function launch(players)
     if not ok then warn("[JobService] launch cut-scene:", err) end
 
     S.guards.graceUntil = os.clock() + (Constants.DETECTION.DROP_IN_GRACE or 0)
+    -- [HOOK: MaskUp] casing starts BEFORE startRun so addToCrew leaves the masks off
+    local casing = maskUpCall("beginCasing", crewList, j.cfg, j.refs) == true
     startRun(nil, "launch", crewList)
     launching = false
     for _, p in ipairs(crewList) do
-        launchRemote:FireClient(p, { phase = "title", jobName = j.cfg.name, tagline = j.cfg.tagline })
+        launchRemote:FireClient(p, { phase = "title", jobName = j.cfg.name, tagline = j.cfg.tagline,
+            subtitle = casing and "Look around. Mask up when you're ready." or nil })   -- [HOOK: MaskUp]
     end
     if run then emit("launched", crewList, j.cfg, j.refs) end
 end
@@ -1548,12 +1639,25 @@ function JobService:noteBots(names)
 end
 
 -- ── selecting / arming a job ─────────────────────────────────────────
+-- v3.2: doors open on TOTAL STARS (Constants.STARS.UNLOCK), not level. Open if ANY
+-- player in the server can open it (friends play free); veterans are grandfathered.
+local function starsNeeded(id)
+    local u = (Constants.STARS or {}).UNLOCK
+    return (u and tonumber(u[id])) or 0
+end
 local function unlocked(cfg)
-    if (cfg.unlockLevel or 1) <= 1 then return true end
+    local need = starsNeeded(cfg.id)
+    if need <= 0 then return true end
+    if not S.data or type(S.data.canOpen) ~= "function" then return true end
     for _, p in ipairs(Players:GetPlayers()) do
-        if S.progress:getLevel(p) >= cfg.unlockLevel then return true end
+        local ok, yes = pcall(S.data.canOpen, S.data, p, need)
+        if ok and yes then return true end
     end
     return false
+end
+
+function JobService:starsNeeded(id)
+    return starsNeeded(id)
 end
 
 function JobService:isUnlocked(id)
@@ -1636,7 +1740,7 @@ function JobService:cycleJob(player)
                 notifyAll(string.format("Next heist: %s — %s", cfg.name, cfg.tagline), "gold", 4)
                 return
             else
-                notify(player, string.format("%s unlocks at level %d", cfg.name, cfg.unlockLevel), "white", 3)
+                notify(player, string.format("%s needs ⭐ %d — earn stars on the easier heists", cfg.name, starsNeeded(cand)), "white", 3)
             end
         end
     end
@@ -1815,6 +1919,8 @@ function JobService:init(deps)
         kickedAt[p] = nil
         task.defer(checkLaunch)
         if run and run.crew[p] then
+            -- v3.2: leaving mid-run drops the hot streak ONE level
+            if S.data and type(S.data.leftMidRun) == "function" then pcall(S.data.leftMidRun, S.data, p) end
             run.crew[p] = nil
             if next(run.crew) == nil or #activeCrew() == 0 then
                 finish("abandoned")

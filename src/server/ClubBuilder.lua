@@ -46,7 +46,12 @@
                      tagged "PortalZone", attribute JobId = jobId
           setState : count (players in the zone), needed (players to launch, may be nil),
                      launchIn (seconds left, nil/0 = not counting), locked (false | true |
-                     level number) → updates the door sign, floor glow and door leaves
+                     number = total STARS needed, v3.2 "Need ⭐ N") → updates the door sign,
+                     floor glow and door leaves
+          (v3.2) each door sign carries a TextLabel "BestStars" in its top-right corner,
+                     tagged "DoorStars" with attribute JobId. The server leaves it EMPTY —
+                     the client (DoorStars.lua) fills it locally with the LOCAL player's
+                     best stars (attribute Stars_<jobId>) + hot streak (attribute Streak).
       refs.leaderboardAnchor = CFrame   (see _lobbyWest — board front faces along LookVector)
       refs.introPath = { CFrame × 6 }   first-join camera fly-over (IntroCam.lua)
 --]]
@@ -1560,6 +1565,13 @@ function ClubBuilder:_portal(f, id, index, c)
     frame({ Size = UDim2.new(1, 0, 0, 10), BackgroundColor3 = col }, bg)
     text({ Text = string.format("DOOR %d", index), Position = UDim2.fromOffset(18, 14), Size = UDim2.fromOffset(140, 22),
         TextColor3 = T.faint, FontFace = UITheme.F.mono, TextSize = 20 }, bg)
+    -- (v3.2) your best stars + hot streak, top-right; filled per player by the client
+    local bestStars = text({ Name = "BestStars", Text = "", AnchorPoint = Vector2.new(1, 0),
+        Position = UDim2.new(1, -16, 0, 11), Size = UDim2.fromOffset(220, 26), RichText = true,
+        TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display, TextSize = 24,
+        TextColor3 = Color3.fromRGB(253, 224, 71) }, bg)
+    bestStars:SetAttribute("JobId", id)
+    CollectionService:AddTag(bestStars, "DoorStars")
     text({ Text = cfg.name or string.upper(id), Position = UDim2.fromOffset(16, 34), Size = UDim2.new(1, -32, 0, 64),
         TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextScaled = true,
         TextColor3 = T.text, TextStrokeColor3 = col, TextStrokeTransparency = 0.4 }, bg)
@@ -1599,7 +1611,8 @@ function ClubBuilder:_portal(f, id, index, c)
         launchIn = tonumber(launchIn)
         if locked then
             -- (v2.0.1) locked == true just means a heist is already running
-            status.Text = (type(locked) == "number") and string.format("LOCKED — level %d", locked) or "Heist in progress…"
+            -- (v3.2) a number = the door still needs that many total stars
+            status.Text = (type(locked) == "number") and string.format("🔒 Need ⭐ %d", locked) or "Heist in progress…"
             status.TextColor3 = T.danger
             glow:SetAttribute("State", "locked")
             dispText.Text = "✕"

@@ -512,6 +512,28 @@ Constants.COLORS = {
     PATH_STONE    = {180, 175, 165},  -- Walkway color
 }
 
+-- ───── (v3.2) HEIST STARS: 3 per heist (JobService finish → PlayerDataService) ─────
+-- ⭐ no alarm (stealth) · ⭐ every bag of the job in the trunk · ⭐ fast (the getaway
+-- started before PAR seconds). Only a WIN with cash in the car earns stars.
+-- Best stars per job are saved (bestStars / totalStars); total stars open the doors.
+Constants.STARS = {
+    PAR = { mart = 150, villa = 300, jewelry = 240, bank = 420 },   -- seconds (drop-in → GO!)
+    PAR_DEFAULT = 300,
+    -- total stars (best per job, summed) needed to open a heist door. Old saves that
+    -- already finished a heist keep everything open (unlockAll, PlayerDataService migrate).
+    UNLOCK = { mart = 0, villa = 1, jewelry = 3, bank = 6 },
+}
+
+-- ───── (v3.2) HOT STREAK: consecutive good heists → bigger take ─────
+-- A win with cash in the car → +1 level (cap MAX). The bonus is paid on the NEXT
+-- heist: PER_LEVEL x the level you came in with, on the bags' cash (take).
+-- Fail / busted / timeout / caught / leaving mid-run → -1 level (never straight to 0).
+-- An empty-car win changes nothing.
+Constants.STREAK = {
+    MAX = 5,
+    PER_LEVEL = 0.10,
+}
+
 -- ───── Sound IDs (Roblox marketplace assets — known free) ─────
 Constants.SOUNDS = {
     LOBBY_AMBIENT = "rbxassetid://1846431634",  -- (v3.0.1) APM "Miami Nights A" (old id was not audio)  -- chill background loop

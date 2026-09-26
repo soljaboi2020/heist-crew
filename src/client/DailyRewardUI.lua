@@ -23,6 +23,11 @@
         friendly note on the card ("Rewards are paused…"), not a red error,
         and the card doesn't pop up by itself.
 
+    v3.2 "MIAMI HUD": the DAILY button is a chunky gold button (icon-only
+    circle on phones) in the rightEdge row — which now sits INSIDE the
+    topRight stack, so it can't land on THE JOB card any more. The card glows
+    gold/pink, day labels + amounts are bigger.
+
     Talks to the DailyReward RemoteFunction ("status" | "claim") →
         { ok, day, amount, nextAt, msg, claimable, secondsLeft, streak, rewards, bonus,
           saveFailed? (optional — see NEEDS in the v2.1 report) }
@@ -141,31 +146,22 @@ function DailyRewardUI:_build()
     screen.Parent = pg
 
     -- ── the small reopen button (UITheme rightEdge slot) ──
-    local open = Instance.new("TextButton")
-    open.Name = "DailyButton"
-    open.Text = ""
-    open.AutoButtonColor = false
-    open.LayoutOrder = 1
-    open.Size = UDim2.fromOffset(118, 44)
-    open.BackgroundColor3 = T.bg
-    open.BackgroundTransparency = 0.08
-    open.BorderSizePixel = 0
+    local touch = UITheme.isTouch()
+    local open = UITheme.button("", T.gold, { Name = "DailyButton", AutoButtonColor = false, LayoutOrder = 1,
+        Size = touch and UDim2.fromOffset(52, 52) or UDim2.fromOffset(128, 48) })
     open.Parent = UITheme.slot("rightEdge")
-    UITheme.corner(open, 22)
-    local og = Instance.new("UIGradient")
-    og.Rotation = 90
-    og.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 155, 170))
-    og.Parent = open
-    UITheme.stroke(open, T.gold, 0.2, 2)
-    local gift = UITheme.badge(I.daily, T.gold, 34)
-    gift.AnchorPoint = Vector2.new(0, 0.5)
-    gift.Position = UDim2.new(0, 5, 0.5, 0)
+    do local c = open:FindFirstChildOfClass("UICorner") if c then c.CornerRadius = UDim.new(0, touch and 26 or 24) end end
+    local gift = UITheme.badge(I.daily, T.hot, touch and 40 or 36)
+    gift.AnchorPoint = touch and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5)
+    gift.Position = touch and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, 5, 0.5, 0)
     gift.Parent = open
-    UITheme.label({ Text = "DAILY", Position = UDim2.fromOffset(44, 0), Size = UDim2.new(1, -50, 1, 0),
-        FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.gold, Parent = open })
+    if not touch then
+        UITheme.label({ Text = "DAILY", Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -52, 1, 0),
+            FontFace = UITheme.F.display, TextSize = 20, TextColor3 = T.bgDeep, Parent = open })
+    end
     local dot = frame({ Name = "Ready", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -6, 0, 6),
-        Size = UDim2.fromOffset(14, 14), BackgroundColor3 = T.danger, BackgroundTransparency = 0, Visible = false })
-    UITheme.corner(dot, 7)
+        Size = UDim2.fromOffset(16, 16), BackgroundColor3 = T.danger, BackgroundTransparency = 0, Visible = false })
+    UITheme.corner(dot, 8)
     UITheme.stroke(dot, T.bgDeep, 0, 2)
     dot.Parent = open
     local openScale = Instance.new("UIScale")
@@ -203,19 +199,19 @@ function DailyRewardUI:_build()
     fitScale.Parent = group
 
     local panel = UITheme.card({ Name = "Panel", Position = UDim2.fromOffset(3, 3), Size = UDim2.new(1, -6, 1, -6),
-        transparency = 0.03, radius = 20, accent = T.gold, Active = true })
+        transparency = 0.03, radius = 22, accent = T.gold, tint = T.hot, Active = true })
     panel.Parent = group
 
     local hero = UITheme.badge(I.daily, T.gold, 50)
     hero.Position = UDim2.fromOffset(20, 16)
     hero.Parent = panel
-    UITheme.caption("Daily reward", { Position = UDim2.fromOffset(80, 18), Size = UDim2.fromOffset(300, 14),
+    UITheme.caption("Daily reward", { Position = UDim2.fromOffset(80, 16), Size = UDim2.fromOffset(300, 16),
         TextColor3 = T.gold }).Parent = panel
-    UITheme.label({ Text = "Come back every day!", Position = UDim2.fromOffset(80, 32), Size = UDim2.fromOffset(380, 30),
-        FontFace = UITheme.F.display, TextSize = 26 }).Parent = panel
+    UITheme.label({ Text = "Come back every day!", Position = UDim2.fromOffset(80, 32), Size = UDim2.fromOffset(380, 32),
+        FontFace = UITheme.F.display, TextSize = 28 }).Parent = panel
     local sub = UITheme.label({ Text = DEFAULT_SUB,
-        Position = UDim2.fromOffset(20, 72), Size = UDim2.new(1, -40, 0, 20), TextWrapped = true,
-        FontFace = UITheme.F.medium, TextSize = 15, TextColor3 = T.muted })
+        Position = UDim2.fromOffset(20, 72), Size = UDim2.new(1, -40, 0, 22), TextWrapped = true,
+        FontFace = UITheme.F.bold, TextSize = 16, TextColor3 = T.muted })
     sub.Parent = panel
 
     local close = Instance.new("TextButton")
@@ -257,7 +253,7 @@ function DailyRewardUI:_build()
         box.Parent = row
         local dayL = UITheme.label({ Position = UDim2.fromOffset(0, 7), Size = UDim2.new(1, 0, 0, 14),
             Text = "DAY " .. i, TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
-            TextSize = 12, TextColor3 = T.muted })
+            TextSize = 14, TextColor3 = T.muted })
         dayL.Parent = box
         local big = i == 7
         local b = UITheme.badge(big and I.daily or I.cash, big and T.gold or T.money, big and 40 or 34)
@@ -266,11 +262,11 @@ function DailyRewardUI:_build()
         b.Parent = box
         local amt = UITheme.label({ Position = UDim2.fromOffset(0, 72), Size = UDim2.new(1, 0, 0, 18),
             Text = UITheme.money(DEFAULT_REWARDS[i]), TextXAlignment = Enum.TextXAlignment.Center,
-            FontFace = UITheme.F.display, TextSize = 15, TextColor3 = T.money })
+            FontFace = UITheme.F.display, TextSize = 16, TextColor3 = T.money })
         amt.Parent = box
         local extra = UITheme.label({ Position = UDim2.fromOffset(0, 88), Size = UDim2.new(1, 0, 0, 12),
             Text = big and "+ GOLD BAG" or "", TextXAlignment = Enum.TextXAlignment.Center,
-            FontFace = UITheme.F.bold, TextSize = 10, TextColor3 = T.gold })
+            FontFace = UITheme.F.display, TextSize = 12, TextColor3 = T.gold })
         extra.Parent = box
         -- claimed check
         local check = frame({ Name = "Check", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 4),
@@ -305,8 +301,9 @@ function DailyRewardUI:_build()
     cg.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(190, 190, 190))
     cg.Parent = claim
     local claimLabel = UITheme.label({ Size = UDim2.fromScale(1, 1), Text = "CLAIM!", TextXAlignment = Enum.TextXAlignment.Center,
-        FontFace = UITheme.F.display, TextSize = 22, TextColor3 = T.bgDeep })
+        FontFace = UITheme.F.display, TextSize = 24, TextColor3 = T.bgDeep })
     claimLabel.Parent = claim
+    UITheme.stroke(claim, T.money:Lerp(Color3.new(0, 0, 0), 0.5), 0, 3)
     local claimScale = Instance.new("UIScale")
     claimScale.Parent = claim
     claim.MouseEnter:Connect(function() if claim.Active then tween(claimScale, 0.12, { Scale = 1.03 }) end end)

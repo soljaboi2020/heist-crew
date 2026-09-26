@@ -77,20 +77,25 @@ function Notifications:show(text, colorName, duration)
     toast.Name = "Toast"
     toast.LayoutOrder = self._n
     toast.AutomaticSize = Enum.AutomaticSize.X
-    toast.Size = UDim2.fromOffset(0, 44)
-    toast.BackgroundColor3 = T.bg
-    toast.BackgroundTransparency = 0.06
+    toast.Size = UDim2.fromOffset(0, 50)
+    toast.BackgroundColor3 = Color3.new(1, 1, 1)      -- (v3.2) the gradient below carries the colour
+    toast.BackgroundTransparency = 0.04
     toast.GroupTransparency = 1
     toast.Parent = self._container
-    UITheme.corner(toast, 14)
+    UITheme.corner(toast, 16)
+    -- v3.2: a glow of the toast's colour on the left, fading into night purple
     local g = Instance.new("UIGradient")
-    g.Rotation = 90
-    g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(160, 165, 180))
+    g.Rotation = 0
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, T.bg:Lerp(accent, 0.45)),
+        ColorSequenceKeypoint.new(0.35, T.bg),
+        ColorSequenceKeypoint.new(1, T.bgDeep),
+    })
     g.Parent = toast
 
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(0, 5, 1, -14)
-    bar.Position = UDim2.fromOffset(9, 7)
+    bar.Size = UDim2.new(0, 6, 1, -16)
+    bar.Position = UDim2.fromOffset(10, 8)
     bar.BackgroundColor3 = accent
     bar.BorderSizePixel = 0
     bar.Parent = toast
@@ -100,9 +105,9 @@ function Notifications:show(text, colorName, duration)
         Text = text,
         AutomaticSize = Enum.AutomaticSize.X,
         Size = UDim2.new(0, 0, 1, 0),
-        Position = UDim2.fromOffset(24, 0),
-        FontFace = UITheme.F.bold,
-        TextSize = 18,
+        Position = UDim2.fromOffset(26, 0),
+        FontFace = UITheme.F.display,
+        TextSize = 21,
         TextColor3 = T.text,
     })
     label.Parent = toast

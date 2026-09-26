@@ -27,7 +27,10 @@
         needed   players needed to START a countdown (half the server, rounded up)
         total    players in the server (all of them = the fast 5 s countdown)
         launchIn seconds until launch (nil = no countdown)
-        locked   true while a heist is busy, or the heist is still level-locked
+        locked   true while a heist is busy; a NUMBER (v3.2) = the heist still needs
+                 that many total stars (setState shows "Need ⭐ N")
+    The remote payload keeps locked a BOOLEAN (PortalHud reads it) and adds
+        starsNeeded = N  (v3.2, > 0 only when the door is star-locked, not busy)
 
     PUBLIC API:
         PortalService:init({ hub = world.hub, jobService = JobService, notify = fn(player, text, color, dur)? })
@@ -146,19 +149,27 @@ local function publish(zl, total, phase)
     local payload = { portals = {} }
     for _, id in ipairs(jobIds(zl)) do
         local count = #(occupants[id] or {})
-        local locked = phase ~= "idle" or not Job:isUnlocked(id)
+        local busy = phase ~= "idle"
+        local starLocked = not Job:isUnlocked(id)
+        local locked = busy or starLocked
+        -- v3.2: a star-locked door says how many stars it needs (busy wins: "in progress")
+        local need = 0
+        if starLocked and not busy and type(Job.starsNeeded) == "function" then
+            local okN, n = pcall(Job.starsNeeded, Job, id)
+            need = okN and tonumber(n) or 0
+        end
         local la = (id == current and source == "portal" and launchAt > 0) and launchAt or 0
         payload.portals[id] = {
             count = count, needed = needed, total = total, launchAt = la, locked = locked,
-            selected = id == current,
+            selected = id == current, starsNeeded = need,
         }
         local launchIn = la > 0 and math.max(0, math.ceil(la - now())) or nil
-        local key = string.format("%d|%d|%s|%s", count, needed, tostring(launchIn), tostring(locked))
+        local key = string.format("%d|%d|%s|%s|%d", count, needed, tostring(launchIn), tostring(locked), need)
         if lastState[id] ~= key then
             lastState[id] = key
             local portal = hub and type(hub.portals) == "table" and hub.portals[id]
             if type(portal) == "table" and type(portal.setState) == "function" then
-                local ok, err = pcall(portal.setState, count, needed, launchIn, locked)
+                local ok, err = pcall(portal.setState, count, needed, launchIn, (need > 0) and need or locked)
                 if not ok then warn("[PortalService] setState(" .. id .. "):", err) end
             end
         end
@@ -166,7 +177,7 @@ local function publish(zl, total, phase)
     -- fire on change, plus every 2 s so late joiners catch up
     local sig = {}
     for id, s in pairs(payload.portals) do
-        table.insert(sig, string.format("%s:%d:%d:%d:%s:%s", id, s.count, s.needed, s.launchAt, tostring(s.locked), tostring(s.selected)))
+        table.insert(sig, string.format("%s:%d:%d:%d:%s:%s:%d", id, s.count, s.needed, s.launchAt, tostring(s.locked), tostring(s.selected), s.starsNeeded or 0))
     end
     table.sort(sig)
     local key = table.concat(sig, ";")

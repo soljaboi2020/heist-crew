@@ -26,6 +26,11 @@
     Attributes read (see TutorialService): Tutorial, TutorialTarget,
     TutorialPause, TutorialWait, TutorialReward, + Jailed, IntroPlaying,
     IntroCamDone, GetawayPlaying.
+    v3.2 "MIAMI HUD" (visual only — the logic is untouched): the Boss icon is
+    his real Fedora-and-Shades picture (UITheme swaps the 🎩 emoji, which drew
+    as a purple cylinder), gold-glow Miami cards, bigger words, every button
+    at least 44 px tall for thumbs.
+
     Remote "Tutorial" (client → server): { action = "start" | "skip" | "skipTicket" }
 
     PUBLIC API:
@@ -64,7 +69,7 @@ local STEPS = {
 }
 local PAUSED = {
     failed   = { icon = "😅", text = "Oops! That didn't work.", boss = "No worries. Every crew messes up. Try again!" },
-    died     = { icon = "🩹", text = "Ouch! Let's try that again.", boss = "Shake it off, rookie." },
+    died     = { icon = "🤕", text = "Ouch! Let's try that again.", boss = "Shake it off, rookie." },
     otherJob = { icon = "🏪", text = "That's a different heist!", boss = "Have fun! Sunny's Mart will wait for you." },
 }
 
@@ -100,7 +105,7 @@ function TutorialHud:_buildOffer(pg)
     back.Parent = screen
 
     local card = UITheme.card({ Name = "Card", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(480, 0), AutomaticSize = Enum.AutomaticSize.Y, accent = T.gold })
+        Size = UDim2.fromOffset(500, 0), AutomaticSize = Enum.AutomaticSize.Y, tint = T.gold, radius = 24 })
     card.Parent = screen
     UITheme.autoScale(card)
     UITheme.padding(card, 24, 22)
@@ -110,16 +115,24 @@ function TutorialHud:_buildOffer(pg)
     list.Padding = UDim.new(0, 10)
     list.Parent = card
 
-    UITheme.badge("🎩", T.gold, 84, { LayoutOrder = 1 }).Parent = card
-    UITheme.label({ LayoutOrder = 2, Text = "FIRST HEIST?", Size = UDim2.new(1, 0, 0, 44), FontFace = UITheme.F.display,
-        TextSize = 40, TextColor3 = T.gold, TextXAlignment = Enum.TextXAlignment.Center }).Parent = card
-    UITheme.label({ LayoutOrder = 3, Text = "Let the Boss show you!", Size = UDim2.new(1, 0, 0, 28),
-        FontFace = UITheme.F.bold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Center }).Parent = card
+    -- the Boss himself: his Fedora-and-Shades picture (UITheme.IMG.boss) in a big gold ring
+    UITheme.badge(UITheme.IMG.boss, T.gold, 104, { LayoutOrder = 1 }).Parent = card
+    local title = UITheme.label({ LayoutOrder = 2, Text = "FIRST HEIST?", Size = UDim2.new(1, 0, 0, 50), FontFace = UITheme.F.display,
+        TextSize = 46, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Center,
+        TextStrokeTransparency = 0.5, TextStrokeColor3 = T.bgDeep })
+    local tg = Instance.new("UIGradient")
+    tg.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, T.pink), ColorSequenceKeypoint.new(0.5, T.gold), ColorSequenceKeypoint.new(1, T.teal),
+    })
+    tg.Parent = title
+    title.Parent = card
+    UITheme.label({ LayoutOrder = 3, Text = "Let the Boss show you!", Size = UDim2.new(1, 0, 0, 30),
+        FontFace = UITheme.F.display, TextSize = 26, TextXAlignment = Enum.TextXAlignment.Center }).Parent = card
 
     local row = Instance.new("Frame")
     row.LayoutOrder = 4
     row.BackgroundTransparency = 1
-    row.Size = UDim2.new(1, 0, 0, 64)
+    row.Size = UDim2.new(1, 0, 0, 70)
     row.Parent = card
     local rl = Instance.new("UIListLayout")
     rl.FillDirection = Enum.FillDirection.Horizontal
@@ -127,9 +140,9 @@ function TutorialHud:_buildOffer(pg)
     rl.VerticalAlignment = Enum.VerticalAlignment.Center
     rl.Padding = UDim.new(0, 14)
     rl.Parent = row
-    local go = UITheme.button("LET'S GO!", T.money, { Name = "LetsGo", Size = UDim2.fromOffset(220, 60), TextSize = 28, LayoutOrder = 1 })
+    local go = UITheme.button("LET'S GO!", T.money, { Name = "LetsGo", Size = UDim2.fromOffset(230, 66), TextSize = 30, LayoutOrder = 1 })
     go.Parent = row
-    local know = UITheme.button("I know how", T.bgRaised, { Name = "IKnowHow", Size = UDim2.fromOffset(170, 52), TextSize = 20,
+    local know = UITheme.button("I know how", T.bgRaised, { Name = "IKnowHow", Size = UDim2.fromOffset(180, 56), TextSize = 21,
         TextColor3 = T.text, LayoutOrder = 2 })
     know.Parent = row
 
@@ -149,14 +162,14 @@ function TutorialHud:_chip(text, parent, order)
     local chip = Instance.new("TextLabel")
     chip.LayoutOrder = order
     chip.AutomaticSize = Enum.AutomaticSize.X
-    chip.Size = UDim2.fromOffset(34, 30)
+    chip.Size = UDim2.fromOffset(36, 32)
     chip.BackgroundColor3 = T.gold
     chip.BorderSizePixel = 0
     chip.Text = text
     chip.TextColor3 = T.bgDeep
     chip.FontFace = UITheme.F.display
-    chip.TextSize = 18
-    UITheme.corner(chip, 8)
+    chip.TextSize = 19
+    UITheme.corner(chip, 9)
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 10)
     pad.PaddingRight = UDim.new(0, 10)
@@ -167,14 +180,14 @@ function TutorialHud:_chip(text, parent, order)
 end
 
 function TutorialHud:_buildCard()
-    local card = UITheme.card({ Name = "TutorialStep", LayoutOrder = 0, Size = UDim2.fromOffset(360, 0),
-        AutomaticSize = Enum.AutomaticSize.Y, accent = T.gold, Visible = false })
+    local card = UITheme.card({ Name = "TutorialStep", LayoutOrder = 0, Size = UDim2.fromOffset(UITheme.isTouch() and 330 or 380, 0),
+        AutomaticSize = Enum.AutomaticSize.Y, accent = T.gold, tint = T.gold, Visible = false })
     card.Parent = UITheme.slot("left")
     UITheme.padding(card, 14, 14)
     local scale = Instance.new("UIScale")
     scale.Parent = card
 
-    local badge = UITheme.badge("🚪", T.gold, 60)
+    local badge = UITheme.badge("🚪", T.gold, 62)
     badge.Parent = card
     local col = Instance.new("Frame")
     col.BackgroundTransparency = 1
@@ -187,15 +200,15 @@ function TutorialHud:_buildCard()
     list.Padding = UDim.new(0, 6)
     list.Parent = col
 
-    local cap = UITheme.caption("Step 1 of 6 · The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 14), TextColor3 = T.gold })
+    local cap = UITheme.caption("Step 1 of 6 · The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 16), TextColor3 = T.gold })
     cap.Parent = col
     local main = UITheme.label({ LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        TextWrapped = true, FontFace = UITheme.F.display, TextSize = 22, TextYAlignment = Enum.TextYAlignment.Top })
+        TextWrapped = true, FontFace = UITheme.F.display, TextSize = 24, TextYAlignment = Enum.TextYAlignment.Top })
     main.Parent = col
     local chips = Instance.new("Frame")
     chips.LayoutOrder = 3
     chips.BackgroundTransparency = 1
-    chips.Size = UDim2.new(1, 0, 0, 30)
+    chips.Size = UDim2.new(1, 0, 0, 32)
     chips.Parent = col
     local cl = Instance.new("UIListLayout")
     cl.FillDirection = Enum.FillDirection.Horizontal
@@ -203,14 +216,14 @@ function TutorialHud:_buildCard()
     cl.Padding = UDim.new(0, 6)
     cl.Parent = chips
     local boss = UITheme.label({ LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        TextWrapped = true, FontFace = UITheme.F.medium, TextSize = UITheme.T.body, TextColor3 = T.muted,
+        TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 18, TextColor3 = T.muted,
         TextYAlignment = Enum.TextYAlignment.Top })
     boss.Parent = col
 
     local btns = Instance.new("Frame")
     btns.LayoutOrder = 5
     btns.BackgroundTransparency = 1
-    btns.Size = UDim2.new(1, 0, 0, 44)
+    btns.Size = UDim2.new(1, 0, 0, 48)
     btns.Visible = false
     btns.Parent = col
     local bl = Instance.new("UIListLayout")
@@ -218,12 +231,12 @@ function TutorialHud:_buildCard()
     bl.SortOrder = Enum.SortOrder.LayoutOrder
     bl.Padding = UDim.new(0, 8)
     bl.Parent = btns
-    local retry = UITheme.button("TRY AGAIN", T.money, { Name = "TryAgain", Size = UDim2.fromOffset(140, 42), TextSize = 20, LayoutOrder = 1 })
+    local retry = UITheme.button("TRY AGAIN", T.money, { Name = "TryAgain", Size = UDim2.fromOffset(150, 46), TextSize = 21, LayoutOrder = 1 })
     retry.Parent = btns
-    local stopB = UITheme.button("Stop", T.bgRaised, { Name = "StopTutorial", Size = UDim2.fromOffset(80, 42), TextSize = 18,
+    local stopB = UITheme.button("Stop", T.bgRaised, { Name = "StopTutorial", Size = UDim2.fromOffset(84, 46), TextSize = 19,
         TextColor3 = T.text, LayoutOrder = 2 })
     stopB.Parent = btns
-    local skipStep = UITheme.button("Skip this", T.bgRaised, { Name = "SkipStep", Size = UDim2.fromOffset(120, 42), TextSize = 18,
+    local skipStep = UITheme.button("Skip this", T.bgRaised, { Name = "SkipStep", Size = UDim2.fromOffset(124, 46), TextSize = 19,
         TextColor3 = T.text, LayoutOrder = 3 })
     skipStep.Parent = btns
 
@@ -231,12 +244,12 @@ function TutorialHud:_buildCard()
     skipAll.Name = "SkipTutorial"
     skipAll.LayoutOrder = 6
     skipAll.BackgroundTransparency = 1
-    skipAll.Size = UDim2.new(1, 0, 0, 18)
+    skipAll.Size = UDim2.new(1, 0, 0, 34)        -- (v3.2) tall enough for a thumb
     skipAll.Text = "Skip tutorial"
     skipAll.TextXAlignment = Enum.TextXAlignment.Right
-    skipAll.TextColor3 = T.faint
+    skipAll.TextColor3 = T.muted
     skipAll.FontFace = UITheme.F.bold
-    skipAll.TextSize = 13
+    skipAll.TextSize = 16
     skipAll.Parent = col
 
     retry.Activated:Connect(function() send("start") end)
@@ -256,7 +269,7 @@ function TutorialHud:_buildCard()
             task.delay(4, function()
                 if os.clock() - armedAt >= 3.9 then
                     skipAll.Text = "Skip tutorial"
-                    skipAll.TextColor3 = T.faint
+                    skipAll.TextColor3 = T.muted
                 end
             end)
         end
@@ -448,20 +461,30 @@ function TutorialHud:_celebrate(amount)
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.32)
     card.Size = UDim2.fromOffset(620, 190)
-    card.BackgroundColor3 = T.bg
-    card.BackgroundTransparency = 0.05
+    card.BackgroundColor3 = Color3.new(1, 1, 1)
+    card.BackgroundTransparency = 0.04
     card.GroupTransparency = 1
     card.Parent = screen
+    do
+        local g = Instance.new("UIGradient")
+        g.Rotation = 90
+        g.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, T.bg:Lerp(T.gold, 0.3)),
+            ColorSequenceKeypoint.new(0.45, T.bg),
+            ColorSequenceKeypoint.new(1, T.bgDeep),
+        })
+        g.Parent = card
+    end
     UITheme.corner(card, 22)
     UITheme.stroke(card, T.gold, 0.1, 3)
     local sc = UITheme.autoScale(card)
-    UITheme.badge("🎩", T.gold, 76, { Position = UDim2.fromOffset(26, 57) }).Parent = card
+    UITheme.badge(UITheme.IMG.boss, T.gold, 76, { Position = UDim2.fromOffset(26, 57) }).Parent = card
     UITheme.label({ Text = "YOU'RE A REAL CREW MEMBER NOW!", Position = UDim2.fromOffset(118, 34), Size = UDim2.new(1, -136, 0, 70),
         TextWrapped = true, FontFace = UITheme.F.display, TextSize = 32, TextColor3 = T.gold }).Parent = card
     UITheme.label({ Text = string.format("+%s from the Boss", UITheme.money(amount)), Position = UDim2.fromOffset(118, 110),
         Size = UDim2.new(1, -136, 0, 34), FontFace = UITheme.F.display, TextSize = 28, TextColor3 = T.money }).Parent = card
     UITheme.label({ Text = "Pick any heist door next. Good luck, crew!", Position = UDim2.fromOffset(118, 146),
-        Size = UDim2.new(1, -136, 0, 22), FontFace = UITheme.F.medium, TextSize = 17, TextColor3 = T.muted }).Parent = card
+        Size = UDim2.new(1, -136, 0, 22), FontFace = UITheme.F.bold, TextSize = 18, TextColor3 = T.muted }).Parent = card
     local base = sc.Scale
     sc.Scale = base * 0.6
     TweenService:Create(card, TweenInfo.new(0.35), { GroupTransparency = 0 }):Play()

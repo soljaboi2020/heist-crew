@@ -51,6 +51,9 @@ local LootHud = {}
 local localPlayer = Players.LocalPlayer
 
 local ACTION = "HC_ThrowBag"
+-- (v3.2) the Boss target moved onto THE JOB card header (JobHud) — one less
+-- panel on screen. Flip this back on to bring the bottom chip back.
+local SHOW_TARGET_CHIP = false
 local THROW_COOLDOWN = 0.35
 -- Touch button spot inside Roblox's context-button frame (bottom-right third of the
 -- screen, around the jump button). Scale values; tweak here if it crowds the jump button.
@@ -115,7 +118,7 @@ local function styleTouchButton(actionName, title, pos)
             t.FontFace = UITheme.F.bold
             t.TextColor3 = T.text
             t.TextScaled = false
-            t.TextSize = 13
+            t.TextSize = 16
         end
     end)
 end
@@ -151,7 +154,7 @@ function LootHud:_buildUi()
     scale.Parent = group
 
     local pill = UITheme.card({ Name = "Pill", Size = UDim2.fromOffset(0, 52), AutomaticSize = Enum.AutomaticSize.X,
-        radius = 26, noHighlight = true })
+        radius = 26, noHighlight = true, tint = T.pink })
     pill.Parent = group
     hpad(pill, 7, 8)
     hrow(pill, 10)
@@ -160,16 +163,16 @@ function LootHud:_buildUi()
     bagBadge.Parent = pill
 
     local caption = UITheme.caption("Carrying", { LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 52), TextSize = 13 })
+        Size = UDim2.fromOffset(0, 52), TextSize = 15, TextColor3 = T.pink })
     caption.Parent = pill
     self._caption = caption
     local kind = UITheme.label({ Name = "Kind", LayoutOrder = 3, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, Text = "" })
+        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 23, Text = "" })
     kind.Parent = pill
     UITheme.label({ LayoutOrder = 4, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 52),
         Text = "·", TextColor3 = T.faint, TextSize = 21 }).Parent = pill
     local value = UITheme.label({ Name = "Value", LayoutOrder = 5, AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 21, TextColor3 = T.money, Text = "" })
+        Size = UDim2.fromOffset(0, 52), FontFace = UITheme.F.display, TextSize = 23, TextColor3 = T.money, Text = "" })
     value.Parent = pill
 
     -- v3: flag chips (HEAVY / FRAGILE 75% / JACKPOT / TARGET)
@@ -182,7 +185,7 @@ function LootHud:_buildUi()
         UITheme.corner(chip, 14)
         hpad(chip, 9, 9)
         local l = UITheme.label({ Name = "Text", AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 28),
-            Text = text, FontFace = UITheme.F.display, TextSize = 13, TextColor3 = T.bgDeep })
+            Text = text, FontFace = UITheme.F.display, TextSize = 15, TextColor3 = T.bgDeep })
         l.Parent = chip
         chip.Parent = flags
         return chip
@@ -190,7 +193,7 @@ function LootHud:_buildUi()
     self._flagHeavy = flagChip(1, "HEAVY", T.danger)
     self._flagFragile = flagChip(2, "FRAGILE", T.pink)
     self._flagJackpot = flagChip(3, "JACKPOT", T.gold)
-    self._flagTarget = flagChip(4, "TARGET", T.info)
+    self._flagTarget = flagChip(4, "TARGET", T.teal)
     self._flags = flags
 
     -- key hint chip:  [G] THROW
@@ -207,7 +210,7 @@ function LootHud:_buildUi()
     UITheme.corner(keycap, 13)
     keycap.Parent = hint
     UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 36),
-        Text = "THROW", FontFace = UITheme.F.display, TextSize = 14 }).Parent = hint
+        Text = "THROW", FontFace = UITheme.F.display, TextSize = 17 }).Parent = hint
 
     -- ── v3 target chip (left end of the row) ──
     local target = UITheme.card({ Name = "Target", LayoutOrder = 0, Size = UDim2.fromOffset(0, 46),
@@ -239,7 +242,7 @@ function LootHud:_buildUi()
     keyScale.Parent = key
     UITheme.badge(UITheme.ICON.key, T.info, 34, { LayoutOrder = 1 }).Parent = key
     UITheme.label({ LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 46),
-        Text = "KEYCARD", FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.info }).Parent = key
+        Text = "KEYCARD", FontFace = UITheme.F.display, TextSize = 19, TextColor3 = T.info }).Parent = key
 
     self._row = rowFrame
     self._group, self._scale = group, scale
@@ -384,7 +387,7 @@ end
 -- v3: the Boss's target, while a heist is running
 function LootHud:_renderTarget()
     local name = ReplicatedStorage:GetAttribute("TargetName")
-    local show = self._stage == "ACTIVE" and type(name) == "string" and name ~= ""
+    local show = SHOW_TARGET_CHIP and self._stage == "ACTIVE" and type(name) == "string" and name ~= ""
     local wasVisible = self._target.Visible
     self._target.Visible = show
     if show then

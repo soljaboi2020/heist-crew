@@ -15,6 +15,8 @@
           count    players in that zone      needed  players it takes to start a countdown
           total    everyone in the server    launchAt  server time of the drop-in (0/nil = none)
           locked   false | true | level number
+    v3.2: the card glows in the heist's colour, bigger words, no "…" glyphs.
+
     Zones: BaseParts tagged "PortalZone" with attribute JobId (ClubBuilder).
 
     Sets a LOCAL attribute on the player: InPortal = jobId (or nil) — TipHud,
@@ -39,7 +41,7 @@ local localPlayer = Players.LocalPlayer
 local FALLBACK_NAME = { mart = "SUNNY'S MART", villa = "VILLA ROSA", jewelry = "DIAMOND DOLLS", bank = "OCEAN BANK" }
 local JOB_COLOR = {
     mart = Color3.fromRGB(74, 222, 128), villa = Color3.fromRGB(255, 70, 180),
-    jewelry = Color3.fromRGB(40, 230, 255), bank = Color3.fromRGB(251, 191, 36),
+    jewelry = Color3.fromRGB(45, 212, 191), bank = Color3.fromRGB(252, 196, 45),
 }
 
 local function jobName(id)
@@ -67,12 +69,12 @@ function PortalHud:_build()
     local old = pg:FindFirstChild("PortalHud")
     if old then old:Destroy() end
     -- (v2.1) a chunky card in the UITheme bottomCenter slot
-    local panel = UITheme.card({ Name = "Portal", LayoutOrder = 40, Size = UDim2.fromOffset(0, 76),
-        AutomaticSize = Enum.AutomaticSize.X, radius = 20, Visible = false })
+    local panel = UITheme.card({ Name = "Portal", LayoutOrder = 40, Size = UDim2.fromOffset(0, 82),
+        AutomaticSize = Enum.AutomaticSize.X, radius = 22, Visible = false })
     panel.Parent = UITheme.slot("bottomCenter")
     local stroke = panel:FindFirstChild("Stroke")
     local minW = Instance.new("UISizeConstraint")
-    minW.MinSize = Vector2.new(340, 76)
+    minW.MinSize = Vector2.new(340, 82)
     minW.Parent = panel
     local scale = Instance.new("UIScale")
     scale.Parent = panel
@@ -86,20 +88,20 @@ function PortalHud:_build()
     outer.SortOrder = Enum.SortOrder.LayoutOrder
     outer.Padding = UDim.new(0, 14)
     outer.Parent = panel
-    local badge = UITheme.badge(UITheme.ICON.door, T.gold, 52, { LayoutOrder = 1 })
+    local badge = UITheme.badge(UITheme.ICON.door, T.gold, 58, { LayoutOrder = 1 })
     badge.Parent = panel
 
     local col = Instance.new("Frame")
     col.LayoutOrder = 2
     col.BackgroundTransparency = 1
-    col.Size = UDim2.fromOffset(0, 60)
+    col.Size = UDim2.fromOffset(0, 64)
     col.AutomaticSize = Enum.AutomaticSize.X
     col.Parent = panel
     local cl = Instance.new("UIListLayout")
     cl.SortOrder = Enum.SortOrder.LayoutOrder
     cl.VerticalAlignment = Enum.VerticalAlignment.Center
     cl.Parent = col
-    UITheme.caption("Heist door", { LayoutOrder = 1, Size = UDim2.fromOffset(200, 16), TextSize = 13,
+    UITheme.caption("Heist door", { LayoutOrder = 1, Size = UDim2.fromOffset(200, 18), TextSize = 15,
         TextColor3 = T.gold }).Parent = col
 
     local row = Instance.new("Frame")
@@ -123,11 +125,11 @@ function PortalHud:_build()
         l.Parent = row
         return l
     end
-    local name = lbl(2, { FontFace = UITheme.F.display, TextSize = 26 })
-    local sep1 = lbl(3, { Text = "·", TextColor3 = T.faint, TextSize = 26 })
-    local count = lbl(4, { FontFace = UITheme.F.bold, TextSize = 20 })
-    local sep2 = lbl(5, { Text = "·", TextColor3 = T.faint, TextSize = 26 })
-    local status = lbl(6, { FontFace = UITheme.F.display, TextSize = 22 })
+    local name = lbl(2, { FontFace = UITheme.F.display, TextSize = 28 })
+    local sep1 = lbl(3, { Text = "·", TextColor3 = T.faint, TextSize = 28 })
+    local count = lbl(4, { FontFace = UITheme.F.display, TextSize = 22 })
+    local sep2 = lbl(5, { Text = "·", TextColor3 = T.faint, TextSize = 28 })
+    local status = lbl(6, { FontFace = UITheme.F.display, TextSize = 24 })
 
     self._u = { panel = panel, stroke = stroke, badge = badge, scale = scale, name = name, sep1 = sep1, count = count,
         sep2 = sep2, status = status }
@@ -142,7 +144,11 @@ function PortalHud:_render(jobId)
     u.name.TextColor3 = col
     if u.stroke then
         u.stroke.Color = col
-        u.stroke.Transparency = 0.2
+        u.stroke.Transparency = 0.1
+    end
+    if self._tinted ~= jobId then
+        self._tinted = jobId
+        UITheme.tint(u.panel, col, 0.4)
     end
 
     local n = math.max(0, math.floor(tonumber(d.count) or 0))
@@ -153,7 +159,8 @@ function PortalHud:_render(jobId)
     if d.locked then
         u.count.Visible, u.sep1.Visible = false, false
         -- (v2.0.1) true = a heist is running; a number = level lock
-        u.status.Text = (type(d.locked) == "number") and string.format("LOCKED — reach level %d", d.locked) or "Heist in progress…"
+        local need = tonumber(d.starsNeeded) or 0   -- v3.2: star-locked doors
+        u.status.Text = (need > 0) and string.format("🔒 Need ⭐ %d", need) or "Heist in progress!"
         u.status.TextColor3 = T.danger
         return
     end
@@ -171,10 +178,10 @@ function PortalHud:_render(jobId)
         u.status.Text = string.format("Waiting for %d more", more)
         u.status.TextColor3 = T.muted
     elseif self._state[jobId] == nil then
-        u.status.Text = "Stay here…"
+        u.status.Text = "Stay here!"
         u.status.TextColor3 = T.muted
     else
-        u.status.Text = "Get ready…"
+        u.status.Text = "Get ready!"
         u.status.TextColor3 = T.gold
     end
 end

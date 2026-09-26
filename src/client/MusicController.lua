@@ -21,7 +21,8 @@
     Replaces the old always-on server loop (HeistBuilder "AmbientMusic",
     now removed); any leftover copy is muted locally so nothing doubles up.
 
-    🎵 MUSIC button (UITheme rightEdge slot, under DAILY) mutes/unmutes.
+    🎵 round MUSIC button (PC: bottom-right corner · phones: the rightEdge
+    row next to DAILY) mutes/unmutes; a red slash shows while muted.
     Stored in the local player attribute "MusicMuted" (this session only —
     a server-side save needs PlayerDataService + a remote).
 
@@ -191,55 +192,83 @@ local function step(dt, now)
 end
 
 -- ── the 🎵 button ──────────────────────────────────────────────────────
+-- v3.2: a small round icon button. PC: bottom-right corner. Phones: the
+-- bottom-right is the jump button, so it joins the rightEdge row under
+-- the cash + THE JOB cards (next to DAILY).
 function MusicController:_buildButton()
+    local touch = UITheme.isTouch()
+    local size = touch and 52 or 48
     local b = Instance.new("TextButton")
     b.Name = "MusicButton"
     b.Text = ""
     b.AutoButtonColor = false
-    b.LayoutOrder = 2              -- under DAILY (LayoutOrder 1)
-    b.Size = UDim2.fromOffset(118, 44)
-    b.BackgroundColor3 = T.bg
-    b.BackgroundTransparency = 0.08
+    b.LayoutOrder = 70             -- after DAILY (1) and the chat button (60) in the rightEdge row
+    b.Size = UDim2.fromOffset(size, size)
+    b.BackgroundColor3 = Color3.new(1, 1, 1)
+    b.BackgroundTransparency = 0.05
     b.BorderSizePixel = 0
-    UITheme.corner(b, 22)
+    UITheme.corner(b, size / 2)
     local g = Instance.new("UIGradient")
     g.Rotation = 90
-    g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 155, 170))
+    g.Color = ColorSequence.new(T.bg:Lerp(T.teal, 0.35), T.bgDeep)
     g.Parent = b
-    local stroke = UITheme.stroke(b, T.info, 0.2, 2)
-    local badge = UITheme.badge("🎵", T.info, 34)
-    badge.AnchorPoint = Vector2.new(0, 0.5)
-    badge.Position = UDim2.new(0, 5, 0.5, 0)
+    local stroke = UITheme.stroke(b, T.teal, 0.1, 2.5)
+    local badge = UITheme.badge(UITheme.ICON.music, T.teal, size - 12)
+    badge.AnchorPoint = Vector2.new(0.5, 0.5)
+    badge.Position = UDim2.fromScale(0.5, 0.5)
+    badge.BackgroundTransparency = 1
     badge.Parent = b
-    local label = UITheme.label({ Name = "Label", Text = "MUSIC", Position = UDim2.fromOffset(44, 0),
-        Size = UDim2.new(1, -50, 1, 0), FontFace = UITheme.F.display, TextSize = 17, TextColor3 = T.info })
-    label.Parent = b
+    local ring = badge:FindFirstChild("Ring")
+    if ring then ring.Transparency = 1 end
+    -- a red slash across the note while muted
+    local slash = Instance.new("Frame")
+    slash.Name = "Slash"
+    slash.AnchorPoint = Vector2.new(0.5, 0.5)
+    slash.Position = UDim2.fromScale(0.5, 0.5)
+    slash.Size = UDim2.fromOffset(4, size - 14)
+    slash.Rotation = 45
+    slash.BackgroundColor3 = T.danger
+    slash.BorderSizePixel = 0
+    slash.Visible = false
+    slash.ZIndex = 3
+    UITheme.corner(slash, 2)
+    slash.Parent = b
     local sc = Instance.new("UIScale")
     sc.Parent = b
-    b.MouseEnter:Connect(function() TweenService:Create(sc, TweenInfo.new(0.12), { Scale = 1.06 }):Play() end)
+    b.MouseEnter:Connect(function() TweenService:Create(sc, TweenInfo.new(0.12), { Scale = 1.08 }):Play() end)
     b.MouseLeave:Connect(function() TweenService:Create(sc, TweenInfo.new(0.15), { Scale = 1 }):Play() end)
     b.Activated:Connect(function() self:setMuted(not muted) end)
-    self._btn = { button = b, badge = badge, label = label, stroke = stroke }
-    -- (v3.1) own corner (bottom-right): in the rightEdge slot it overlapped THE JOB card mid-heist
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "MusicButton"
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 12
-    sg.Parent = localPlayer:WaitForChild("PlayerGui")
-    b.AnchorPoint = Vector2.new(1, 1)
-    b.Position = UDim2.new(1, -14, 1, -14)
-    b.Parent = sg
+    self._btn = { button = b, badge = badge, slash = slash, stroke = stroke }
+    if touch then
+        b.Parent = UITheme.slot("rightEdge")
+    else
+        -- (v3.1) own corner (bottom-right): in the old rightEdge slot it overlapped THE JOB card
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "MusicButton"
+        sg.ResetOnSpawn = false
+        sg.DisplayOrder = 12
+        pcall(function() sg.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets end)
+        sg.Parent = localPlayer:WaitForChild("PlayerGui")
+        local holder = Instance.new("Frame")
+        holder.Name = "Holder"
+        holder.BackgroundTransparency = 1
+        holder.AnchorPoint = Vector2.new(1, 1)
+        holder.Position = UDim2.new(1, -14, 1, -14)
+        holder.Size = UDim2.fromOffset(size, size)
+        holder.Parent = sg
+        UITheme.autoScale(holder)
+        b.Parent = holder
+    end
     self:_paintButton()
 end
 
 function MusicController:_paintButton()
     local u = self._btn
     if not u then return end
-    local col = muted and T.faint or T.info
-    UITheme.setBadge(u.badge, muted and "🔇" or "🎵", col)
-    u.label.Text = muted and "MUTED" or "MUSIC"
-    u.label.TextColor3 = muted and T.muted or T.info
+    local col = muted and T.faint or T.teal
+    u.slash.Visible = muted
     u.stroke.Color = col
+    UITheme.setBadge(u.badge, UITheme.ICON.music, col)
 end
 
 function MusicController:setMuted(on)

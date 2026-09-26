@@ -40,6 +40,9 @@ Remotes.NAMES = {
     DailyReward     = "DailyReward",       -- RemoteFunction ("status"|"claim") -> {ok, day, amount, nextAt, msg}
     Jail            = "Jail",              -- server→client ({jailed:boolean, freeAt:number?})
     Leaderboard     = "Leaderboard",       -- server→client ({rows = {{name, cash, heists}}})
+    Ping            = "Ping",              -- v3.2 client→server (origin, dir) · server→client {id, by, kind, label, pos, target, life, t}
+    QuickChat       = "QuickChat",         -- v3.2 client→server (index 1..6) · server→client {by, index, t}
+    MaskUp          = "MaskUp",            -- v3.2 casing → MASK UP (server↔client)
     Getaway         = "Getaway",           -- v3.0 server↔client ({phase="vote"|"scene"|..., scene, crew, carModel}; votes/GO)
 
     -- Client → Server (none yet — using ProximityPrompt for vault interaction)

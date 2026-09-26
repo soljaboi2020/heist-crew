@@ -34,6 +34,29 @@
         PlayerDataService:isTutorialDone(player)   -> bool (true if not loaded yet / load failed:
                                                       never nag someone whose real save we can't see)
         PlayerDataService:markTutorialDone(player) -> bool  true only the FIRST time (reward-once guard)
+
+    v3.2 SAVE FIELDS (heist stars + hot streak — Constants.STARS / Constants.STREAK):
+        bestStars     { [jobId] = 0..3 }  best stars ever earned on each heist
+        totalStars    sum of bestStars (recomputed on every change + on load)
+        unlockAll     bool. GRANDFATHER: an old save (no bestStars field) that already
+                      finished a heist keeps every door open. New players start false.
+        streak        0..STREAK.MAX  hot streak level
+        streakAtRisk  bool. true while the player is in a heist run (JobService sets it at
+                      drop-in, clears it at the finish). A save that still has it on load
+                      means they left / disconnected mid-run → the streak drops ONE level.
+        PlayerDataService:getStreak(player) -> n
+        PlayerDataService:changeStreak(player, delta) -> before, after   (clamped 0..MAX)
+        PlayerDataService:setStreakAtRisk(player, on)
+        PlayerDataService:leftMidRun(player) -> before, after   (drop one level + clear the flag;
+                                                                   no-op if the flag is off)
+        PlayerDataService:recordStars(player, jobId, n) -> bestBefore, bestAfter, totalStars
+        PlayerDataService:getBestStars(player, jobId) -> 0..3
+        PlayerDataService:getTotalStars(player) -> n
+        PlayerDataService:canOpen(player, starsNeeded) -> bool   (unlockAll, enough stars, or a
+                                                                   failed load: never lock out
+                                                                   someone whose real save we can't see)
+        Player attributes kept in sync (clients read these): Streak, TotalStars,
+        Stars_<jobId> (per job in Constants.JOBS), UnlockAll.
 --]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -81,6 +104,11 @@ local function makeDefaultData()
         cosmetics = {},         -- v2: [itemId] = true
         equippedCosmetics = {}, -- v2: { bag, car, trail }
         tutorialDone = false,   -- v3.1: finished or skipped the first-time tutorial
+        bestStars = {},         -- v3.2: [jobId] = 0..3
+        totalStars = 0,         -- v3.2: sum of bestStars
+        unlockAll = false,      -- v3.2: grandfathered veteran (every door open)
+        streak = 0,             -- v3.2: hot streak level 0..STREAK.MAX
+        streakAtRisk = false,   -- v3.2: in a run right now (left mid-run → -1 on next load)
     }
 end
 
@@ -104,21 +132,56 @@ local function migrate(data)
     if data.tutorialDone == nil then
         data.tutorialDone = (tonumber(data.heistsCompleted) or 0) > 0
     end
+    -- v3.2 heist stars: an old save (no bestStars) that already finished a heist is
+    -- grandfathered — every door stays open. Must run BEFORE the defaults fill in.
+    if data.bestStars == nil then
+        data.unlockAll = (tonumber(data.heistsCompleted) or 0) > 0
+    end
     local defaults = makeDefaultData()
     for k, v in pairs(defaults) do
         if data[k] == nil then data[k] = v end
     end
     if type(data.masks) ~= "table" then data.masks = { Bandit = true } end
     data.masks.Bandit = true
-    for _, k in ipairs({ "gear", "codes", "cosmetics", "equippedCosmetics" }) do
+    for _, k in ipairs({ "gear", "codes", "cosmetics", "equippedCosmetics", "bestStars" }) do
         if type(data[k]) ~= "table" then data[k] = {} end
     end
-    for _, k in ipairs({ "lastDailyAt", "dailyStreak", "lifetimeEarned", "heistsCompleted" }) do
+    for _, k in ipairs({ "lastDailyAt", "dailyStreak", "lifetimeEarned", "heistsCompleted", "streak" }) do
         if type(data[k]) ~= "number" then data[k] = tonumber(data[k]) or 0 end
     end
     data.dailyStreak = math.clamp(math.floor(data.dailyStreak), 0, 7)
     data.tutorialDone = data.tutorialDone == true
+    -- v3.2 stars: clamp each job to 0..3, recompute the total
+    local total = 0
+    for id, n in pairs(data.bestStars) do
+        n = math.clamp(math.floor(tonumber(n) or 0), 0, 3)
+        data.bestStars[id] = n
+        total = total + n
+    end
+    data.totalStars = total
+    data.unlockAll = data.unlockAll == true
+    -- v3.2 hot streak: a save still flagged "in a run" means they left mid-run
+    -- (or the server died) → one level down, never straight to zero
+    local maxStreak = (Constants.STREAK and Constants.STREAK.MAX) or 5
+    data.streak = math.clamp(math.floor(data.streak), 0, maxStreak)
+    if data.streakAtRisk == true then
+        data.streak = math.max(0, data.streak - 1)
+    end
+    data.streakAtRisk = false
     return data
+end
+
+-- v3.2: the attributes clients read (door stars, streak flame, CashHud)
+local function syncAttrs(player, data)
+    if not data or typeof(player) ~= "Instance" then return end
+    pcall(function()
+        player:SetAttribute("Streak", data.streak or 0)
+        player:SetAttribute("TotalStars", data.totalStars or 0)
+        player:SetAttribute("UnlockAll", data.unlockAll == true)
+        for _, cfg in ipairs(Constants.JOBS or {}) do
+            player:SetAttribute("Stars_" .. cfg.id, (data.bestStars and data.bestStars[cfg.id]) or 0)
+        end
+    end)
 end
 
 function PlayerDataService:loadPlayer(player)
@@ -152,6 +215,7 @@ function PlayerDataService:loadPlayer(player)
     data = migrate(data)
 
     cache[player.UserId] = data
+    syncAttrs(player, data)
     print(string.format("[PlayerDataService] Loaded %s — cash: $%d, level: %d",
         player.Name, data.cash, data.level))
     return data
@@ -208,6 +272,77 @@ function PlayerDataService:markTutorialDone(player)
     if not data or data.tutorialDone == true then return false end
     data.tutorialDone = true
     return true
+end
+
+-- ── v3.2 hot streak ──────────────────────────────────────────────────
+function PlayerDataService:getStreak(player)
+    local data = cache[player.UserId]
+    return data and (data.streak or 0) or 0
+end
+
+-- returns before, after (clamped 0..STREAK.MAX)
+function PlayerDataService:changeStreak(player, delta)
+    local data = cache[player.UserId]
+    if not data then return 0, 0 end
+    local before = data.streak or 0
+    local maxStreak = (Constants.STREAK and Constants.STREAK.MAX) or 5
+    data.streak = math.clamp(before + math.floor(tonumber(delta) or 0), 0, maxStreak)
+    syncAttrs(player, data)
+    return before, data.streak
+end
+
+function PlayerDataService:setStreakAtRisk(player, on)
+    local data = cache[player.UserId]
+    if data then data.streakAtRisk = on == true end
+end
+
+-- the player is leaving (or dropped out of) a run before it finished: one level
+-- down, flag cleared so a later load can't take a second level
+function PlayerDataService:leftMidRun(player)
+    local data = cache[player.UserId]
+    if not data or data.streakAtRisk ~= true then
+        local s = data and data.streak or 0
+        return s, s
+    end
+    data.streakAtRisk = false
+    return self:changeStreak(player, -1)
+end
+
+-- ── v3.2 heist stars ─────────────────────────────────────────────────
+function PlayerDataService:getBestStars(player, jobId)
+    local data = cache[player.UserId]
+    return data and data.bestStars and data.bestStars[jobId] or 0
+end
+
+function PlayerDataService:getTotalStars(player)
+    local data = cache[player.UserId]
+    return data and data.totalStars or 0
+end
+
+-- keeps the best; returns bestBefore, bestAfter, totalStars
+function PlayerDataService:recordStars(player, jobId, n)
+    local data = cache[player.UserId]
+    if not data or type(jobId) ~= "string" then return 0, 0, 0 end
+    n = math.clamp(math.floor(tonumber(n) or 0), 0, 3)
+    local before = data.bestStars[jobId] or 0
+    if n > before then
+        data.bestStars[jobId] = n
+        local total = 0
+        for _, v in pairs(data.bestStars) do total = total + v end
+        data.totalStars = total
+        syncAttrs(player, data)
+    end
+    return before, math.max(before, n), data.totalStars or 0
+end
+
+-- can this player open a door that needs `need` total stars?
+function PlayerDataService:canOpen(player, need)
+    need = tonumber(need) or 0
+    if need <= 0 then return true end
+    if loadFailed[player.UserId] then return true end
+    local data = cache[player.UserId]
+    if not data then return false end
+    return data.unlockAll == true or (data.totalStars or 0) >= need
 end
 
 function PlayerDataService:getData(player)

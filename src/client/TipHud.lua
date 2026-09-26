@@ -18,6 +18,10 @@
     first bag · near the car with a bag · first alarm · first time in the car ·
     reaching the vault · lasers ahead · first time in jail.
 
+    v3.2 "MIAMI HUD": night-purple card with a gold glow, the Boss's real hat
+    as the icon (UITheme swaps the 🎩 emoji for his Fedora picture), bigger
+    words, even shorter tips, a drawn X you can actually tap (44 px).
+
     v3.1: quiet while the player attribute `Tutorial` is set (TutorialService /
     TutorialHud run the first-time walkthrough and own the coaching then).
 --]]
@@ -39,17 +43,17 @@ local GAP_TIME = 0.8
 local URGENT = { alarm = true, spotted = true, jail = true }
 
 local TIPS = {
-    welcome = { "Welcome to The Vault!", "Follow the gold bar at the top. It always says what to do next.", I.boss },
-    portal  = { "Heist door", "Stay here. When your crew is in too, the heist starts!", I.door },
-    jail    = { "Busted!", "A friend can hold E at your cell door to get you out.", I.jail },
-    start   = { "You're in!", "Stay out of flashlights and red camera beams.", I.eye },
-    spotted = { "They see you!", "Hide! If the meter fills up, you go back to the door.", I.eye },
-    bag     = { "Heavy bag!", "Take it to the car. G throws it to a friend.", I.bag },
+    welcome = { "Welcome to The Vault!", "The bar at the top says what to do.", I.boss },
+    portal  = { "Heist door", "Stay here. Your crew can join you!", I.door },
+    jail    = { "Busted!", "A friend can get you out. Hang on!", I.jail },
+    start   = { "You're in!", "Stay out of flashlights and red beams.", I.eye },
+    spotted = { "They see you!", "Hide! Full meter = back to the door.", I.eye },
+    bag     = { "Got a bag!", "Take it to the car.", I.bag },
     trunk   = { "Load it up", "Hold E at the back of the car.", I.car },
-    alarm   = { "Alarm!", "Load the car, jump in and hit GO! Fast!", I.alarm },
-    drive   = { "In the car!", "Wait for your crew or hit GO!, then vote how you escape.", I.car },
-    vault   = { "The vault", "Put the drill on it and stay close. Stuck? Hold E.", I.drill },
-    lasers  = { "Lasers!", "They blink. Walk through when they're off.", I.alarm },
+    alarm   = { "Alarm!", "Load the car and hit GO! Fast!", I.alarm },
+    drive   = { "In the car!", "Hit GO! Then vote how to escape.", I.car },
+    vault   = { "The vault", "Put the drill on it. Stuck? Hold E.", I.drill },
+    lasers  = { "Lasers!", "Walk through when they blink off.", I.alarm },
 }
 
 function TipHud:_build()
@@ -62,55 +66,61 @@ function TipHud:_build()
     card.LayoutOrder = 1
     card.Size = UDim2.fromOffset(UITheme.L.TIP_W, 0)
     card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = T.bg
-    card.BackgroundTransparency = 0.06
+    card.BackgroundColor3 = Color3.new(1, 1, 1)     -- (v3.2) the gradient carries the colour
+    card.BackgroundTransparency = 0.04
     card.GroupTransparency = 1
     card.Visible = false
     card.Parent = UITheme.slot("left")
-    UITheme.corner(card, 16)
-    UITheme.stroke(card, T.gold, 0.35, 2)
+    UITheme.corner(card, 18)
+    local stroke = UITheme.stroke(card, T.gold, 0.15, 2.5)
     local g = Instance.new("UIGradient")
     g.Rotation = 90
-    g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(160, 165, 180))
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, T.bg:Lerp(T.gold, 0.28)),
+        ColorSequenceKeypoint.new(0.45, T.bg),
+        ColorSequenceKeypoint.new(1, T.bgDeep),
+    })
     g.Parent = card
     UITheme.padding(card, 12, 12)
     local scale = Instance.new("UIScale")
     scale.Parent = card
 
-    local badge = UITheme.badge(I.boss, T.gold, 44)
+    local badge = UITheme.badge(I.boss, T.gold, 54)
     badge.Parent = card
     local col = Instance.new("Frame")
     col.BackgroundTransparency = 1
-    col.Position = UDim2.fromOffset(54, 0)
-    col.Size = UDim2.new(1, -54, 0, 0)
+    col.Position = UDim2.fromOffset(64, 0)
+    col.Size = UDim2.new(1, -64, 0, 0)
     col.AutomaticSize = Enum.AutomaticSize.Y
     col.Parent = card
     local list = Instance.new("UIListLayout")
     list.SortOrder = Enum.SortOrder.LayoutOrder
     list.Padding = UDim.new(0, 2)
     list.Parent = col
-    UITheme.caption("The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, -24, 0, 14), TextColor3 = T.gold }).Parent = col
-    local head = UITheme.label({ LayoutOrder = 2, Size = UDim2.new(1, -24, 0, 24), FontFace = UITheme.F.display,
-        TextSize = 20, TextTruncate = Enum.TextTruncate.AtEnd })
+    UITheme.caption("The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, -34, 0, 16), TextColor3 = T.gold }).Parent = col
+    local head = UITheme.label({ LayoutOrder = 2, Size = UDim2.new(1, -34, 0, 28), FontFace = UITheme.F.display,
+        TextSize = 24, TextScaled = true })
+    do local c = Instance.new("UITextSizeConstraint") c.MaxTextSize = 24 c.MinTextSize = 14 c.Parent = head end
     head.Parent = col
     local body = UITheme.label({ LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium,
+        TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.bold,
         TextSize = UITheme.T.body, TextColor3 = T.text })
     body.Parent = col
 
     local close = Instance.new("TextButton")
     close.AnchorPoint = Vector2.new(1, 0)
-    close.Position = UDim2.new(1, 4, 0, -4)
-    close.Size = UDim2.fromOffset(28, 28)
+    close.Position = UDim2.new(1, 10, 0, -10)      -- inside the card padding (a CanvasGroup clips)
+    close.Size = UDim2.fromOffset(44, 44)             -- (v3.2) a real touch target
     close.BackgroundTransparency = 1
-    close.Text = "✕"
-    close.TextColor3 = T.muted
-    close.FontFace = UITheme.F.bold
-    close.TextSize = 17
+    close.Text = ""
     close.ZIndex = 3
     close.Parent = card
+    local x = UITheme.closeX(14, T.muted, 3)          -- drawn: BuilderSans has no ✕ glyph
+    x.AnchorPoint = Vector2.new(0.5, 0.5)
+    x.Position = UDim2.fromScale(0.5, 0.5)
+    x.Parent = close
     close.Activated:Connect(function() self:_hide() end)
-    self._u = { card = card, head = head, body = body, badge = badge, scale = scale }
+    self._u = { card = card, head = head, body = body, badge = badge, scale = scale, stroke = stroke }
 end
 
 function TipHud:_hide()
@@ -141,6 +151,7 @@ function TipHud:_display(key)
     u.head.Text = tip[1]
     u.body.Text = tip[2]
     UITheme.setBadge(u.badge, tip[3] or I.boss, URGENT[key] and T.danger or T.gold)
+    u.stroke.Color = URGENT[key] and T.danger or T.gold
     u.card.Visible = true
     u.card.GroupTransparency = 1
     u.scale.Scale = 0.9

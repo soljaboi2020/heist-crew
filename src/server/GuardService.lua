@@ -78,8 +78,17 @@ local function maskHas(player, abilityId)
 end
 
 -- Returns (cannotBeSeen, fillTimeMultiplier)
+-- [HOOK: MaskUp] v3.2 casing (MaskUpService): an unmasked crew member outside a
+-- restricted room is just a customer / staff — guards don't get suspicious and
+-- bumping into one does nothing. In a restricted room the meter fills as normal.
+local function isCivilian(player)
+    return player:GetAttribute("Casing") == true and player:GetAttribute("InRestricted") ~= true
+end
+GuardService.isCivilian = isCivilian
+
 function GuardService.stealthFactor(player)
     if player:GetAttribute("Hidden") or player:GetAttribute("Jailed") then return true, math.huge end
+    if isCivilian(player) then return true, math.huge end   -- [HOOK: MaskUp]
     local m = 1
     if player:GetAttribute("Crouching") then m = m * CROUCH_MULT end
     if player:GetAttribute("InShadow") then
@@ -196,6 +205,7 @@ local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, hea
         local hum = character:FindFirstChildOfClass("Humanoid")
         if hum and hum.SeatPart then return end   -- (fix v1.1) in the car = the police's job
         if isHidden(player) then return end        -- (v2.0) hidden in a closet / jailed
+        if isCivilian(player) then return end      -- [HOOK: MaskUp] a customer bumped him
         if guard.cooldown > 0 then return end
         if guard.stunnedUntil and os.clock() < guard.stunnedUntil then return end
         guard.cooldown = 2  -- prevent multi-fire

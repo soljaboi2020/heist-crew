@@ -573,6 +573,21 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
     (−45,3.5,34.5)). All E prompts ≥ 6 apart. ⚠️ Constants.WORLD MART_/JEWELRY_ HALF_DEPTH comments are stale.
   - Mock: drv_rr_v3int 208/208 · drv_tut 68/68 · drv_cones 30/30 · drv_getaway 1401/1401.
 
+- **2026-09-26** — **v3.2 "CREW"** (research-driven: `docs/research/heist-games-ideas.md`; Malachi: "do now all").
+  - **UI friendliness:** Miami purple cards w/ pink→teal glow edges, bigger text (body 19), chunky buttons, compact role
+    card (tap for perks), THE JOB starts folded (J), target on the job header, 🎩 emoji → real Roblox fedora image
+    168167624, drawn chevrons/X (font drew ▾ ✕ as boxes), rightEdge inside the topRight stack, phone safe-area layout.
+  - **⭐ Stars** (no alarm · all loot · under PAR mart 150/villa 300/jewelry 240/bank 420 s) saved per job; doors unlock
+    by total stars (villa 1 · jewelry 3 · bank 6); veterans grandfathered (`unlockAll`). **🔥 Hot streak** +10%/level
+    (max 5), a fail drops one level; `streakAtRisk` handles leaving mid-run. PayoutScreen stars + streak row; DoorStars.
+  - **🎭 MASK UP** (MaskUpService/MaskUpUI, key **M** / L2): drop in unmasked = civilians in public rooms; crimes or
+    restricted rooms (VAULT/SAFE/LASERS/SECURITY/MANAGER/OFFICE from plan.rooms, or refs.restricted) mask everyone;
+    1.5 s cinematic, 1.8 s guard grace. Powers start at mask-up. Tutorial runs skip casing.
+  - **📍 Ping** (T tap / middle mouse / DPadUp; server re-casts, 0.7 s rate) + **💬 quick-chat wheel** (hold T, 6 lines,
+    index only on the wire) + **📱 MobileActionButton** (touch-only, mirrors the shown ProximityPrompt).
+  - Remotes added: Ping, QuickChat, MaskUp. Mock: rr_v3int 208 · stars 74 · maskup 51 · ping 72 · tut 68 · client 0 err.
+  - Lesson: client modules must tolerate a double :start() (init.client ORDER + test drivers) — guard with self._started.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

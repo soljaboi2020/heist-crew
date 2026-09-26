@@ -28,6 +28,14 @@
     than 4 bags fold into one "N bags" row so the bonuses always fit.
     Sets the LOCAL player attribute PayoutOpen = true while the card is up
     (GetawayCinematic hands the camera back when it goes false).
+
+    v3.2 STARS + HOT STREAK: three big stars under the title fill in one by one
+    (ding each) with a line under each — earned ("No alarm!") or why you missed it
+    ("Too slow — beat 4:00", "Left 2 bags", "The alarm went off"). "NEW BEST!" when
+    you beat your best on this heist. A "🔥 HOT STREAK x3 +30%" row pays YOUR streak
+    bonus (payload.players[tostring(UserId)].streakBonus, already inside `pay`), and
+    the meta line shows where the streak is now (up / cooled down).
+    Also starts DoorStars (the per-player stars on the club's heist doors).
 --]]
 
 local Players = game:GetService("Players")
@@ -96,7 +104,7 @@ function PayoutScreen:_build()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(540, 560)
+    card.Size = UDim2.fromOffset(540, 680)
     card.BackgroundColor3 = T.bg
     card.BackgroundTransparency = 0.02
     card.Parent = screen
@@ -113,7 +121,7 @@ function PayoutScreen:_build()
     local function refit()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
         -- v2.1: follows the HUD scale (big on 1440p), never bigger than the screen
-        self._fit = math.clamp(math.min(UITheme.scale(), (vp.Y - 40) / 580, (vp.X - 40) / 560), 0.4, 1.6)
+        self._fit = math.clamp(math.min(UITheme.scale(), (vp.Y - 40) / 700, (vp.X - 40) / 560), 0.4, 1.6)
         if screen.Enabled then scale.Scale = self._fit end
     end
     refit()
@@ -158,9 +166,38 @@ function PayoutScreen:_build()
         TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, FontFace = UITheme.F.medium, TextSize = 17, TextColor3 = T.text })
     subtitle.Parent = card
 
+    -- v3.2 ⭐ the three heist stars
+    local starRow = Instance.new("Frame")
+    starRow.Name = "Stars"
+    starRow.Position = UDim2.fromOffset(30, 164)
+    starRow.Size = UDim2.new(1, -60, 0, 100)
+    starRow.BackgroundTransparency = 1
+    starRow.Parent = card
+    local starSlots = {}
+    for k = 1, 3 do
+        local slot = Instance.new("Frame")
+        slot.Position = UDim2.fromScale((k - 1) / 3, 0)
+        slot.Size = UDim2.fromScale(1 / 3, 1)
+        slot.BackgroundTransparency = 1
+        slot.Parent = starRow
+        local star = UITheme.label({ Text = "★", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0),
+            Size = UDim2.fromOffset(80, 62), TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display,
+            TextSize = 62, TextColor3 = T.muted, TextTransparency = 0.6 })
+        star.Parent = slot
+        local cap = UITheme.label({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62),
+            Size = UDim2.new(1, -6, 0, 36), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Top,
+            TextWrapped = true, FontFace = UITheme.F.bold, TextSize = 14, TextColor3 = T.muted })
+        cap.Parent = slot
+        starSlots[k] = { star = star, cap = cap }
+    end
+    local newBest = UITheme.label({ Text = "NEW BEST!", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, -4),
+        Size = UDim2.fromOffset(110, 20), TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display,
+        TextSize = 18, TextColor3 = Color3.fromRGB(253, 224, 71), Rotation = 6, Visible = false })
+    newBest.Parent = starRow
+
     local list = Instance.new("Frame")
-    list.Position = UDim2.fromOffset(30, 170)
-    list.Size = UDim2.new(1, -60, 0, 200)
+    list.Position = UDim2.fromOffset(30, 272)
+    list.Size = UDim2.new(1, -60, 0, 220)
     list.BackgroundTransparency = 1
     list.ClipsDescendants = true
     list.Parent = card
@@ -170,20 +207,20 @@ function PayoutScreen:_build()
     layout.Parent = list
 
     local line = Instance.new("Frame")
-    line.Position = UDim2.new(0, 30, 0, 380)
+    line.Position = UDim2.new(0, 30, 0, 500)
     line.Size = UDim2.new(1, -60, 0, 1)
     line.BackgroundColor3 = T.line
     line.BackgroundTransparency = 0.85
     line.BorderSizePixel = 0
     line.Parent = card
-    local cutCap = UITheme.caption("Your money", { Position = UDim2.fromOffset(30, 392), Size = UDim2.fromOffset(200, 16),
+    local cutCap = UITheme.caption("Your money", { Position = UDim2.fromOffset(30, 512), Size = UDim2.fromOffset(200, 16),
         TextSize = 14 })
     cutCap.Parent = card
-    local cut = UITheme.label({ Position = UDim2.fromOffset(28, 408), Size = UDim2.fromOffset(300, 52),
+    local cut = UITheme.label({ Position = UDim2.fromOffset(28, 528), Size = UDim2.fromOffset(300, 52),
         FontFace = UITheme.F.display, TextSize = 48, TextColor3 = T.money })
     cut.Parent = card
-    local meta = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -30, 0, 396),
-        Size = UDim2.fromOffset(210, 50), TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top,
+    local meta = UITheme.label({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -30, 0, 512),
+        Size = UDim2.fromOffset(230, 72), TextXAlignment = Enum.TextXAlignment.Right, TextYAlignment = Enum.TextYAlignment.Top,
         FontFace = UITheme.F.display, TextSize = 18, TextColor3 = T.gold, TextWrapped = true })
     meta.Parent = card
 
@@ -193,7 +230,8 @@ function PayoutScreen:_build()
 
     self._u = { screen = screen, dim = dim, card = card, scale = scale, accent = accent, wash = wash, gradeRing = gradeRing,
         grade = grade, gradeWord = gradeWord,
-        jobCap = jobCap, title = title, subtitle = subtitle, list = list, cut = cut, meta = meta, again = again }
+        jobCap = jobCap, title = title, subtitle = subtitle, list = list, cut = cut, meta = meta, again = again,
+        starSlots = starSlots, newBest = newBest }
     again.Activated:Connect(function() self:close() end)
 end
 
@@ -216,6 +254,49 @@ local function row(parent, order, left, right, color, icon)
         TextXAlignment = Enum.TextXAlignment.Right, FontFace = UITheme.F.display, TextSize = 19, TextColor3 = color or T.text }).Parent = r
     r.Visible = false
     return r
+end
+
+-- v3.2 ⭐ what each star says (pure: the mock tests call it). s = payload.stars
+local function clock(sec)
+    sec = math.max(0, math.floor(tonumber(sec) or 0))
+    return string.format("%d:%02d", sec // 60, sec % 60)
+end
+function PayoutScreen.starLines(win, s)
+    s = type(s) == "table" and s or {}
+    if not win then
+        return {
+            { on = false, text = "Get away to earn stars" },
+            { on = false, text = "" },
+            { on = false, text = "" },
+        }
+    end
+    local left = math.max(0, (tonumber(s.bagsTotal) or 0) - (tonumber(s.bagsLoaded) or 0))
+    return {
+        { on = s.stealth == true, text = s.stealth and "Sneaky! No alarm" or "The alarm went off" },
+        { on = s.loot == true, text = s.loot and "All the loot!"
+            or (left > 0 and string.format("Left %d bag%s behind", left, left == 1 and "" or "s") or "Get every bag") },
+        { on = s.fast == true, text = s.fast and ("Fast! " .. clock(s.time))
+            or ("Too slow — beat " .. clock(s.par)) },
+    }
+end
+
+-- v3.2 🔥 my streak info from the payload (nil = not in this run)
+function PayoutScreen.mine(p)
+    local players = type(p) == "table" and type(p.players) == "table" and p.players or {}
+    return players[tostring(localPlayer and localPlayer.UserId or 0)]
+end
+
+local function ding(pitch)
+    local ok = pcall(function()
+        local s = Instance.new("Sound")
+        s.SoundId = "rbxasset://sounds/electronicpingshort.wav"
+        s.Volume = 0.5
+        s.PlaybackSpeed = pitch or 1
+        s.Parent = SoundService
+        s:Play()
+        s.Ended:Connect(function() s:Destroy() end)
+    end)
+    return ok
 end
 
 function PayoutScreen:close()
@@ -277,6 +358,13 @@ function PayoutScreen:show(win, p)
         order = order + 1
         table.insert(rows, row(u.list, order, "Sneaky bonus (no alarm!)", "+" .. UITheme.money(p.stealthBonus), T.gold, UITheme.ICON.star))
     end
+    -- v3.2 🔥 your hot streak bonus
+    local me = PayoutScreen.mine(p)
+    if win and me and (tonumber(me.streakBonus) or 0) > 0 then
+        order = order + 1
+        table.insert(rows, row(u.list, order, string.format("HOT STREAK x%d  +%d%%", tonumber(me.streakBefore) or 0,
+            tonumber(me.streakPct) or 0), "+" .. UITheme.money(me.streakBonus), Color3.fromRGB(251, 146, 60), "🔥"))
+    end
     -- v3.0 getaway bonuses (car power, helicopter) + the Boss's target
     if win and type(p.getaway) == "table" then
         for _, g in ipairs(p.getaway.rows or {}) do
@@ -306,11 +394,35 @@ function PayoutScreen:show(win, p)
 
     u.cut.Text = "$0"
     local each = (win and mine) and (p.each or 0) or 0
+    -- v3.2: your pay includes your own streak bonus
+    if win and mine and me and tonumber(me.pay) then each = me.pay end
     local mins = math.floor((p.time or 0) / 60)
     u.meta.Text = string.format("%s\n%d:%02d", (win and mine) and ("+" .. tostring(p.xp or 0) .. " XP") or "", mins, (p.time or 0) % 60)
     if not mine and win then
         u.meta.Text = "You didn't get away this time\n" .. string.format("%d:%02d", mins, (p.time or 0) % 60)
     end
+    -- v3.2 🔥 where the streak is now
+    if me and tonumber(me.streakAfter) and tonumber(me.streakBefore) then
+        local a, b = tonumber(me.streakAfter), tonumber(me.streakBefore)
+        local line
+        if a > b then line = string.format("🔥 Streak x%d!", a)
+        elseif a < b then line = string.format("🔥 Streak cooled to x%d", a)
+        elseif a > 0 then line = string.format("🔥 Streak x%d", a) end
+        if line then u.meta.Text = u.meta.Text .. "\n" .. line end
+    end
+    -- v3.2 ⭐ reset the stars (they fill in below)
+    local lines = PayoutScreen.starLines(win, p.stars)
+    for k, slot in ipairs(u.starSlots) do
+        slot.star.TextColor3 = T.muted
+        slot.star.TextTransparency = 0.6
+        slot.star.TextSize = 62
+        slot.cap.Text = ""
+        slot.cap.TextColor3 = T.muted
+        slot.lineText = lines[k] and lines[k].text or ""
+        slot.on = lines[k] and lines[k].on == true
+    end
+    u.newBest.Visible = false
+    local showNewBest = win and mine and me and (tonumber(me.bestAfter) or 0) > (tonumber(me.bestBefore) or 0)
 
     u.screen.Enabled = true
     localPlayer:SetAttribute("PayoutOpen", true)
@@ -324,6 +436,25 @@ function PayoutScreen:show(win, p)
 
     task.spawn(function()
         task.wait(0.5)
+        -- v3.2 ⭐ stars fill in one by one
+        local lit = 0
+        for _, slot in ipairs(u.starSlots) do
+            if self._token ~= token then return end
+            slot.cap.Text = slot.lineText or ""
+            if slot.on then
+                lit = lit + 1
+                slot.star.TextColor3 = Color3.fromRGB(253, 224, 71)
+                slot.star.TextTransparency = 0
+                slot.star.TextSize = 96
+                TweenService:Create(slot.star, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextSize = 62 }):Play()
+                slot.cap.TextColor3 = T.text
+                ding(0.9 + 0.15 * lit)
+            else
+                slot.cap.TextColor3 = T.muted
+            end
+            task.wait(0.4)
+        end
+        if showNewBest and self._token == token then u.newBest.Visible = true end
         for _, r in ipairs(rows) do
             if self._token ~= token then return end
             r.Visible = true
@@ -346,6 +477,11 @@ end
 
 function PayoutScreen:start()
     self:_build()
+    -- v3.2: the per-player stars on the club's heist doors (DoorStars guards a double start)
+    pcall(function()
+        local ds = script.Parent:FindFirstChild("DoorStars")
+        if ds then require(ds):start() end
+    end)
     local remote = Remotes.getRemote(Remotes.NAMES.HeistState, "RemoteEvent")
     if remote then
         remote.OnClientEvent:Connect(function(state, payload)

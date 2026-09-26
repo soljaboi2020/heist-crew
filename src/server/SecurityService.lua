@@ -204,7 +204,9 @@ local function tickCameras(dt)
                 local seen = state.seen[player] or {}
                 state.seen[player] = seen
                 local inView = false
-                if hrp then
+                -- [HOOK: MaskUp] v3.2 casing: cameras ignore unmasked crew outside restricted rooms
+                local civilian = player:GetAttribute("Casing") == true and player:GetAttribute("InRestricted") ~= true
+                if hrp and not civilian then
                     local to = hrp.Position - head.Position
                     local dist = to.Magnitude
                     if dist < S.CAMERA_RANGE and dist > 0.1 and look:Dot(to.Unit) > cosHalf then

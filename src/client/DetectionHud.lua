@@ -13,6 +13,9 @@
     v2.0 (feel agent): under the meter, tiny labels say WHY you're safer right
     now — "sneaking" (Crouching: guards 2x slower), "in the dark" (InShadow:
     1.6x slower), "hidden" (Hidden: guards + cameras can't see you at all).
+
+    v3.2: bigger words, a chunkier meter, and the direction arrow is DRAWN
+    (UITheme.chevron) — the "▲" glyph drew as an empty box in BuilderSans.
 --]]
 
 local Players = game:GetService("Players")
@@ -41,37 +44,39 @@ function DetectionHud:start()
     local card = Instance.new("CanvasGroup")
     card.AnchorPoint = Vector2.new(0.5, 0.5)
     card.Position = UDim2.fromScale(0.5, 0.62)   -- (v1.1) below the crosshair, clear of the toast stack
-    card.Size = UDim2.fromOffset(260, 66)
+    card.Size = UDim2.fromOffset(300, 78)
     card.BackgroundTransparency = 1
     card.GroupTransparency = 1
     card.Parent = screen
     UITheme.autoScale(card)     -- v2.1: readable on 1440p and phones
-    local eye = UITheme.label({ Text = "SPOTTING…", Size = UDim2.new(1, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Center,
-        FontFace = UITheme.F.display, TextSize = 21, TextStrokeTransparency = 0.4, TextStrokeColor3 = Color3.new() })
+    local eye = UITheme.label({ Text = "SPOTTING...", Size = UDim2.new(1, 0, 0, 28), TextXAlignment = Enum.TextXAlignment.Center,
+        FontFace = UITheme.F.display, TextSize = 25, TextStrokeTransparency = 0.3, TextStrokeColor3 = Color3.new() })
     eye.Parent = card
     local track = Instance.new("Frame")
-    track.Position = UDim2.fromOffset(20, 29)
-    track.Size = UDim2.new(1, -40, 0, 9)
+    track.Position = UDim2.fromOffset(20, 33)
+    track.Size = UDim2.new(1, -40, 0, 12)
     track.BackgroundColor3 = Color3.new(0, 0, 0)
     track.BackgroundTransparency = 0.4
     track.BorderSizePixel = 0
     track.Parent = card
-    UITheme.corner(track, 5)
+    UITheme.corner(track, 6)
+    UITheme.stroke(track, Color3.new(0, 0, 0), 0.4, 1.5)
     local fill = Instance.new("Frame")
     fill.Size = UDim2.fromScale(0, 1)
     fill.BorderSizePixel = 0
     fill.Parent = track
-    UITheme.corner(fill, 5)
+    UITheme.corner(fill, 6)
 
     -- (v2.0) why you're safer: "sneaking · in the dark" / "hidden"
-    local why = UITheme.label({ Name = "Why", Position = UDim2.fromOffset(0, 43), Size = UDim2.new(1, 0, 0, 18),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.bold, TextSize = 15,
-        TextColor3 = T.info, TextStrokeTransparency = 0.6, TextStrokeColor3 = Color3.new(), Text = "" })
+    local why = UITheme.label({ Name = "Why", Position = UDim2.fromOffset(0, 51), Size = UDim2.new(1, 0, 0, 22),
+        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 18,
+        TextColor3 = T.teal, TextStrokeTransparency = 0.6, TextStrokeColor3 = Color3.new(), Text = "" })
     why.Parent = card
 
-    local arrow = UITheme.label({ Text = "▲", AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(34, 34),
-        TextXAlignment = Enum.TextXAlignment.Center, FontFace = UITheme.F.display, TextSize = 30,
-        TextStrokeTransparency = 0.4, TextStrokeColor3 = Color3.new(), Visible = false })
+    local arrow = UITheme.chevron(34, T.danger, 7)
+    arrow.Name = "Arrow"
+    arrow.AnchorPoint = Vector2.new(0.5, 0.5)
+    arrow.Visible = false
     arrow.Parent = screen
     UITheme.autoScale(arrow)
 
@@ -89,7 +94,7 @@ function DetectionHud:start()
         fill.Size = UDim2.fromScale(math.clamp(shown, 0, 1), 1)
         fill.BackgroundColor3 = col
         eye.TextColor3 = col
-        eye.Text = shown > 0.85 and "SPOTTED!" or (c > g and "CAMERA SEES YOU" or "SPOTTING…")
+        eye.Text = shown > 0.85 and "SPOTTED!" or (c > g and "CAMERA SEES YOU" or "SPOTTING...")
         if active then
             local reasons = {}
             if localPlayer:GetAttribute("Hidden") then
@@ -112,8 +117,7 @@ function DetectionHud:start()
                 arrow.Visible = true
                 arrow.Position = UDim2.fromOffset(centre.X + dir.X * r, centre.Y + dir.Y * r)
                 arrow.Rotation = math.deg(math.atan2(dir.X, -dir.Y))
-                arrow.TextColor3 = col
-                arrow.TextTransparency = 1 - math.clamp(shown * 1.5, 0.3, 1)
+                UITheme.paintShape(arrow, col, 1 - math.clamp(shown * 1.5, 0.3, 1))
             else
                 arrow.Visible = false
             end
