@@ -39,6 +39,8 @@
         and break rooms) is public. Height band: sneakIn floor −6 .. +14 so the
         roof is not "inside the vault".
 
+    [slice] v3.3: jobs with refs.arrival (the crew starts on the sidewalk) ALWAYS
+    case — the tutorial exception below only applies to drop-in-inside jobs.
     TUTORIAL: runs where anyone in the crew is DOING the tutorial (player
     attribute `Tutorial` = "portal" on the tutorial job, or any in-run step;
     "offer" / "paused" don't count) SKIP casing — masks go on at the drop-in
@@ -289,7 +291,13 @@ end
 function MaskUpService:beginCasing(list, cfg, refs)
     self:init()
     stopCasing(false)
-    if not list or #list == 0 or tutorialCrew(list, cfg) then return false end
+    -- [slice] v3.3 a job that starts OUTSIDE (refs.arrival — Sunny's Mart) always
+    -- cases, even on a tutorial run: the rookie walks in the front door as a
+    -- customer (masked, the register camera would catch them on the doormat).
+    -- The tutorial's first step (the breaker) is a crime, so the masks still go
+    -- on right where the tutorial expects them.
+    local arrives = type(refs) == "table" and type(refs.arrival) == "table"
+    if not list or #list == 0 or (tutorialCrew(list, cfg) and not arrives) then return false end
     local token = {}
     state.token = token
     state.casing = true

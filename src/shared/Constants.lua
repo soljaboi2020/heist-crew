@@ -105,7 +105,7 @@ Constants.WORLD = {
     JEWELRY_HALF_DEPTH     = 18,      -- z -1..35, shopfront faces north (z -1)
 
     -- v2.0 new jobs + buildings (docs/V2_SPEC.md §1)
-    MART_CENTER            = {x = 62, y = 0,   z = 13},   -- Sunny's Mart (warm-up) x 50..74, z 1..25, front faces north
+    MART_CENTER            = {x = 62, y = 0,   z = 13},   -- Sunny's Mart (warm-up): front line z 1 (= z - HALF_DEPTH), x 50..74; v3.3 the building runs back to z 33.5 (x 48..74) + yard x 74..83.7
     MART_HALF_WIDTH        = 12,
     MART_HALF_DEPTH        = 12,
     BANK_CENTER            = {x = 112, y = 0,  z = 28},   -- Ocean Bank x 84..140, z 1..55, front faces north
@@ -185,13 +185,24 @@ Constants.JOBS = {
         stealthBonus = 0.25,
         vaultNoun = "Safe", drillTime = 12,
         warmup = true,
+        -- (v3.3 SLICE) one goal at a time: camera → safe → cash in the car → GO!
+        -- Boss lines are matched to briefing shots by keyword (BriefingUI):
+        -- camera/breaker → breaker · safe/drill → the safe · car → the car.
         briefing = {
-            "This is Sunny's Mart. It's a little store, so it's a great first job!",
-            "You start inside, by the back door. There is 1 guard. If he sees you, you go back to the door. Just sneak back in!",
-            "There is 1 camera. If the camera sees you, the alarm goes off and the police come!",
-            "Press C to crouch. Dark spots make you harder to see. Press H at a closet or a big box to hide inside.",
-            "Grab the cash from the registers. Then put the drill on the safe in the back office.",
-            "Put the money bags in the car. Get everyone in the car (or press GO!) and pick your escape. If nobody sees you, you get extra cash!",
+            "This is Sunny's Mart. A little corner store. Your first job!",
+            "You start outside on the sidewalk. No masks yet, so walk in like a normal shopper.",
+            "Job 1: the breaker box is in the stock room at the back. Turn it off and the camera goes dark!",
+            "There is 1 guard. He walks by the registers. Once your mask is on, stay out of his light!",
+            "Job 2: put the drill on the safe in the office. If it gets stuck, hold E to fix it.",
+            "Job 3: bag the cash and put it in the car out back. Then hop in and press GO!",
+            "Extra cash if you want it: the registers, the lotto tickets and the ATM. But the guard is watching!",
+        },
+        -- (v3.3 SLICE) the goal words on the objective bar (JobService SLICE_WORDS keys)
+        goals = {
+            cameras = "Turn off the camera (breaker in the back)",
+            safe = "Crack the safe in the office",
+            loot = "Bag the safe cash + load the car  %d/%d",
+            car = "Hop in the car + press GO!",
         },
     },
     {
@@ -204,7 +215,7 @@ Constants.JOBS = {
             "This job is Villa Rosa. It's a rich guy's beach house. He's on vacation, but his vault is full of money!",
             "There are 3 guards with flashlights. If a guard sees you, you get sent back to the door. Just sneak back in!",
             "There are also 3 cameras. If a camera sees you, the alarm goes off and the police come!",
-            "Press C to crouch. Dark spots make you harder to see. Press H at a closet to hide. Press V at a vent to crawl through and sneak past!",
+            "Press C to crouch. Dark spots make you harder to see. Press E at a closet to hide. Hold E at a vent to crawl through and sneak past!",
             "Tip: find the breaker box in the security room. Use it to turn the cameras off.",
             "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
             "Red lasers blink on and off. Walk through when they turn off.",
@@ -223,7 +234,7 @@ Constants.JOBS = {
             "This job is Diamond Dolls. It's a jewelry store with glass cases full of shiny stuff!",
             "If a guard sees you, you go back to the door. If a camera sees you, the alarm goes off and the police come!",
             "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
-            "Press C to crouch. Dark spots and hiding spots (hold E) help you sneak.",
+            "Press C to crouch. Dark spots and hiding spots (press E) help you sneak.",
             "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
             "Put the bags in the car. Get everyone in the car (or press GO!) and pick your escape before the timer runs out!",
         },
@@ -238,7 +249,7 @@ Constants.JOBS = {
             "This is Ocean Bank. It has the biggest vault in Miami, full of gold and money!",
             "There are 4 guards. If a guard sees you, you go back to the door. Just sneak back in!",
             "There are lots of cameras. If a camera sees you, the alarm goes off and the police come!",
-            "Press C to crouch. Dark spots make you harder to see. Hold E on a hiding spot to hide. Vents are secret shortcuts!",
+            "Press C to crouch. Dark spots make you harder to see. Press E at a hiding spot to hide. Vents are secret shortcuts (hold E)!",
             "Find the breaker box to turn the cameras off. Find the keycard to open the vault hallway.",
             "Red lasers blink on and off. Walk through when they turn off.",
             "Put the drill on the big round vault. If it gets stuck, hold E to fix it.",

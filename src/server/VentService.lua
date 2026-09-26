@@ -6,10 +6,15 @@
     other end (docs/V2_SPEC.md §2). This adds a "Crawl through" prompt on
     each end; using it fades you over to the other end.
 
-    KEY (playtest fix, 2026-09-25): vent / hatch prompts use their OWN key —
-    V on keyboard, ButtonY on gamepad — and a short 6-stud reach, so they never
-    compete with an E loot prompt standing next to them (Sunny's Mart's Golden
-    Ticket sat beside the roof hatch and E climbed to the roof instead).
+    KEY (v3.3 "one key"): back on E (v3.0.1 had moved it to V after the Golden
+    Ticket sat beside the mart's roof hatch). E-for-everything is what Roblox
+    players expect, and rooms now keep E prompts >= 6 studs apart. So the
+    nearest thing wins naturally:
+      • the prompt sits on an Attachment at the spot you STAND to use it (this
+        end's exit spot), not up on the ceiling hatch / inside the wall grille
+      • reach 5 studs (loot reaches 7) — you have to be right at the vent
+      • ActionText says what happens ("Climb to the roof", "Crawl through"),
+        ObjectText what it is ("Roof hatch" / "Vent").
 
     Where you come out: the other end's Position + its LookVector * 2.5 (builders
     point each vent part's LookVector at the spot a player should appear), lifted
@@ -25,6 +30,7 @@ local VentService = {}
 
 local deps = {}
 local busy = {}
+local REACH = 5
 
 local function findPair(part)
     local pairName = part:GetAttribute("Pair")
@@ -61,18 +67,65 @@ local function exitCFrame(target)
     return CFrame.lookAt(pos, pos + flat.Unit)
 end
 
+-- what the thing IS, for the prompt's ObjectText
+local function objectText(part)
+    local label = string.lower(tostring(part:GetAttribute("Label") or ""))
+    local name = string.lower(part.Name)
+    if label:find("vent", 1, true) then return "Vent" end
+    if label:find("roof", 1, true) or label:find("climb", 1, true) or name:find("hatch", 1, true) then
+        return "Roof hatch"
+    end
+    return "Vent"
+end
+
+-- (v3.3) where the prompt lives: at the spot you stand to use this end (its
+-- own exit spot), a bit above the floor — so reach is measured from where the
+-- player actually is, not from a hatch up in the ceiling
+local function promptParent(part)
+    local ok, cf = pcall(exitCFrame, part)
+    if not ok or not cf then return part end
+    local standAt = cf.Position - Vector3.new(0, 1, 0)
+    -- only if it is close to the part (else the prompt would float far from the vent)
+    if (standAt - part.Position).Magnitude > 9 then return part end
+    local a = Instance.new("Attachment")
+    a.Name = "VentPromptSpot"
+    a.Parent = part
+    a.WorldPosition = standAt
+    return a
+end
+
+-- ActionText = what happens. Builders' Label is sometimes a verb ("Climb down")
+-- and sometimes a noun ("Roof hatch", "Air vent") — nouns get a verb here.
+local VERBS = { climb = true, crawl = true, go = true, drop = true, enter = true, use = true, sneak = true }
+local function actionText(part)
+    local label = part:GetAttribute("Label")
+    if type(label) == "string" and label ~= "" then
+        local first = string.lower(label:match("^(%a+)") or "")
+        if VERBS[first] then return label end
+    end
+    if objectText(part) == "Roof hatch" then
+        local other = findPair(part)
+        if other and other.Position.Y < part.Position.Y - 3 then return "Climb down" end
+        if other and other.Position.Y > part.Position.Y + 3 then return "Climb to the roof" end
+        return "Climb through"
+    end
+    return "Crawl through"
+end
+
 local function attach(part)
-    if not part:IsA("BasePart") or part:FindFirstChild("VentPrompt") then return end
+    if not part:IsA("BasePart") or part:FindFirstChild("VentPrompt", true) then return end
     local p = Instance.new("ProximityPrompt")
     p.Name = "VentPrompt"
-    p.ActionText = part:GetAttribute("Label") or "Crawl through"
-    p.ObjectText = "Vent"
-    p.KeyboardKeyCode = Enum.KeyCode.V        -- NOT E: E is the loot / door key
-    p.GamepadKeyCode = Enum.KeyCode.ButtonY   -- (ButtonX is the default "interact")
+    p.ActionText = actionText(part)
+    p.ObjectText = objectText(part)
+    -- the other end may be tagged a moment later: fix the words once it exists
+    task.defer(function() if p.Parent then p.ActionText = actionText(part) end end)
+    p.KeyboardKeyCode = Enum.KeyCode.E        -- (v3.3) one key: E, like every Roblox game
+    p.GamepadKeyCode = Enum.KeyCode.ButtonX
     p.HoldDuration = 0.5
-    p.MaxActivationDistance = 6
+    p.MaxActivationDistance = REACH
     p.RequiresLineOfSight = false
-    p.Parent = part
+    p.Parent = promptParent(part)
     p.Triggered:Connect(function(player)
         if busy[player] then return end
         if player:GetAttribute("Jailed") or player:GetAttribute("Hidden") then return end

@@ -56,7 +56,7 @@ do
 end
 
 local ORDER = {
-    "CashHud", "Notifications", "FeelFX", "HeistHud", "CrewHud",
+    "CashHud", "Notifications", "FeelFX", "CameraFeel", "HeistHud", "CrewHud",
     "JobHud", "LootHud", "LootMinigames", "CrouchController", "AbilityHud", "ShopUI", "DailyRewardUI", "CarHud",
     "BriefingUI", "WaypointHud", "DetectionHud", "PayoutScreen", "TipHud", "TutorialHud",
     "ClubFX", "PortalHud", "IntroCam", "GetawayVote", "GetawayCinematic", "GuardCones", "MusicController", "PingWheel", "MobileActionButton", "MaskUpUI", "DoorStars",   -- v2.0

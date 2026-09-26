@@ -192,6 +192,10 @@ end
 local function notifyAll(text, color, duration)
     for _, p in ipairs(Players:GetPlayers()) do notify(p, text, color, duration) end
 end
+-- (v3.3) everyone except `who` (who already got the big banner)
+local function notifyOthers(who, text, color, duration)
+    for _, p in ipairs(Players:GetPlayers()) do if p ~= who then notify(p, text, color, duration) end end
+end
 
 local function isPlayer(x) return typeof(x) == "Instance" and x:IsA("Player") end
 local function rootOf(x)
@@ -538,10 +542,8 @@ local function bump(item, who, why)
     if before <= floor + 1e-6 then return false end
     item.integrity = math.max(floor, before - (V3.FRAGILE_LOSS or 0.25))
     if who and isPlayer(who) then
+        -- (v3.3) one message per event: the CRACK! banner (the toast used to repeat it)
         feel("big", "CRACK!", { player = who, color = "danger", sound = "alarm_small", shake = true })
-        local tip = why == "run" and "  Hold C to walk slow with it!" or ""
-        notify(who, string.format("Your %s cracked! Now it's worth %s.%s", item.name,
-            UITheme.money(itemValue(item, tierMult(who))), tip), "red", 3)
         if carriers[who] then syncAttrs(who) end
     end
     return true
@@ -574,7 +576,7 @@ local function spawnLoose(item, cframe, velocity, owner)
     p.ActionText = item.heavy and "Lift together" or "Pick up"
     p.ObjectText = item.name .. " · " .. UITheme.money(itemValue(item, 1)) .. (item.heavy and " · HEAVY" or "")
     p.HoldDuration = 0.3
-    p.MaxActivationDistance = 8
+    p.MaxActivationDistance = 7   -- (v3.3) loot reach 7 everywhere
     p.RequiresLineOfSight = true
     p.Parent = bag
     p.Triggered:Connect(function(player)
@@ -745,15 +747,16 @@ local function takePile(pile, player, partner)
     rollDeposit(item)
     setCarrying(player, item, partner)
     if item.duck then
+        -- (v3.3) one message each: the QUACK! banner for the finder, a toast for the rest of the crew
         feel("big", "QUACK!", { player = player, color = "info", sound = "tick" })
-        notify(player, item.line or "It's a rubber duck! Worth $1.", "white", 4)
-        notifyAll(player.DisplayName .. " found a rubber duck. Quack!", "white", 3)
+        notifyOthers(player, player.DisplayName .. " found a rubber duck. Quack!", "white", 3)
     elseif item.deposit then
         notify(player, string.format("%s! (%s)", item.name, UITheme.money(itemValue(item, 1))), "gold", 3)
     end
     if item.hidden then
-        feel("big", "SECRET STASH!", { color = "gold", sound = "success" })
-        notifyAll(player.DisplayName .. " found a SECRET STASH!", "gold", 4)
+        -- (v3.3) one message each: the banner for the finder, a toast for the rest of the crew
+        feel("big", "SECRET STASH!", { player = player, color = "gold", sound = "success" })
+        notifyOthers(player, player.DisplayName .. " found a SECRET STASH!", "gold", 4)
     end
     cb.onEvent(pile.isCase and "smash" or "take", player,
         { kind = item.kind, name = item.name, pos = pile.anchor.Position, value = itemValue(item, 1),

@@ -5,6 +5,14 @@
     (now or added later by a job builder) gets a "Hide" prompt (E).
     ObjectText = the part's "Label" attribute ("Closet").
 
+    KEY (v3.3 "one key"): back on E — E-for-everything is what Roblox players
+    expect, and rooms now keep E prompts >= 6 studs apart. To keep the nearest
+    thing winning, the hide prompt has a SHORT reach (5 studs, measured from
+    the spot's middle; a bit more for a deep spot so you can still reach it
+    standing against its front) while loot prompts reach 7 — so next to a
+    register the register wins, right in front of the closet the closet wins.
+    While you're inside, "Get out" is 0 studs away, so it always wins.
+
     Hiding:
       • remembers where you stood, moves you into the spot and anchors your
         HumanoidRootPart (you can't walk while hidden)
@@ -43,6 +51,7 @@ local HideService = {}
 local TAG = "HideSpot"
 local PROMPT_NAME = "HidePrompt"
 local LEASH = 10          -- moved further than this from the spot by someone else → auto-unhide
+local REACH = 5           -- (v3.3) prompt reach; loot is 7, vents/hatches 5
 
 local Feel = nil
 local hideRemote = nil
@@ -62,7 +71,7 @@ end
 local function setPromptIdle(entry, part)
     local p = entry.prompt
     if not p then return end
-    p.ActionText = "Hide"
+    p.ActionText = "Hide inside"
     p.ObjectText = tostring(part:GetAttribute("Label") or "Hiding spot")
     p:SetAttribute("Occupant", nil)
 end
@@ -211,11 +220,14 @@ local function addSpot(part)
     if existing then existing:Destroy() end
     local p = Instance.new("ProximityPrompt")
     p.Name = PROMPT_NAME
-    -- (v3.0.1) H = Hide, its own key: on E it stole grabs from nearby loot (Studio playtest)
-    p.KeyboardKeyCode = Enum.KeyCode.H
-    p.GamepadKeyCode = Enum.KeyCode.ButtonY
+    -- (v3.3) back on E (v3.0.1 had it on H) — short reach instead, so the nearest thing wins
+    p.KeyboardKeyCode = Enum.KeyCode.E
+    p.GamepadKeyCode = Enum.KeyCode.ButtonX
     p.HoldDuration = 0
-    p.MaxActivationDistance = 8
+    -- measured from the part's middle: a deep closet needs its half-depth on top
+    local half = math.min(part.Size.X, part.Size.Z) / 2
+    p.MaxActivationDistance = math.max(REACH, half + 3.5)
+    p.UIOffset = Vector2.new(0, 24)   -- sits a little lower than a loot prompt at the same spot
     p.RequiresLineOfSight = false   -- the prompt sits inside a closet/plant; LOS would block it
     p.Parent = part
     local entry = { prompt = p, occupant = nil }

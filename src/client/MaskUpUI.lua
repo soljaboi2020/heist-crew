@@ -22,6 +22,12 @@
 
     Sounds: built-in rbxasset://sounds only (snap.mp3, bass.wav, swoosh.wav),
     each wrapped in pcall so a failed load never errors.
+
+    v3.3: after the shot the camera goes BEHIND the character facing the way
+    the character faces (CameraFeel.restoreBehind) — it used to keep the
+    face-on angle, so you ended up looking at yourself / a wall. The MASKS ON
+    title takes its turn on FeelFX's big-banner lock (never on top of another
+    banner or the drop-in title).
 --]]
 
 local Players = game:GetService("Players")
@@ -44,6 +50,13 @@ local SOUNDS = {
     snap = "rbxasset://sounds/snap.mp3",
     bass = "rbxasset://sounds/bass.wav",
 }
+
+local function sibling(name)
+    local mod = script.Parent:FindFirstChild(name)
+    if not mod then return nil end
+    local ok, res = pcall(require, mod)
+    return ok and type(res) == "table" and res or nil
+end
 
 local function playSound(id, volume)
     pcall(function()
@@ -223,6 +236,15 @@ end
 
 -- ── the mask-up shot ─────────────────────────────────────────────────
 function MaskUpUI:_title(why)
+    local FX = sibling("FeelFX")
+    if FX and type(FX.queueBig) == "function" then
+        local ok = pcall(function() FX:queueBig(3.2, function() self:_showTitle(why) end) end)
+        if ok then return end
+    end
+    self:_showTitle(why)
+end
+
+function MaskUpUI:_showTitle(why)
     local u = self._ui
     u.tWhy.Text = why or ""
     u.title.GroupTransparency = 1
@@ -289,6 +311,9 @@ function MaskUpUI:_maskUp(payload)
                 if hum and hum.Parent then cam.CameraSubject = hum end
                 cam.FieldOfView = fov0
             end)
+            -- (v3.3) behind you, facing the way you face — not face-on / into a wall
+            local CF = sibling("CameraFeel")
+            if CF then pcall(CF.restoreBehind) end
         end
         self._masking = false
         self:_title(payload.text)

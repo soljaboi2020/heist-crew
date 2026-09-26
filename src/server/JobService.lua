@@ -317,6 +317,109 @@ local function keycardHeld()
     return false
 end
 
+-- ── [slice] v3.3 THE GOAL CHAIN (refs.goalChain — Sunny's Mart) ──────
+-- One goal at a time, in order: ① turn off the camera → ② crack the safe →
+-- ③ bag the safe cash + load the car → press GO! (+ an optional Boss target).
+-- The objective bar (CrewHud) names the first unfinished non-optional step and
+-- the waypoint (WaypointHud) follows that step's kind, so buildTargets below
+-- only ever sends the CURRENT goal (plus small bonus markers after ②).
+-- Words: cfg.goals overrides any line (Constants.JOBS mart entry).
+local SLICE_WORDS = {
+    cameras = "Turn off the camera (breaker in the back)", camerasDone = "Camera is off!",
+    safe = "Crack the safe in the office", safeOpen = "The safe is open!",
+    drilling = "Drilling the safe… %d%%", jammed = "Drill stuck — hold E to fix it!",
+    loot = "Bag the safe cash + load the car  %d/%d", car = "Hop in the car + press GO!",
+    getaway = "Getaway! Enjoy the ride", bonus = "Bonus: the %s (+$5,000)",
+}
+local function sliceWord(j, key)
+    local g = j.cfg.goals
+    return (type(g) == "table" and type(g[key]) == "string") and g[key] or SLICE_WORDS[key]
+end
+
+-- loot kinds that live behind the safe door (goal ③ counts only these)
+local function sliceVaultKinds(refs)
+    local kinds = {}
+    for _, s in ipairs(refs.lootSpots or {}) do
+        if s.inVault ~= false and s.kind then kinds[s.kind] = true end
+    end
+    return kinds
+end
+
+local function sliceSafeLoaded(refs)
+    local kinds = sliceVaultKinds(refs)
+    local ok, rows = pcall(function() return S.loot:getLoaded() end)
+    local n = 0
+    for _, r in ipairs(ok and type(rows) == "table" and rows or {}) do
+        if kinds[r.kind] then n = n + 1 end
+    end
+    return n
+end
+
+local function sliceCamsOff(refs)
+    return not (refs.breaker and has(refs, "cameras")) or S.security:camerasCut()
+end
+
+local function sliceSteps(j, c, add)
+    local refs = j.refs
+    local camsOff = sliceCamsOff(refs)
+    if refs.breaker and has(refs, "cameras") then
+        add("cameras", camsOff and sliceWord(j, "camerasDone") or sliceWord(j, "cameras"), camsOff, false)
+    end
+    if refs.vault then
+        local open = run ~= nil and run.vaultOpen == true
+        local label = sliceWord(j, "safe")
+        local d = run and run.drill
+        if open then label = sliceWord(j, "safeOpen")
+        elseif d and d.jammed then label = sliceWord(j, "jammed")
+        elseif d then label = string.format(sliceWord(j, "drilling"), math.floor((d.progress or 0) * 100)) end
+        add("vault", label, open, false)
+        local want = c.vault or 0
+        if want > 0 then
+            local got = math.min(sliceSafeLoaded(refs), want)
+            add("loot", string.format(sliceWord(j, "loot"), got, want), got >= want, false)
+        end
+    end
+    -- the Boss's target: optional (dashed ring on the JOB card, never the objective bar)
+    local tname
+    for _, s in ipairs(refs.lootSpots or {}) do
+        if s.target then tname = (Constants.LOOT[s.kind] and Constants.LOOT[s.kind].name) or s.kind break end
+    end
+    if tname then
+        add("target", string.format(sliceWord(j, "bonus"), tname), c.targetSecured == true, true)
+    end
+    if run and run.getaway then
+        add("car", sliceWord(j, "getaway"), true, false)
+    else
+        add("car", sliceWord(j, "car"), false, false)
+    end
+end
+
+local function sliceTargets(j, t, add, carPos)
+    local refs = j.refs
+    if not sliceCamsOff(refs) then
+        add(refs.breaker.Position, "BREAKER", "optional")        -- WaypointHud: step "cameras" → kind "optional"
+        return t
+    end
+    if refs.vault and refs.vault.door and not run.vaultOpen then
+        local label = "DRILL"
+        if run.drill then label = run.drill.jammed and "FIX DRILL" or "DRILLING" end
+        add(refs.vault.door.Position, label, "vault")
+        return t
+    end
+    local kinds = sliceVaultKinds(refs)
+    local n = 0
+    for _, r in ipairs(S.loot:remaining()) do
+        if kinds[r.kind] and not r.locked and n < 2 then add(r.pos, "CASH", "loot") n = n + 1 end
+    end
+    add(carPos and carPos + Vector3.new(0, 4, 0), n > 0 and "CAR" or "GO!", "car")
+    -- bonus (small extra marker only — the step is optional)
+    for _, r in ipairs(S.loot:remaining()) do
+        if r.target and not r.locked then add(r.pos, "BONUS", "optional") break end
+    end
+    return t
+end
+-- ── [/slice] ─────────────────────────────────────────────────────────
+
 -- v1.1: waypoints — where the NEXT thing to do is (the client draws markers)
 local function buildTargets(j, c)
     local t = {}
@@ -350,6 +453,7 @@ local function buildTargets(j, c)
         add(carPos and carPos + Vector3.new(0, 4, 0), "GET IN THE CAR", "car")
         return t
     end
+    if refs.goalChain then return sliceTargets(j, t, add, carPos) end   -- [slice]
     if refs.breaker and has(refs, "cameras") and not S.security:camerasCut() then
         add(refs.breaker.Position, "BREAKER", "optional")
     end
@@ -403,6 +507,9 @@ local function buildInfo()
     local steps = {}
     local function add(id, label, done, optional) table.insert(steps, { id = id, label = label, done = done, optional = optional }) end
 
+    if refs.goalChain then   -- [slice] the mart's one-goal-at-a-time chain
+        sliceSteps(j, c, add)
+    else
     if has(refs, "cameras") and refs.breaker then
         add("cameras", S.security:camerasCut() and "Cameras are off" or "Turn off the cameras", S.security:camerasCut(), true)
     end
@@ -432,6 +539,7 @@ local function buildInfo()
     else
         add("car", string.format("Put bags in the car (%d)  ·  then everyone hop in!", c.loaded), false)
     end
+    end   -- [slice] (goalChain else-branch)
 
     local jailedNames = {}
     if run then
@@ -1220,11 +1328,12 @@ finish = function(result)
         local pay = each + (each > 0 and (streakPay[p] or 0) or 0)
         local pi = playerInfo[tostring(p.UserId)]
         if pi then pi.pay = pay end
+        local payBanner = false   -- (v3.3) one message per event: the "+$pay" banner OR the toast
         if pay > 0 then
             S.economy:addCash(p, pay, "Heist payout " .. r.jobId, { payout = true })
             lifetimeEarned(p, pay)
             if feel("cash", p, pay, carPos) then feltCash = true end
-            feel("big", "+" .. UITheme.money(pay), { player = p, color = "money", sound = "success" })
+            payBanner = feel("big", "+" .. UITheme.money(pay), { player = p, color = "money", sound = "success" })
         end
         local d = S.data:getData(p)
         if d then
@@ -1233,7 +1342,9 @@ finish = function(result)
         end
         S.progress:addXP(p, xpEach, "heist")
         if each > 0 then
-            notify(p, string.format("You got %s%s", UITheme.money(pay), stealthAmt > 0 and "  (+sneaky bonus)" or ""), "green", 6)
+            if not payBanner then   -- (v3.3) the banner already said it
+                notify(p, string.format("You got %s%s", UITheme.money(pay), stealthAmt > 0 and "  (+sneaky bonus)" or ""), "green", 6)
+            end
             -- v2.0 masks: Bandit "LUCKY" → +10% of the bags' cash, on top, for you
             local MS = optionalService("MaskService")
             if MS and type(MS.has) == "function" and take > 0 then
@@ -1356,6 +1467,25 @@ local function enoughReady()
 end
 
 local function dropPoints(j)
+    -- [slice] v3.3 a job with refs.arrival (Sunny's Mart) starts OUTSIDE: the crew
+    -- stands on the sidewalk in two rows facing the front door (PAYDAY-style casing:
+    -- unmasked, you walk in like a customer). Every other job is unchanged.
+    local a = j.refs.arrival
+    if type(a) == "table" and typeof(a.at) == "Vector3" then
+        local face = typeof(a.face) == "Vector3" and a.face or (a.at + Vector3.new(0, 0, 10))
+        local spread = typeof(a.spread) == "Vector3" and a.spread or Vector3.new(1.3, 0, 0)
+        local back = Vector3.new(a.at.X - face.X, 0, a.at.Z - face.Z)
+        back = back.Magnitude > 1e-3 and back.Unit or Vector3.new(0, 0, -1)
+        local gap = tonumber(a.rowGap) or 2
+        local pts = {}
+        for i = 1, 8 do
+            local row = (i - 1) % 4
+            local col = math.floor((i - 1) / 4)
+            table.insert(pts, a.at + spread * ((row - 1.5) * 2) + back * (col * gap))
+        end
+        return pts, face
+    end
+    -- [/slice]
     -- (v1.2.3) Malachi: "I should spawn in the heist, not outside". Each job has a
     -- sneaky side door (sneakIn); the crew lands there in two rows.
     local s = j.refs.sneakIn
@@ -1486,7 +1616,8 @@ local function launch(players)
     launching = false
     for _, p in ipairs(crewList) do
         launchRemote:FireClient(p, { phase = "title", jobName = j.cfg.name, tagline = j.cfg.tagline,
-            subtitle = casing and "Look around. Mask up when you're ready." or nil })   -- [HOOK: MaskUp]
+            subtitle = casing and ((type(j.refs.arrival) == "table" and j.refs.arrival.line)   -- [slice]
+                or "Look around. Mask up when you're ready.") or nil })   -- [HOOK: MaskUp]
     end
     if run then emit("launched", crewList, j.cfg, j.refs) end
 end
@@ -1764,7 +1895,11 @@ function JobService:init(deps)
             if os.clock() < resettingUntil then return end
             data = data or {}
             if kind == "needKeycard" then
-                notify(player, "It's locked! Find the keycard first (or bring a Hacker)", "white", 3)
+                notify(player, "You need the keycard (or a Hacker)", "white", 3)   -- (v3.3)
+                return
+            end
+            if kind == "hackHold" then   -- (v3.3) a Hacker tapped the keypad: the hack is a long hold
+                notify(player, "Hold E to hack it!", "white", 3)
                 return
             end
             startRun(player, kind)
@@ -1775,10 +1910,14 @@ function JobService:init(deps)
                 feel("sound", "pickup", data.pos, player)
                 notifyAll(player.DisplayName .. " found the keycard!", "gold", 3)
             elseif kind == "cameras" then
-                if not feel("big", "CAMERAS OFF", { color = "info" }) then
+                -- (v3.3) one message each: the banner for whoever cut it, a toast for the rest of the crew
+                if not feel("big", "CAMERAS OFF", { player = player, color = "info" }) then
                     feel("sound", "tick", data.pos)
+                    notify(player, "Cameras off!", "gold", 3)
                 end
-                notifyAll(player.DisplayName .. " turned off the cameras!", "gold", 3)
+                for _, other in ipairs(Players:GetPlayers()) do
+                    if other ~= player then notify(other, player.DisplayName .. " turned off the cameras!", "gold", 3) end
+                end
             elseif kind == "door" then
                 feel("sound", "door", data.pos)
                 notifyAll("The door is open!" .. (has(job().refs, "laserRows") and " Watch out for the lasers." or ""), "gold", 3)
@@ -1941,6 +2080,22 @@ end
 function JobService:getCurrent()
     local j = job()
     return j and j.cfg, j and j.refs
+end
+
+-- (v3.3) [slice] the goal chain as the objective bar sees it (TutorialService
+-- follows it so the tutorial card and the bar never disagree). Empty unless a
+-- run is live on a refs.goalChain job. drill = { progress 0..1, jammed } | nil.
+-- alarm = true once the alarm is on (the bar then says "Load the car and hit GO!").
+function JobService:getGoalSteps()
+    local j = job()
+    if not j or not run or not j.refs.goalChain then return {}, nil, false end
+    local steps = {}
+    local c = S.loot:counts()
+    sliceSteps(j, c, function(id, label, done, optional)
+        table.insert(steps, { id = id, label = label, done = done, optional = optional })
+    end)
+    local d = run.drill
+    return steps, d and { progress = d.progress or 0, jammed = d.jammed == true } or nil, run.alarm == true
 end
 
 return JobService

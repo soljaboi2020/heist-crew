@@ -17,6 +17,18 @@
         escape   pick how you get away (the movie plays)
         → payout: "You're a real crew member now!" + $1,000 (once, ever) + tutorialDone
 
+      (v3.3) GOAL-CHAIN JOBS (refs.goalChain — Sunny's Mart's vertical slice)
+      follow the SAME chain as the objective bar (JobService:getGoalSteps),
+      so the card and the bar can never disagree (CrewHud also shows the
+      card's line on the bar while a tutorial is up):
+        door     walk from the sidewalk in the front door (until you're inside)
+        breaker  turn off the camera (breaker in the back)
+        safe     crack the safe: put the drill on it (hold E)
+          drilling / jammed   the drill is working · stuck → hold E to fix it
+        safeCash bag the safe cash (E)  ⇄  trunk  load it in the car (E)
+        ticket   OPTIONAL Golden Ticket (+ ticketCar)   → go → escape
+      The alarm going off jumps straight to go (or trunk while carrying).
+
       Every step advances from REAL game state, never a timer:
         JobService "launched" / "finished" events · SecurityService:camerasCut() ·
         LootService:isCarrying / counts().loaded / counts().targetSecured ·
@@ -34,6 +46,7 @@
     PLAYER ATTRIBUTES (server-set, the client TutorialHud reads them):
         Tutorial            string|nil  "offer" | "portal" | "breaker" | "cash" | "trunk" |
                                         "ticket" | "ticketCar" | "go" | "escape" | "paused"
+                                        (v3.3 chain) | "door" | "safe" | "drilling" | "jammed" | "safeCash"
                                         (nil = no tutorial; TipHud stays quiet while set)
         TutorialTarget      Vector3|nil where the arrow points
         TutorialPause       string|nil  why it paused: "failed" | "died" | "otherJob"
@@ -69,7 +82,8 @@ TutorialService.STEALTH_MULT = 2
 TutorialService.JOB = "mart"
 
 local TICK = 0.25
-local IN_RUN = { breaker = true, cash = true, trunk = true, ticket = true, ticketCar = true, go = true, escape = true }
+local IN_RUN = { breaker = true, cash = true, trunk = true, ticket = true, ticketCar = true, go = true, escape = true,
+    door = true, safe = true, drilling = true, jammed = true, safeCash = true }   -- (v3.3) chain steps
 
 local D = {}          -- deps
 local st = {}         -- [player] = { step, assist, inRun, heists, loaded, lastSelect }
@@ -196,12 +210,115 @@ local function getawayStarted()
     return type(ph) == "string" and ph ~= "" and ph ~= "wait"
 end
 
+-- ── (v3.3) the goal chain (refs.goalChain) ───────────────────────────
+-- change the step only when it really changes (the card pops on a change);
+-- the arrow target follows every tick
+local function keepStep(player, step, target)
+    local s = st[player]
+    if s and s.step == step then
+        player:SetAttribute("TutorialTarget", target)
+    else
+        setStep(player, step, target)
+    end
+end
+
+-- inside the store's footprint (refs.plan.bounds), past the front doormat
+local function insideStore(player, refs)
+    local root = rootOf(player)
+    local b = refs.plan and refs.plan.bounds
+    if not root or type(b) ~= "table" then return true end
+    local p = root.Position
+    return p.X > b[1] and p.X < b[3] and p.Z > b[2] + 1.5 and p.Z < b[4]
+end
+
+local function doorPos(refs)
+    local e = refs.plan and refs.plan.entry
+    if type(e) == "table" then return Vector3.new(e[1], 3, e[2] + 3) end   -- just inside the front door
+    for _, en in ipairs(refs.entrances or {}) do
+        if en.kind == "front" then return en.at end
+    end
+    return refs.entryPoint
+end
+
+-- nearest open pile of the safe's cash (the loot goal ③ counts)
+local function safeCashPos(player, refs)
+    local kinds = {}
+    for _, sp in ipairs(refs.lootSpots or {}) do
+        if sp.inVault ~= false and sp.kind then kinds[sp.kind] = true end
+    end
+    local root = rootOf(player)
+    local from = root and root.Position or Vector3.zero
+    local best, bd = nil, math.huge
+    for _, r in ipairs(D.loot:remaining()) do
+        if kinds[r.kind] and not r.locked and not r.target and typeof(r.pos) == "Vector3" then
+            local d = (r.pos - from).Magnitude
+            if d < bd then best, bd = r.pos, d end
+        end
+    end
+    -- no pile left but the goal isn't done: a dropped / thrown bag lying loose
+    if not best and typeof(refs.root) == "Instance" then
+        for _, c in ipairs(refs.root:GetChildren()) do
+            local pr = c:FindFirstChild("PickUpBag")
+            if pr and pr:IsA("ProximityPrompt") and pr.Enabled and c:IsA("BasePart") then
+                local d = (c.Position - from).Magnitude
+                if d < bd then best, bd = c.Position, d end
+            end
+        end
+    end
+    return best
+end
+
+local function chainTick(player, s, refs)
+    local J = D.jobService
+    if type(J.getGoalSteps) ~= "function" then return end
+    local steps, drill, alarm = J:getGoalSteps()
+    local cur
+    for _, g in ipairs(steps or {}) do
+        if not g.done and not g.optional then cur = g break end
+    end
+    local trunk, seat = carParts()
+    if getawayStarted() then keepStep(player, "escape", nil) return end
+    local carryingTicket = carrying(player) and player:GetAttribute("CarryTarget") == true
+    if carrying(player) and (alarm or not cur or cur.id == "loot" or cur.id == "car") then
+        keepStep(player, carryingTicket and "ticketCar" or "trunk", trunk and trunk.Position)
+        return
+    end
+    if alarm then keepStep(player, "go", seat and seat.Position) return end
+    local id = cur and cur.id or "car"
+    if id == "cameras" then
+        if not s.entered and insideStore(player, refs) then s.entered = true end
+        if not s.entered then
+            keepStep(player, "door", doorPos(refs))
+        else
+            keepStep(player, "breaker", refs.breaker and refs.breaker.Position)
+        end
+    elseif id == "vault" then
+        s.entered = true
+        local pos = refs.vault and refs.vault.door and refs.vault.door.Position
+        keepStep(player, drill and (drill.jammed and "jammed" or "drilling") or "safe", pos)
+    elseif id == "loot" then
+        keepStep(player, "safeCash", safeCashPos(player, refs))
+    else
+        -- the chain's last goal (car): the optional Golden Ticket first, unless skipped / taken
+        local tp = (not s.ticketSkipped and not counts().targetSecured) and ticketPos() or nil
+        if tp then
+            keepStep(player, "ticket", tp)
+        else
+            keepStep(player, "go", seat and seat.Position)
+        end
+    end
+end
+
 -- ── the steps ────────────────────────────────────────────────────────
 local afterLoad   -- forward
 
 local function enterRunStep(player)
     -- first step inside the mart: the breaker (if there's a camera to cut)
     local refs = martRefs()
+    if refs and refs.goalChain and st[player] then   -- (v3.3) the goal chain
+        chainTick(player, st[player], refs)
+        return
+    end
     local hasCams = refs and refs.breaker and type(refs.cameras) == "table" and #refs.cameras > 0
     if hasCams and not D.security:camerasCut() then
         setStep(player, "breaker", refs.breaker.Position)
@@ -258,6 +375,8 @@ local function tickPlayer(player, s)
         -- jailed: keep the step, the card says "wait for a friend"; out / home = handled by events
         return
     end
+    local chainRefs = martRefs()
+    if chainRefs and chainRefs.goalChain then chainTick(player, s, chainRefs) return end   -- (v3.3)
     local trunk, seat = carParts()
     if step == "breaker" then
         if D.security:camerasCut() then
@@ -370,6 +489,7 @@ end
 function TutorialService:skipTicket(player)
     local s = st[player]
     if not s or (s.step ~= "ticket" and s.step ~= "ticketCar") then return false end
+    s.ticketSkipped = true   -- (v3.3) the chain would offer it again otherwise
     local _, seat = carParts()
     setStep(player, "go", seat and seat.Position)
     return true
@@ -391,6 +511,7 @@ local function onLaunched(players, cfg)
                 s.inRun = true
                 s.heists = heistsOf(p)
                 s.loaded = 0
+                s.entered, s.ticketSkipped = false, false   -- (v3.3) chain
                 s.assist = allRookies
                 p:SetAttribute("TutorialAssist", allRookies)
                 p:SetAttribute("TutorialStealthMult", allRookies and TutorialService.STEALTH_MULT or nil)

@@ -10,6 +10,13 @@
                 If the holder is caught or leaves, it respawns somewhere else.
       DOORS     keycard doors: "Swipe keycard" (needs HasKeycard) or, for the
                 Hacker only, "Hack keypad" (hold 4s, no card needed).
+                (v3.3) ONE prompt on E (name "Swipe", ObjectText "Keypad",
+                attribute KeypadHack = hack hold). Its words switch per player:
+                CrewHud's prompt filter shows "Swipe keycard" (0.3 s) when you
+                hold the card, "Hack it (Hacker)" (4 s) for a Hacker without
+                one. The server decides on trigger: card → open · Hacker who
+                really held it ≥ ~the hack time → open · else "You need the
+                keycard (or a Hacker)". (v1.1–3.2 had a second prompt on H.)
       LASERS    rows blink on/off on a rhythm; touching a lit row trips the alarm.
 
     Role-specific prompts carry a "RoleOnly" attribute; the client hides them
@@ -23,7 +30,7 @@
     keycard or lasers) are fine: every system just has nothing to run.
 
     Callbacks (from JobService):
-        onEvent(kind, player, data)  -- "keycard", "cameras", "door", "needKeycard"; data = { pos = Vector3 }
+        onEvent(kind, player, data)  -- "keycard", "cameras", "door", "needKeycard", (v3.3) "hackHold"; data = { pos = Vector3 }
         onAlarm(reason, player)
     PUBLIC API:
         SecurityService:init(callbacks, ShopService)
@@ -415,29 +422,48 @@ function SecurityService:arm(jobRefs)
 
     for i, door in ipairs(refs.keycardDoors or {}) do
         door._closed = door.door.CFrame
-        local swipe = prompt(door.panel, "Swipe", "Swipe keycard", "Keypad", 0.3)
+        -- (v3.3) ONE keypad prompt on E: swipe with the card, else hack if you're the Hacker
+        local hackHold = S.HACK_DOOR_HOLD
+        local swipe = prompt(door.panel, "Swipe", "Swipe keycard", "Keypad", 0.3, { KeypadHack = hackHold })
+        local began = {}   -- [player] = { t = os.clock(), token } while E is held
+        local function canHack(player)
+            return roleOf(player) == "Hacker" and not player:GetAttribute("HasKeycard")
+        end
+        track(swipe.PromptButtonHoldBegan:Connect(function(player)
+            local token = {}
+            began[player] = { t = os.clock(), token = token }
+            -- v2.0 masks: HACK CHIP halves the keypad hack too (opens while you're still holding)
+            if canHack(player) and maskHas(player, "hackchip") then
+                local speed = (Constants.MASK_POWERS or {}).HACK_SPEED or 2
+                task.delay(hackHold / speed, function()
+                    local b = began[player]
+                    if b and b.token == token and swipe.Parent and not state.doorOpen[i] and canHack(player) then
+                        openDoor(i, player)
+                    end
+                end)
+            end
+        end))
+        track(swipe.PromptButtonHoldEnded:Connect(function(player)
+            task.defer(function() began[player] = nil end)   -- after Triggered has read it
+        end))
         track(swipe.Triggered:Connect(function(player)
             if state.doorOpen[i] then return end
             if player:GetAttribute("HasKeycard") then
                 openDoor(i, player)
+            elseif roleOf(player) == "Hacker" then
+                -- the hold is the client's; make sure this one really was the long hack hold
+                local b = began[player]
+                local held = b and (os.clock() - b.t) or 0
+                local need = hackHold * (maskHas(player, "hackchip") and 0.4 or 0.8)
+                if held >= need then
+                    openDoor(i, player)
+                else
+                    cb.onEvent("hackHold", player)
+                end
             else
                 cb.onEvent("needKeycard", player)
             end
         end))
-        local hack = prompt(door.panel, "HackKeypad", "Hack keypad", "Keypad", S.HACK_DOOR_HOLD, { RoleOnly = "Hacker" })
-        -- (fix v1.1) same panel as "Swipe" — give it its own key and let both show,
-        -- otherwise Roblox shows only one prompt per key and the Hacker never sees this
-        hack.KeyboardKeyCode = Enum.KeyCode.H
-        hack.GamepadKeyCode = Enum.KeyCode.ButtonY
-        hack.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
-        swipe.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
-        track(hack.Triggered:Connect(function(player)
-            if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
-        end))
-        -- v2.0 masks: HACK CHIP halves the keypad hack too
-        hackChipFast(hack, function(player)
-            if roleOf(player) == "Hacker" and not state.doorOpen[i] then openDoor(i, player) end
-        end)
     end
 
     track(RunService.Heartbeat:Connect(function(dt)

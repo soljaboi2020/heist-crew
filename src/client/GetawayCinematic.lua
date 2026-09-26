@@ -295,6 +295,9 @@ function GetawayCinematic:stop()
         cam.FieldOfView = 70
         local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then cam.CameraSubject = hum end
+        -- (v3.3) behind the character, facing the way it faces (CameraFeel)
+        local mod = script.Parent:FindFirstChild("CameraFeel")
+        if mod then pcall(function() require(mod).restoreBehind() end) end
     end
     if s.controls then pcall(function() s.controls:Enable() end) end
     for _, g in ipairs(s.hiddenGuis or {}) do

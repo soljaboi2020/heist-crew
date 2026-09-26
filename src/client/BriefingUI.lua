@@ -28,6 +28,12 @@
     ("VILLA ROSA · THE STAFF DOOR"); the other HUD ScreenGuis are hidden for
     the fly-through and put back after. No shots → the old club camera.
 
+    v3.3 "FEELS LIKE ROBLOX": every camera hand-back goes through
+    CameraFeel.restoreBehind() (Custom camera BEHIND your character, facing
+    the way you face). The drop-in title takes FeelFX's big-banner lock from
+    the fade until it is gone, and is shorter: ~2.5 s on screen, then the
+    jackpot banner, then the first tip — nothing at the same time.
+
     PUBLIC API: BriefingUI:start()
 --]]
 
@@ -44,6 +50,28 @@ local T = UITheme.C
 
 local BriefingUI = {}
 local localPlayer = Players.LocalPlayer
+
+-- (v3.3) shared helpers: the camera hand-back + FeelFX's big-banner lock
+local function sibling(name)
+    local mod = script.Parent:FindFirstChild(name)
+    if not mod then return nil end
+    local ok, res = pcall(require, mod)
+    return ok and type(res) == "table" and res or nil
+end
+local function restoreBehind()
+    local CF = sibling("CameraFeel")
+    local ok = CF and pcall(CF.restoreBehind)
+    if not ok then
+        local cam = workspace.CurrentCamera
+        if cam.CameraType == Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Custom end
+        local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then cam.CameraSubject = hum end
+    end
+end
+local function bigLock(method, secs)
+    local FX = sibling("FeelFX")
+    if FX and type(FX[method]) == "function" then pcall(FX[method], FX, secs) end
+end
 
 -- v1.2: shots inside The Vault (club HQ): holo table, job screen, DJ stage, garage bay
 local HF = Constants.WORLD.HUB_FLOOR
@@ -437,8 +465,7 @@ function BriefingUI:play()
     if self._camTween then self._camTween:Cancel() self._camTween = nil end
     cam.FieldOfView = oldFov
     cam.CameraType = (oldType == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or oldType
-    local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if hum then cam.CameraSubject = hum end
+    restoreBehind()   -- (v3.3) behind you, facing the way you face
     for _, g in ipairs(hiddenHud) do
         if g.Parent and not g.Enabled then g.Enabled = true end
     end
@@ -454,10 +481,7 @@ function BriefingUI:play()
 end
 
 function BriefingUI:_restoreCamera()
-    local cam = workspace.CurrentCamera
-    if cam.CameraType == Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Custom end
-    local hum = localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if hum then cam.CameraSubject = hum end
+    restoreBehind()
 end
 
 function BriefingUI:_dropIn(payload)
@@ -486,21 +510,26 @@ function BriefingUI:_dropIn(payload)
         return
     end
     if payload.phase == "fade" then
+        -- (v3.3) the centre is ours from the fade until the title is gone (a
+        -- safety cap in case "title" never comes); banners + tips wait
+        bigLock("holdBig", 6)
         self:_letterbox(true)
         TweenService:Create(u.black, TweenInfo.new(0.9), { BackgroundTransparency = 0 }):Play()
     elseif payload.phase == "title" then
+        -- title on screen ~2.5 s (in 0.4 · hold · out 0.5) — then the jackpot, then tips
+        bigLock("setBig", 2.6)
         self:_restoreCamera()
         u.tName.Text = payload.jobName or ""
         -- [HOOK: MaskUp] v3.2 casing: "Look around. Mask up when you're ready." (MaskUpUI shows MASKS ON later)
         u.tSub.Text = payload.subtitle or "MASKS ON.  THE JOB IS ON."
         u.black.BackgroundTransparency = 0
         u.title.GroupTransparency = 1
-        TweenService:Create(u.title, TweenInfo.new(0.6), { GroupTransparency = 0 }):Play()
-        task.delay(1.4, function()
-            TweenService:Create(u.black, TweenInfo.new(1.2), { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(u.title, TweenInfo.new(0.4), { GroupTransparency = 0 }):Play()
+        task.delay(0.7, function()
+            TweenService:Create(u.black, TweenInfo.new(0.9), { BackgroundTransparency = 1 }):Play()
         end)
-        task.delay(3.6, function()
-            TweenService:Create(u.title, TweenInfo.new(0.8), { GroupTransparency = 1 }):Play()
+        task.delay(2.0, function()
+            TweenService:Create(u.title, TweenInfo.new(0.5), { GroupTransparency = 1 }):Play()
             self:_letterbox(false)
         end)
     end

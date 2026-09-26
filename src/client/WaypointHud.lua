@@ -33,6 +33,9 @@
     kinds → colour:  boss gold · ready/portal green (the heist doors) ·
                      search/door/vault cyan · loot green · car pink ·
                      marina cyan · jail red · optional dimmed
+    (v3.3) the CURRENT goal marker is always strong: an "optional"-kind target
+    that is the main marker (the mart's BREAKER is goal ①) draws gold, never
+    muted. Optional extras (BONUS) stay small, muted and a bit fainter.
 
     v2.0 lobby: the heist DOORS start a run. If the server's "ready" target
     isn't there, we add our own "HEIST DOORS" marker at the middle of the door
@@ -58,6 +61,7 @@ local COLORS = {
     search = T.info, door = T.info, vault = T.info, marina = T.info,
     loot = T.money, car = T.pink, optional = T.muted,
 }
+local MAIN_OPTIONAL = T.gold   -- (v3.3) colour for an "optional"-kind target when it IS the current goal
 local MAX = 3
 local NEAR = 25          -- studs: extras only inside this radius
 local FADE_FROM = 17     -- extras start fading here
@@ -316,6 +320,7 @@ function WaypointHud:start()
             end
             local t, isMain = entry.t, entry.main
             local col = COLORS[t.kind] or T.text
+            if isMain and t.kind == "optional" then col = MAIN_OPTIONAL end   -- (v3.3) the current goal is never muted
             local d = (t.pos - here).Magnitude
             local alpha
             if isMain then
@@ -323,7 +328,7 @@ function WaypointHud:start()
             else
                 alpha = 1 - math.clamp((d - FADE_FROM) / (NEAR - FADE_FROM), 0, 1)
                 if t.kind == "jail" then alpha = 1 end
-                alpha = alpha * 0.9
+                alpha = alpha * (t.kind == "optional" and 0.7 or 0.9)   -- (v3.3) bonus markers stay quiet
             end
             if alpha <= 0.02 then
                 m.frame.Visible = false

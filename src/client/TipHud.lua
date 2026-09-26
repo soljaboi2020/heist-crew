@@ -10,13 +10,13 @@
         overlap anything
       • tips are SHORT (one line of heading, one short sentence)
       • ONE at a time: a new tip waits in a queue until the current one is
-        gone; urgent ones (alarm / spotted / jail) jump the queue
+        gone; urgent ones (spotted) jump the queue
       • auto-dismiss after 7 s (or the ✕)
 
     Triggers: joining (after the IntroCam fly-over, if it plays) · first time
     standing in a heist door · first run starting · first time being spotted ·
-    first bag · near the car with a bag · first alarm · first time in the car ·
-    reaching the vault · lasers ahead · first time in jail.
+    first bag · near the car with a bag · first time in the car ·
+    reaching the vault · lasers ahead.
 
     v3.2 "MIAMI HUD": night-purple card with a gold glow, the Boss's real hat
     as the icon (UITheme swaps the 🎩 emoji for his Fedora picture), bigger
@@ -24,6 +24,12 @@
 
     v3.1: quiet while the player attribute `Tutorial` is set (TutorialService /
     TutorialHud run the first-time walkthrough and own the coaching then).
+
+    v3.3 "ONE POPUP AT A TIME": a tip WAITS while a big centre banner or the
+    drop-in title is up (FeelFX:isBigBusy) — the drop-in now reads title →
+    jackpot → first tip, nothing at once. Dropped the "jail" and "alarm" tips:
+    the server already toasts both ("You're in jail! A teammate can break you
+    out." / "… ALARM! Get to the car!"), so they were the same message twice.
 --]]
 
 local Players = game:GetService("Players")
@@ -40,17 +46,30 @@ local localPlayer = Players.LocalPlayer
 
 local SHOW_TIME = 7
 local GAP_TIME = 0.8
-local URGENT = { alarm = true, spotted = true, jail = true }
+local URGENT = { spotted = true }
+
+local FeelFX = nil
+local function bigBusy()
+    if FeelFX == nil then
+        FeelFX = false
+        local mod = script.Parent:FindFirstChild("FeelFX")
+        if mod then
+            local ok, res = pcall(require, mod)
+            if ok and type(res) == "table" then FeelFX = res end
+        end
+    end
+    if not FeelFX or type(FeelFX.isBigBusy) ~= "function" then return false end
+    local ok, busy = pcall(FeelFX.isBigBusy, FeelFX)
+    return ok and busy == true
+end
 
 local TIPS = {
     welcome = { "Welcome to The Vault!", "The bar at the top says what to do.", I.boss },
     portal  = { "Heist door", "Stay here. Your crew can join you!", I.door },
-    jail    = { "Busted!", "A friend can get you out. Hang on!", I.jail },
     start   = { "You're in!", "Stay out of flashlights and red beams.", I.eye },
     spotted = { "They see you!", "Hide! Full meter = back to the door.", I.eye },
     bag     = { "Got a bag!", "Take it to the car.", I.bag },
     trunk   = { "Load it up", "Hold E at the back of the car.", I.car },
-    alarm   = { "Alarm!", "Load the car and hit GO! Fast!", I.alarm },
     drive   = { "In the car!", "Hit GO! Then vote how to escape.", I.car },
     vault   = { "The vault", "Put the drill on it. Stuck? Hold E.", I.drill },
     lasers  = { "Lasers!", "Walk through when they blink off.", I.alarm },
@@ -139,6 +158,18 @@ end
 
 function TipHud:_next()
     if self._showing then return end
+    if #self._queue == 0 then return end
+    -- (v3.3) a big banner / title is up: try again when the centre is free
+    if bigBusy() then
+        if not self._waiting then
+            self._waiting = true
+            task.delay(0.3, function()
+                self._waiting = false
+                self:_next()
+            end)
+        end
+        return
+    end
     local key = table.remove(self._queue, 1)
     if key then self:_display(key) end
 end
@@ -171,7 +202,8 @@ function TipHud:show(key)
     if not TIPS[key] then return end
     self._seen[key] = true
     if not self._showing then
-        self:_display(key)
+        table.insert(self._queue, key)   -- (v3.3) in order; waits if a banner is up
+        self:_next()
     elseif URGENT[key] and not URGENT[self._showing] then
         -- urgent: swap straight in
         table.insert(self._queue, 1, key)
@@ -204,9 +236,6 @@ function TipHud:start()
     localPlayer:GetAttributeChangedSignal("InPortal"):Connect(function()
         if localPlayer:GetAttribute("InPortal") then self:show("portal") end
     end)
-    localPlayer:GetAttributeChangedSignal("Jailed"):Connect(function()
-        if localPlayer:GetAttribute("Jailed") then self:show("jail") end
-    end)
 
     task.spawn(function()
         local info = Remotes.getRemote(Remotes.NAMES.JobInfo, "RemoteEvent")
@@ -214,7 +243,6 @@ function TipHud:start()
             info.OnClientEvent:Connect(function(i)
                 i = i or {}
                 if i.stage == "ACTIVE" then self:show("start") end
-                if i.alarm then self:show("alarm") end
                 for _, t in ipairs(i.targets or {}) do
                     local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
                     if root and typeof(t.pos) == "Vector3" and (t.pos - root.Position).Magnitude < 18 then

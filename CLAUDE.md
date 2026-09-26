@@ -597,6 +597,18 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - Remotes added: Ping, QuickChat, MaskUp. Mock: rr_v3int 208 · stars 74 · maskup 51 · ping 72 · tut 68 · client 0 err.
   - Lesson: client modules must tolerate a double :start() (init.client ORDER + test drivers) — guard with self._started.
 
+- **2026-09-26** — **v3.3 "FEEL RESET"** (Malachi: *"some things look like shit… playing it is weird… doesn't feel like
+  a good Roblox game"*). Stopped adding features; made ONE heist great first.
+  - **Sunny's Mart vertical slice:** arrive on the SIDEWALK (`refs.arrival`), walk in unmasked as a customer, MASK UP,
+    one goal at a time (`refs.goalChain`): turn off the camera → crack the safe → bag the cash + load the car → GO;
+    registers/tickets/ATM/stash = optional bonus. Guard walks a waypoint loop with pauses. Full art pass (warm stucco,
+    teal/yellow brand, real shelves/fridges, backlit sign, moody key lights). Tutorial follows the same chain.
+  - **Global feel:** E for everything again (hide 5 / vent 5 / loot 7 reach; keypad = one smart E prompt),
+    **CameraFeel** (zoom 6/11/24 + `restoreBehind()` after every cutscene/teleport), one toast at a time +
+    banner lock (title → jackpot → tip), one message per event (no banner+toast doubles).
+  - Mock: slice 64 · rr_v3int 208 · tut 85 · maskup 51 · stars 74 · getaway 1401 · client 0 err.
+  - ⏭️ Next: play the new mart in Studio with Malachi, then bring villa/jewelry/bank up to the same bar.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

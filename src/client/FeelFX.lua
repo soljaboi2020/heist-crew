@@ -16,10 +16,28 @@
     Every sound is played inside pcall — a bad id is silent, never an error.
     All UI uses Shared.UITheme.
 
+    v3.3 "ONE POPUP AT A TIME" — the BIG-BANNER LOCK. Big centre things
+    (these banners, the LootHud jackpot banner, BriefingUI's drop-in title,
+    MaskUpUI's MASKS ON title) never overlap any more:
+      • banner() is QUEUED: one at a time, each holds the centre ~2.1 s, the
+        same text twice within 3 s is dropped.
+      • queueBig(seconds, fn) — other HUDs queue their own big thing.
+      • holdBig(seconds) — "I'm showing something big RIGHT NOW (or about to)":
+        extends the lock without waiting (the drop-in title is timed by the
+        server, so it takes the lock instead of queueing). setBig(seconds) sets
+        it exactly (can shorten a long hold).
+      • isBigBusy() — true while something big shows OR is queued. TipHud and
+        Notifications wait on it, so the drop-in reads: title → jackpot → tip.
+    Also starts CameraFeel (comfortable zoom + camera behind you after
+    cut-scenes) so it runs without an init.client change.
+
     PUBLIC API:
         FeelFX:start()
-        FeelFX:banner(text, color?, shake?)   -- local-only banner (for other HUDs)
+        FeelFX:banner(text, color?, shake?)   -- local-only banner (queued)
         FeelFX:shake(strength?, seconds?)
+        FeelFX:queueBig(seconds, fn)          -- run fn when the centre is free; holds it `seconds`
+        FeelFX:holdBig(seconds) / FeelFX:setBig(seconds)
+        FeelFX:isBigBusy() -> bool
 --]]
 
 local Players = game:GetService("Players")
@@ -215,8 +233,67 @@ local function pop(pos, text, color, opts)
     return screenPop(text, color)
 end
 
+-- ── the big-banner lock ──────────────────────────────────────────────
+local BANNER_HOLD = 2.1          -- punch in 0.28 + hold + fade 0.45 ≈ 2.1 s on screen
+local BANNER_DEDUPE = 3
+local bigUntil = 0               -- os.clock() until which the centre is taken
+local bigQueue = {}              -- { {secs, fn}, ... }
+local bigRunning = false
+local lastBannerText, lastBannerAt = nil, -math.huge
+
+local function runBigQueue()
+    if bigRunning then return end
+    bigRunning = true
+    task.spawn(function()
+        while #bigQueue > 0 do
+            local wait = bigUntil - os.clock()
+            if wait > 0 then
+                task.wait(math.min(wait, 0.25))
+            else
+                local item = table.remove(bigQueue, 1)
+                bigUntil = os.clock() + (item.secs or BANNER_HOLD)
+                local ok, err = pcall(item.fn)
+                if not ok then warn("[FeelFX] big item:", err) end
+            end
+        end
+        bigRunning = false
+    end)
+end
+
+function FeelFX:queueBig(secs, fn)
+    if type(fn) ~= "function" then return end
+    table.insert(bigQueue, { secs = tonumber(secs) or BANNER_HOLD, fn = fn })
+    while #bigQueue > 4 do table.remove(bigQueue, 1) end   -- never a long backlog of stale banners
+    runBigQueue()
+end
+
+function FeelFX:holdBig(secs)
+    bigUntil = math.max(bigUntil, os.clock() + (tonumber(secs) or BANNER_HOLD))
+end
+
+function FeelFX:setBig(secs)
+    bigUntil = os.clock() + (tonumber(secs) or 0)
+end
+
+function FeelFX:isBigBusy()
+    return os.clock() < bigUntil or #bigQueue > 0
+end
+
 -- ── big banner ───────────────────────────────────────────────────────
 function FeelFX:banner(text, color, shake)
+    local key = string.upper(tostring(text or ""))
+    local now = os.clock()
+    if key == lastBannerText and now - lastBannerAt < BANNER_DEDUPE then return end
+    for _, q in ipairs(bigQueue) do
+        if q.text == key then return end
+    end
+    lastBannerText, lastBannerAt = key, now
+    table.insert(bigQueue, { secs = BANNER_HOLD, text = key, fn = function() self:_showBanner(text, color, shake) end })
+    while #bigQueue > 4 do table.remove(bigQueue, 1) end
+    runBigQueue()
+end
+
+function FeelFX:_showBanner(text, color, shake)
     if not bannerHolder then return end
     for _, c in ipairs(bannerHolder:GetChildren()) do c:Destroy() end
     local col = colorOf(color, T.gold)
@@ -253,7 +330,7 @@ function FeelFX:banner(text, color, shake)
 
     tween(scale, 0.28, { Scale = 1 }, Enum.EasingStyle.Back)
     if shake then self:shake(0.45, 0.55) end
-    task.delay(1.8, function()
+    task.delay(1.6, function()
         if group.Parent then
             tween(group, 0.45, { GroupTransparency = 1 })
             tween(scale, 0.45, { Scale = 0.92 })
@@ -291,6 +368,14 @@ local function handle(payload)
 end
 
 function FeelFX:start()
+    -- (v3.3) camera feel rides along here (no init.client change needed)
+    task.spawn(function()
+        local mod = script.Parent:FindFirstChild("CameraFeel")
+        if mod then
+            local ok, err = pcall(function() require(mod):start() end)
+            if not ok then warn("[HEIST CREW] CameraFeel failed: " .. tostring(err)) end
+        end
+    end)
     local pg = localPlayer:WaitForChild("PlayerGui")
     local old = pg:FindFirstChild("FeelFX")
     if old then old:Destroy() end

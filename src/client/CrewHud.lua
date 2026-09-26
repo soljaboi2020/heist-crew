@@ -453,7 +453,12 @@ function CrewHud:_refresh()
                 end
             end
         end
-        if current then
+        -- (v3.3) a tutorial is up: the bar says exactly what the tutorial card says
+        local tl = localPlayer:GetAttribute("Tutorial") and localPlayer:GetAttribute("TutorialLine")
+        if type(tl) == "string" and tl ~= "" then
+            self:_setObjective(mode, tl, (current and STEP_ICON[current.id]) or I.target, info.silentAlarm == true,
+                { done = done, total = total })
+        elseif current then
             self:_setObjective(mode, current.label, STEP_ICON[current.id] or I.target, info.silentAlarm == true,
                 { done = done, total = total })
         else
@@ -500,6 +505,17 @@ end
 -- The server re-checks the role; this only decides what each player SEES.
 function CrewHud:_filterPrompt(p)
     if not p:IsA("ProximityPrompt") then return end
+    -- (v3.3) the keycard-door keypad is ONE prompt on E: its words + hold follow
+    -- what YOU can do with it (the server re-checks card / role / hold on trigger)
+    local hack = p:GetAttribute("KeypadHack")
+    if type(hack) == "number" then
+        if not localPlayer:GetAttribute("HasKeycard") and localPlayer:GetAttribute("Role") == "Hacker" then
+            p.ActionText, p.HoldDuration = "Hack it (Hacker)", hack
+        else
+            p.ActionText, p.HoldDuration = "Swipe keycard", 0.3
+        end
+        p.ObjectText = "Keypad"
+    end
     local only, hide = p:GetAttribute("RoleOnly"), p:GetAttribute("RoleHide")
     local jailHide = p:GetAttribute("HideIfJailed") == true
     if not only and not hide and not jailHide then return end
@@ -549,9 +565,12 @@ function CrewHud:_titleCard()
             if card.Parent then card:Destroy() end
             return
         end
-        TweenService:Create(card, TweenInfo.new(0.8), { GroupTransparency = 0 }):Play()
-        task.wait(3.2)
-        local out = TweenService:Create(card, TweenInfo.new(1), { GroupTransparency = 1 })
+        -- (v3.3) a big centre title: take FeelFX's banner lock so no banner / tip lands on it
+        local fxMod = script.Parent:FindFirstChild("FeelFX")
+        if fxMod then pcall(function() require(fxMod):holdBig(3.9) end) end
+        TweenService:Create(card, TweenInfo.new(0.5), { GroupTransparency = 0 }):Play()
+        task.wait(2.6)
+        local out = TweenService:Create(card, TweenInfo.new(0.7), { GroupTransparency = 1 })
         out:Play()
         out.Completed:Wait()
         card:Destroy()
@@ -584,6 +603,12 @@ function CrewHud:start()
         self:_refresh()
         self:_filterAll()
     end)
+    -- (v3.3) picking up / losing the keycard switches the keypad's words
+    localPlayer:GetAttributeChangedSignal("HasKeycard"):Connect(function() self:_filterAll() end)
+    -- (v3.3) the tutorial card's line (TutorialHud, local attribute) drives the bar while it's up
+    for _, attr in ipairs({ "TutorialLine", "Tutorial" }) do
+        localPlayer:GetAttributeChangedSignal(attr):Connect(function() self:_refresh() end)
+    end
     -- keep the heist clock / launch countdown ticking between JobInfo pushes
     task.spawn(function()
         while true do

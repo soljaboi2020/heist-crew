@@ -507,7 +507,9 @@ function LootHud:start()
         if launch then
             launch.OnClientEvent:Connect(function(payload)
                 if type(payload) == "table" and payload.phase == "title" then
-                    task.delay(4.6, function() self:_jackpotBanner() end)   -- (v3.1.1) after the title card has faded
+                    -- (v3.3) queued on FeelFX's big-banner lock: BriefingUI's drop-in title holds it
+                    -- ~2.5 s, so the jackpot shows right after it (never on top of it), then tips
+                    task.delay(0.15, function() self:_jackpotBanner() end)
                 end
             end)
         end

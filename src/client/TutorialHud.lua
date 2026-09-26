@@ -9,9 +9,12 @@
             [LET'S GO]  [I know how]      (shows after the IntroCam fly-over)
       • STEP CARD (UITheme slot "left" — the Boss-tip slot; TipHud is quiet
         while the Tutorial attribute is set, so they never fight):
-            [big icon]  STEP 3 OF 6 · THE BOSS SAYS
+            [big icon]  STEP 3 OF 7 · THE BOSS SAYS
                         Grab the cash! Press E at the register
                         [ E ] [ TAP FAST! ]
+            (v3.3) while a step is up the card's line is also set as the
+            LOCAL attribute TutorialLine — CrewHud's objective bar shows it,
+            so the card and the bar always say the same thing.
                         "Then tap fast to stuff the bag!"
             + "Skip this" on the optional Golden Ticket step
             + [TRY AGAIN] [Stop] when it paused (failed / died / other heist)
@@ -48,23 +51,36 @@ local T = UITheme.C
 local TutorialHud = {}
 local localPlayer = Players.LocalPlayer
 
-local TOTAL = 6
+-- (v3.3) the steps follow Sunny's Mart's goal chain (the same order as the
+-- objective bar): door → camera → safe → cash + car → (bonus) → GO.
+-- cash is the old register step (jobs without a goal chain; it shares no. 5).
+local TOTAL = 7
 local STEPS = {
     portal    = { n = 1, icon = "🚪", text = "Walk into the SUNNY'S MART door", chips = { "WALK IN" },
                   boss = "Let's start easy. A little corner shop!" },
-    breaker   = { n = 2, icon = "⚡", text = "Find the breaker. Hold E to turn off the camera", chips = { "HOLD E" },
+    door      = { n = 2, icon = "🚶", text = "Walk in the front door like a shopper", chips = { "WALK IN" },
+                  boss = "No masks yet. You're just a customer!" },
+    breaker   = { n = 3, icon = "⚡", text = "Turn off the camera. Hold E at the breaker in the back", chips = { "HOLD E" },
                   boss = "Cameras first. No camera, no problem!" },
-    cash      = { n = 3, icon = "💰", text = "Grab the cash! Press E at the register", chips = { "E", "TAP FAST!" },
+    safe      = { n = 4, icon = "🔩", text = "Crack the safe! Hold E to put the drill on it", chips = { "HOLD E" },
+                  boss = "If the drill gets stuck, hold E to fix it!" },
+    drilling  = { n = 4, icon = "🔩", text = "The drill is working. Stay close!", chips = { "WAIT" },
+                  boss = "If the drill gets stuck, hold E to fix it!" },
+    jammed    = { n = 4, icon = "🔧", text = "The drill is stuck! Hold E to fix it", chips = { "HOLD E" },
+                  boss = "Quick fix, then it keeps going." },
+    safeCash  = { n = 5, icon = "💰", text = "Bag the cash from the safe! Press E", chips = { "E" },
+                  boss = "Then it goes in the car out back." },
+    cash      = { n = 5, icon = "💰", text = "Grab the cash! Press E at the register", chips = { "E", "TAP FAST!" },
                   boss = "Then tap fast to stuff the bag!" },
-    trunk     = { n = 4, icon = "🚗", text = "Take the bag to the car. Press E at the trunk", chips = { "E" },
+    trunk     = { n = 5, icon = "🚗", text = "Load the bag in the car. Press E at the trunk", chips = { "E" },
                   boss = "The car is parked out back." },
-    ticket    = { n = 5, icon = "🎫", text = "Bonus! Grab the Golden Ticket for +$5,000", chips = { "HOLD E" },
+    ticket    = { n = 6, icon = "🎫", text = "Bonus! Grab the Golden Ticket for +$5,000", chips = { "HOLD E" },
                   boss = "It's hiding in the office. Want it?", skipStep = true },
-    ticketCar = { n = 5, icon = "🎫", text = "Put the Golden Ticket in the trunk", chips = { "E" },
+    ticketCar = { n = 6, icon = "🎫", text = "Put the Golden Ticket in the trunk", chips = { "E" },
                   boss = "That's +$5,000 when you get away!", skipStep = true },
-    go        = { n = 6, icon = "🏁", text = "Get in the car and press GO!", chips = { "F", "GO!" },
+    go        = { n = 7, icon = "🏁", text = "Get in the car and press GO!", chips = { "F", "GO!" },
                   boss = "F to hop in. Then hit the big GO! button." },
-    escape    = { n = 6, icon = "🚤", text = "Pick how you get away!", chips = { "CLICK" },
+    escape    = { n = 7, icon = "🚤", text = "Pick how you get away!", chips = { "CLICK" },
                   boss = "Any way works. You did it!" },
 }
 local PAUSED = {
@@ -200,7 +216,7 @@ function TutorialHud:_buildCard()
     list.Padding = UDim.new(0, 6)
     list.Parent = col
 
-    local cap = UITheme.caption("Step 1 of 6 · The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 16), TextColor3 = T.gold })
+    local cap = UITheme.caption("Step 1 of 7 · The Boss says", { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 16), TextColor3 = T.gold })
     cap.Parent = col
     local main = UITheme.label({ LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
         TextWrapped = true, FontFace = UITheme.F.display, TextSize = 24, TextYAlignment = Enum.TextYAlignment.Top })
@@ -288,6 +304,7 @@ function TutorialHud:_render()
     if (not def and step ~= "paused") or busy then
         u.card.Visible = false
         self._shown = nil
+        localPlayer:SetAttribute("TutorialLine", nil)   -- (v3.3) local only: CrewHud's objective bar mirrors it
         return
     end
     local icon, text, boss, chips, n = nil, nil, nil, {}, nil
@@ -305,6 +322,8 @@ function TutorialHud:_render()
         icon, text, boss, chips, n = def.icon, def.text, def.boss, def.chips, def.n
         showSkipStep = def.skipStep == true
     end
+    -- (v3.3) the objective bar (CrewHud) shows this same line while a step is up (local attribute)
+    localPlayer:SetAttribute("TutorialLine", (step ~= "paused" and not attr("Jailed")) and text or nil)
     u.cap.Text = n and string.upper(string.format("Step %d of %d · The Boss says", n, TOTAL)) or "THE BOSS SAYS"
     UITheme.setBadge(u.badge, icon, step == "paused" and T.danger or T.gold)
     u.main.Text = text

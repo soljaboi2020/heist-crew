@@ -6,7 +6,8 @@
 
       • when a heist LAUNCHES with fewer than BOTS.CREW_TARGET (3) real players,
         1–2 bots drop in at the job's sneakIn (2 bots solo, 1 bot with two
-        players). Each bot belongs to a player and follows them with
+        players). (v3.3) A job with refs.arrival (Sunny's Mart: the crew starts
+        on the sidewalk) drops each bot right NEXT TO its owner on the sidewalk. Each bot belongs to a player and follows them with
         PathfindingService, about FOLLOW_DIST (6) studs behind. Further than
         CATCH_UP_DIST (60), or stuck for 2 s → it teleports behind its player.
       • "Give bag" (E) on a bot: your bag moves onto the bot
@@ -465,8 +466,14 @@ function BotService:spawnFor(players, refs)
     local want = math.clamp((B.CREW_TARGET or 3) - #real, 0, B.MAX or 2)
     if want <= 0 or #real == 0 then return {} end
     local s = refs and refs.sneakIn
+    -- (v3.3) sidewalk arrival (JobService.dropPoints puts the crew there too)
+    local arr = refs and type(refs.arrival) == "table" and typeof(refs.arrival.at) == "Vector3" and refs.arrival or nil
     local base, face, spread
-    if s then
+    if arr then
+        base = arr.at
+        face = typeof(arr.face) == "Vector3" and arr.face or (arr.at + Vector3.new(0, 0, 10))
+        spread = typeof(arr.spread) == "Vector3" and arr.spread or Vector3.new(1.3, 0, 0)
+    elseif s then
         base, face, spread = s.at, s.face, s.spread
     else
         local hrp = rootOf(real[1])
@@ -477,6 +484,7 @@ function BotService:spawnFor(players, refs)
     local names = {}
     local pool = table.clone(B.NAMES or { "Rex", "Pip" })
     local made = {}
+    local placed = {}   -- (v3.3)
     for i = 1, want do
         local owner = real[(i - 1) % #real + 1]
         local name = table.remove(pool, math.random(1, math.max(1, #pool))) or ("Bot" .. i)
@@ -489,7 +497,21 @@ function BotService:spawnFor(players, refs)
         -- wall. Try several spots and NEVER keep a blocked one: the last resort is
         -- right beside the owner (players always land on a clear drop point).
         local pos = nil
-        for _, cand in ipairs({
+        -- (v3.3) arrival: beside the owner first (left / right of him, then the row behind)
+        local ownerRoot = arr and rootOf(owner)
+        if ownerRoot then
+            local op = ownerRoot.Position
+            local right = flat(ownerRoot.CFrame.RightVector)
+            right = right.Magnitude > 1e-3 and right.Unit or Vector3.new(1, 0, 0)
+            local sgn = (i % 2 == 1) and 1 or -1
+            for _, cand in ipairs({ op + right * 2.4 * sgn, op - right * 2.4 * sgn, op + away * 2,
+                op + away * 2 + right * 2.4 * sgn, op + away * 2 - right * 2.4 * sgn }) do
+                local free = true
+                for _, u in ipairs(placed) do if (u - cand).Magnitude < 1.8 then free = false end end
+                if free and clearSpot(cand) then pos = cand break end
+            end
+        end
+        for _, cand in ipairs(pos and {} or {   -- (v3.3) skipped when the arrival spot is set
             base + side + away * 5 + up,        -- behind the crew rows
             base + side - away * 3 + up,        -- in front of them
             base + side + away * 2.5 + up,      -- between the two rows
@@ -502,6 +524,7 @@ function BotService:spawnFor(players, refs)
             pos = hrp and (hrp.Position + flat(hrp.CFrame.RightVector) * (i == 1 and -2.5 or 2.5)) or (base + up)
             if not clearSpot(pos) and hrp then pos = hrp.Position end
         end
+        table.insert(placed, pos)   -- (v3.3) two bots never share a spot
         local bot = makeBot(owner, name, pos, face, gen)
         if bot then
             table.insert(names, name)

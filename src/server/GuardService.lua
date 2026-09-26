@@ -18,6 +18,14 @@
         GuardService:setAlarmActive(active:boolean)  -- triggers chase mode
         GuardService:reset()  -- send everyone back to patrol
 
+    (v3.3) optional route fields (MartBuilder's guardRoutes):
+        waypoints = { Vector3, ... }  a LOOP walked in order (1 → 2 → … → n → 1)
+                                      with PathfindingService; without it the
+                                      guard walks a ↔ b like before
+        pause     = seconds           standing still at each waypoint (default 1.5);
+                                      he glances a little left/right while he waits
+    He faces the way he walks (Humanoid AutoRotate while MoveTo-ing).
+
     v2.0 (feel agent) — sneaking (docs/V2_SPEC.md §2):
       • player attribute Hidden   → guards can't see you, won't chase/path to
                                     you, and can't catch you by touch
@@ -180,7 +188,11 @@ end
 -- ──────────────────────────────────────────────
 -- Spawn a single guard with a patrol path
 -- ──────────────────────────────────────────────
-local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, head)
+local PATROL_PAUSE = 1.5    -- (v3.3) default stop at each waypoint
+local LOOK_AROUND = 12     -- (v3.3) degrees he glances left / right while pausing (small: the
+                           -- mart curtain sits 56° off his nose at the lane's back end, FOV ±40°)
+
+local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, head, cfg)
     local guard = {
         name = name,
         model = model,
@@ -194,7 +206,21 @@ local function spawnGuard(name, waypointA, waypointB, model, humanoid, root, hea
         alarmActive = false,
         cooldown = 0,
         gen = 0,            -- bumped whenever orders change, cancels the current walk
+        pause = PATROL_PAUSE,
     }
+    -- (v3.3) a waypoint loop instead of a <-> b
+    cfg = cfg or {}
+    if type(cfg.pause) == "number" and cfg.pause >= 0 then guard.pause = cfg.pause end
+    if type(cfg.waypoints) == "table" and #cfg.waypoints >= 2 then
+        local loop = {}
+        for _, v in ipairs(cfg.waypoints) do if typeof(v) == "Vector3" then table.insert(loop, v) end end
+        if #loop >= 2 then
+            guard.loop = loop
+            -- standing on the first waypoint already → head for the second
+            local here = cfg.spawn or cfg.a
+            guard.loopIdx = (typeof(here) == "Vector3" and (here - loop[1]).Magnitude < 2) and 2 or 1
+        end
+    end
 
     -- Touching ANY part of the guard (arms, legs, hat) = caught
     local function onTouched(hit)
@@ -286,6 +312,36 @@ local function nearestPlayer(from, maxDist)
     return best
 end
 
+-- (v3.3) stand still for `seconds`, glancing a little left and right of the way
+-- he was walking; ends facing that way again. Stops early if orders change,
+-- he notices someone (checkVision owns his facing then) or he's knocked out.
+local function lookAround(guard, gen, seconds)
+    local root = guard.root
+    local t0 = os.clock()
+    local stopAt = t0 + (seconds or PATROL_PAUSE)
+    local look = root.CFrame.LookVector
+    local base = Vector3.new(look.X, 0, look.Z)
+    base = base.Magnitude > 1e-3 and base.Unit or Vector3.new(0, 0, -1)
+    local yaw0 = math.atan2(-base.X, -base.Z)
+    local sweep = (seconds or 0) >= 0.8
+    guard.humanoid:MoveTo(root.Position)
+    while os.clock() < stopAt and guard.gen == gen do
+        local busy = (guard.lookUntil and os.clock() < guard.lookUntil)
+            or (guard.stunnedUntil and os.clock() < guard.stunnedUntil) or guard.alarmActive
+        if sweep and not busy then
+            local k = (os.clock() - t0) / math.max(stopAt - t0, 0.1)          -- 0 → 1
+            local yaw = yaw0 + math.rad(LOOK_AROUND) * math.sin(k * math.pi * 2)
+            local rp = root.Position
+            root.CFrame = CFrame.new(rp) * CFrame.Angles(0, yaw, 0)
+        end
+        task.wait(0.1)
+    end
+    if sweep and guard.gen == gen and not (guard.lookUntil and os.clock() < guard.lookUntil) then
+        local rp = root.Position
+        root.CFrame = CFrame.new(rp) * CFrame.Angles(0, yaw0, 0)
+    end
+end
+
 local function runBrain(guard)
     task.spawn(function()
         while guards[guard.name] == guard do   -- (fix v1.1) a respawned guard with the same name ends the old loop
@@ -306,12 +362,15 @@ local function runBrain(guard)
                 end
             else
                 guard.humanoid.WalkSpeed = Constants.GUARD_PATROL_SPEED
-                local target = guard.nextWaypoint
+                local target = guard.loop and guard.loop[guard.loopIdx] or guard.nextWaypoint   -- (v3.3)
                 if walkTo(guard, target, gen) then
-                    guard.nextWaypoint = (target == guard.waypointA) and guard.waypointB or guard.waypointA
-                    -- Pause at the end of each leg, like a real patrol
-                    local t = os.clock() + 1.5
-                    while os.clock() < t and guard.gen == gen do task.wait(0.1) end
+                    if guard.loop then
+                        guard.loopIdx = guard.loopIdx % #guard.loop + 1          -- (v3.3) next in the loop
+                    else
+                        guard.nextWaypoint = (target == guard.waypointA) and guard.waypointB or guard.waypointA
+                    end
+                    -- Pause at the end of each leg, like a real patrol (v3.3: glancing around)
+                    lookAround(guard, gen, guard.pause)
                 end
             end
         end
@@ -476,7 +535,7 @@ function GuardService:stun(guard, seconds)
     end)
 end
 
--- routes: { { name, spawn = Vector3, a = Vector3, b = Vector3 } }
+-- routes: { { name, spawn = Vector3, a = Vector3, b = Vector3, waypoints = {Vector3}?, pause = number? } }
 function GuardService:spawnPatrols(cb, routes)
     cb = cb or {}
     callbacks.onPlayerSpotted = cb.onPlayerSpotted or callbacks.onPlayerSpotted
@@ -499,7 +558,7 @@ function GuardService:spawnPatrols(cb, routes)
             -- Server owns the physics so the guard can't be flung/lagged by a client
             pcall(function() root:SetNetworkOwner(nil) end)
             NpcFactory.animate(humanoid)
-            local guard = spawnGuard(name, cfg.a, cfg.b, model, humanoid, root, head)
+            local guard = spawnGuard(name, cfg.a, cfg.b, model, humanoid, root, head, cfg)   -- (v3.3) cfg: waypoints / pause
             guards[name] = guard
             addTakedown(guard)
             runBrain(guard)

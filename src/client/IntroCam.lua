@@ -17,6 +17,9 @@
           IntroPlaying = true while it runs · IntroCamDone = true after.
         (DailyRewardUI waits for IntroCamDone before its card may pop up.)
 
+    v3.3: hands the camera back through CameraFeel.restoreBehind() — Custom,
+    behind your character, facing the way you face.
+
     PUBLIC API: IntroCam:start()
 --]]
 
@@ -32,6 +35,12 @@ local T = UITheme.C
 
 local IntroCam = {}
 local localPlayer = Players.LocalPlayer
+
+local function restoreBehind()
+    local mod = script.Parent:FindFirstChild("CameraFeel")
+    if not mod then return end
+    pcall(function() require(mod).restoreBehind() end)
+end
 
 local TOTAL = 8          -- seconds for the whole fly-over
 local BLEND = 1.2        -- of which: the last glide back behind your character
@@ -239,6 +248,7 @@ function IntroCam:play(points)
     end
     cam.CameraType = (oldType == Enum.CameraType.Scriptable) and Enum.CameraType.Custom or oldType
     if hum and hum.Parent then cam.CameraSubject = hum end
+    restoreBehind()
     for _, s in ipairs(slats) do
         if s.part.Parent then s.part.Transparency = s.t end
     end
@@ -275,6 +285,7 @@ function IntroCam:start()
                     -- never leave the player stuck on a scripted camera
                     local cam = workspace.CurrentCamera
                     if cam and cam.CameraType == Enum.CameraType.Scriptable then cam.CameraType = Enum.CameraType.Custom end
+                    restoreBehind()
                     for _, g in ipairs(self._hidden or {}) do
                         if g.Parent then g.Enabled = true end
                     end
