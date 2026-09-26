@@ -2215,7 +2215,11 @@ function VillaBuilder:_lasers(f)
     end
 
     local rows = {}
-    local zs = { -72.4, -74.6, -76.8, -79.0 }   -- same spacing as v1 (safe spot at the vault door)
+    -- (v3.4) 3 rows at the corridor's ENTRANCE end, leaving a real safe landing (z -75.7..-80.5)
+    -- in front of the vault door. The old 4th row (z -79.0) sat 1.3 studs in front of the drill:
+    -- you had to stand INSIDE the grid to drill, and a jam fix (1.5 s hold) was longer than
+    -- the lasers' 1.1 s off-window, so a stealth villa was near impossible.
+    local zs = { -71.4, -73.4, -75.4 }
     local heights = { 1.3, 2.8, 4.3 }
     for i, z in ipairs(zs) do
         local beams = {}

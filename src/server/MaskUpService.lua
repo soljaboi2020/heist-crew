@@ -104,6 +104,10 @@ local NOT_CRIME = { launch = true, caught = true }
 
 local CRIME_ROOMS = { VAULT = true, SAFE = true, LASERS = true }
 local RESTRICTED_ROOMS = { SECURITY = true, MANAGER = true, OFFICE = true }
+-- (v3.4) jobs that start on the SIDEWALK (refs.arrival): customers belong in the public
+-- front room only; every other plan room is staff-only (restricted). Without this, an
+-- unmasked "shopper" at Diamond Dolls could stroll the back hall + breaker closet.
+local PUBLIC_ROOMS = { SHOWROOM = true, ["BANKING HALL"] = true, ["SHOP FLOOR"] = true, ["SALES FLOOR"] = true, LOBBY = true }
 
 local D = {}            -- deps
 local inited = false
@@ -175,12 +179,14 @@ local function buildZones(refs)
     local plan = refs.plan
     if type(plan) ~= "table" or type(plan.rooms) ~= "table" then return zones end
     local vx, vz = plan.vault and plan.vault[1], plan.vault and plan.vault[2]
+    local arrives = type(refs.arrival) == "table"
     for _, r in ipairs(plan.rooms) do
         local name = string.upper(tostring(r[5] or ""))
         if tonumber(r[1]) and tonumber(r[4]) then
-            local dropRoom = s and s.at and roomHas(r, s.at.X, s.at.Z)
+            -- the drop-in staff room is safe for drop-in jobs; sidewalk jobs never drop in there
+            local dropRoom = (not arrives) and s and s.at and roomHas(r, s.at.X, s.at.Z)
             local crime = CRIME_ROOMS[name] or (vx and vz and roomHas(r, vx, vz)) or false
-            local restricted = crime or RESTRICTED_ROOMS[name] or false
+            local restricted = crime or RESTRICTED_ROOMS[name] or (arrives and not PUBLIC_ROOMS[name]) or false
             if restricted and not dropRoom then
                 table.insert(zones, { x0 = math.min(r[1], r[3]), z0 = math.min(r[2], r[4]), x1 = math.max(r[1], r[3]),
                     z1 = math.max(r[2], r[4]), crime = crime and true or false, name = name, y0 = y0, y1 = y1 })

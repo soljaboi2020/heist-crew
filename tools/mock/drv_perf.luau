@@ -1,0 +1,8 @@
+runMain(function()
+	runScript(SERVER_SCRIPT, MAIN_CTX)
+	task.wait(1)
+	local p = addPlayer("Malachi")
+	local t = os.clock()
+	task.wait(20)
+	print("20 virtual s took", os.clock() - t)
+end, 120)

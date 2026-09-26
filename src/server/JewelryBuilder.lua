@@ -2559,6 +2559,12 @@ function JewelryBuilder:build(folder)
         -- (v3.1) the bigger break room: drop in by the staff door, facing the office door
         sneakIn = { at = Vector3.new(-45, 3.5, 34.5), face = Vector3.new(-45, 3.5, 30),
             spread = Vector3.new(0.6, 0, 0) },
+        -- (v3.4) like Sunny's Mart: the crew starts on the SIDEWALK facing the shop and walks
+        -- in unmasked, like shoppers (MaskUpService casing). Rows x -66.7..-61.3, z -3.4 / -5.2:
+        -- the mock sidewalk survey found x -67..-61 clear (palm trunk at -72, lamp pole at -56).
+        -- sneakIn (the break room) stays the kick-back / jail break-out spot.
+        arrival = { at = Vector3.new(CX, 3.5, -3.4), face = Vector3.new(CX, 3.5, 8), spread = Vector3.new(0.9, 0, 0),
+            rowGap = 1.8, line = "Walk in like a shopper. Look around, then MASK UP!" },
         entrances = {
             { kind = "front", at = Vector3.new(CX, 3, -3.5), label = "Front door" },
             { kind = "side", at = Vector3.new(ANNEX_X1 + 3, 3, (SIDE_Z0 + SIDE_Z1) / 2), label = "Staff door (yard)" },

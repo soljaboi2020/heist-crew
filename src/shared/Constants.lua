@@ -212,15 +212,18 @@ Constants.JOBS = {
         stealthBonus = 0.25,       -- +25% of the take if the alarm never trips
         vaultNoun = "Vault", doorLabel = "Open the locked vault door", drillTime = 24,
         briefing = {
-            "This job is Villa Rosa. It's a rich guy's beach house. He's on vacation, but his vault is full of money!",
-            "There are 3 guards with flashlights. If a guard sees you, you get sent back to the door. Just sneak back in!",
-            "There are also 3 cameras. If a camera sees you, the alarm goes off and the police come!",
-            "Press C to crouch. Dark spots make you harder to see. Press E at a closet to hide. Hold E at a vent to crawl through and sneak past!",
-            "Tip: find the breaker box in the security room. Use it to turn the cameras off.",
-            "The vault room is locked. You need a keycard. It's hidden in a different room every time, so look around.",
-            "Red lasers blink on and off. Walk through when they turn off.",
-            "Put the drill on the vault. If the drill gets stuck, hold E to fix it.",
-            "Put the money bags in the car. Get everyone in the car (or press GO!) and pick your escape. If nobody sees you, you get extra cash!",
+            -- (v3.4) the same numbered steps the objective bar shows (one goal at a time).
+            -- BriefingUI picks each line's camera shot by its first keyword (camera/breaker,
+            -- keycard/locked, laser, vault/drill/safe, car, door/sneak), so word them on purpose.
+            "This job is Villa Rosa. A rich guy's beach house. He's on vacation, and his vault is full of money!",
+            "You sneak in the staff door. Look around first, then press M to MASK UP!",
+            "Step 1: find the breaker in the security room. It turns the cameras off, so they can't see you!",
+            "Step 2: find the keycard. It hides in a different room every time, so follow the gold markers!",
+            "Step 3: swipe it to open the locked door.",
+            "Red lasers blink on and off. Walk through when they turn off!",
+            "Step 4: put the drill on the vault. If it gets stuck, hold E to fix it.",
+            "Step 5: put the money bags in the car, hop in and press GO!",
+            "Watch out for guards! If one sees you, you go back to the door. Press C to crouch and sneak.",
         },
     },
     {
@@ -231,12 +234,18 @@ Constants.JOBS = {
         silentAlarmDelay = 45,     -- first smashed case starts a hidden clock; police roll after this
         vaultNoun = "Safe", doorLabel = "Open the back room door", drillTime = 20,
         briefing = {
-            "This job is Diamond Dolls. It's a jewelry store with glass cases full of shiny stuff!",
-            "If a guard sees you, you go back to the door. If a camera sees you, the alarm goes off and the police come!",
-            "When you smash the first case, the police get called. You won't hear them coming, so be fast!",
-            "Press C to crouch. Dark spots and hiding spots (press E) help you sneak.",
-            "Grab the jewels. Then find the keycard and open the back room. There's a safe in there.",
-            "Put the bags in the car. Get everyone in the car (or press GO!) and pick your escape before the timer runs out!",
+            -- (v3.4) the same numbered steps the objective bar shows (one goal at a time).
+            -- BriefingUI picks each line's camera shot by its first keyword (camera/breaker,
+            -- keycard/locked, laser, vault/drill/safe, car, door/sneak), so word them on purpose.
+            "This job is Diamond Dolls. It's a jewelry store full of shiny stuff!",
+            "Walk in the front like a shopper. Look around, then press M to MASK UP!",
+            "Step 1: the breaker is in the back closet. Turn the cameras off!",
+            "Step 2: find the keycard. Follow the gold markers!",
+            "Step 3: swipe it to open the locked back room.",
+            "Red lasers blink on and off. Walk through when they turn off!",
+            "Step 4: drill the safe. If it gets stuck, hold E to fix it.",
+            "Step 5: put the money bags in the car, hop in and press GO!",
+            "Bonus: the glass cases are full of jewels. But smashing one secretly calls the police, so do it last!",
         },
     },
     {
@@ -246,14 +255,18 @@ Constants.JOBS = {
         stealthBonus = 0.3,
         vaultNoun = "Vault", doorLabel = "Open the vault hallway door", drillTime = 30,
         briefing = {
-            "This is Ocean Bank. It has the biggest vault in Miami, full of gold and money!",
-            "There are 4 guards. If a guard sees you, you go back to the door. Just sneak back in!",
-            "There are lots of cameras. If a camera sees you, the alarm goes off and the police come!",
-            "Press C to crouch. Dark spots make you harder to see. Press E at a hiding spot to hide. Vents are secret shortcuts (hold E)!",
-            "Find the breaker box to turn the cameras off. Find the keycard to open the vault hallway.",
-            "Red lasers blink on and off. Walk through when they turn off.",
-            "Put the drill on the big round vault. If it gets stuck, hold E to fix it.",
-            "If the police catch you, you go to jail! A friend can break you out. Then load the car, get everyone in (or press GO!) and pick your escape!",
+            -- (v3.4) the same numbered steps the objective bar shows (one goal at a time).
+            -- BriefingUI picks each line's camera shot by its first keyword (camera/breaker,
+            -- keycard/locked, laser, vault/drill/safe, car, door/sneak), so word them on purpose.
+            "This is Ocean Bank. The biggest vault in Miami, full of gold and money!",
+            "Walk in the front like a customer. Look around, then press M to MASK UP!",
+            "Step 1: find the breaker in the security room. It turns the cameras off!",
+            "Step 2: find the keycard. Follow the gold markers!",
+            "Step 3: swipe it to open the locked vault hallway.",
+            "Red lasers blink on and off. Walk through when they turn off!",
+            "Step 4: put the drill on the big round vault. If it gets stuck, hold E to fix it.",
+            "Step 5: put the money bags in the car, hop in and press GO!",
+            "If the police catch you, you go to jail. A friend can break you out!",
         },
     },
 }

@@ -317,26 +317,41 @@ local function keycardHeld()
     return false
 end
 
--- ── [slice] v3.3 THE GOAL CHAIN (refs.goalChain — Sunny's Mart) ──────
--- One goal at a time, in order: ① turn off the camera → ② crack the safe →
--- ③ bag the safe cash + load the car → press GO! (+ an optional Boss target).
+-- ── [slice] THE GOAL CHAIN (refs.goalChain) ──────────────────────────
+-- One goal at a time, in order. v3.3 built it for Sunny's Mart; v3.4 made it
+-- generic so every heist plays the same way (Malachi: "make it feel like a
+-- good Roblox game" — one clear thing to do next):
+--   ① turn off the cameras (breaker)        if the job has a breaker + cameras
+--   ② find the keycard                      if the job has keycard doors
+--   ③ open the locked door                  (swipe / hack the keypad)
+--   ④ crack the safe / vault (drill)
+--   ⑤ bag the vault money + load the car    (cfg.goalLoot, default up to 3 bags)
+--   → hop in the car + press GO!            (+ the Boss target as an optional bonus)
 -- The objective bar (CrewHud) names the first unfinished non-optional step and
--- the waypoint (WaypointHud) follows that step's kind, so buildTargets below
--- only ever sends the CURRENT goal (plus small bonus markers after ②).
--- Words: cfg.goals overrides any line (Constants.JOBS mart entry).
+-- the waypoint (WaypointHud) follows that step's kind, so sliceTargets only
+-- ever sends the CURRENT goal (plus small bonus markers once the vault is open).
+-- Words: cfg.goals overrides any line (the mart sets its own); the rest are
+-- built from cfg.vaultNoun / cfg.doorLabel.
 local SLICE_WORDS = {
-    cameras = "Turn off the camera (breaker in the back)", camerasDone = "Camera is off!",
-    safe = "Crack the safe in the office", safeOpen = "The safe is open!",
-    drilling = "Drilling the safe… %d%%", jammed = "Drill stuck — hold E to fix it!",
-    loot = "Bag the safe cash + load the car  %d/%d", car = "Hop in the car + press GO!",
+    cameras = "Turn off the cameras (find the breaker)", camerasDone = "Cameras are off!",
+    keycard = "Find the keycard (check the gold markers)", keycardHeld = "Got the keycard!",
+    door = "Open the locked door", doorDone = "The door is open!",
+    safe = "Crack the %s", safeOpen = "The %s is open!",
+    drilling = "Drilling the %s… %%d%%%%", jammed = "Drill stuck — hold E to fix it!",
+    loot = "Bag the %s money + load the car  %%d/%%d", car = "Hop in the car + press GO!",
     getaway = "Getaway! Enjoy the ride", bonus = "Bonus: the %s (+$5,000)",
 }
+local NOUN_WORDS = { safe = true, safeOpen = true, drilling = true, loot = true }
 local function sliceWord(j, key)
     local g = j.cfg.goals
-    return (type(g) == "table" and type(g[key]) == "string") and g[key] or SLICE_WORDS[key]
+    if type(g) == "table" and type(g[key]) == "string" then return g[key] end
+    if key == "door" and type(j.cfg.doorLabel) == "string" then return j.cfg.doorLabel end
+    local w = SLICE_WORDS[key]
+    if NOUN_WORDS[key] then w = string.format(w, string.lower(nounOf(j))) end
+    return w
 end
 
--- loot kinds that live behind the safe door (goal ③ counts only these)
+-- loot kinds that live behind the vault / safe door (goal ⑤ counts only these)
 local function sliceVaultKinds(refs)
     local kinds = {}
     for _, s in ipairs(refs.lootSpots or {}) do
@@ -359,11 +374,31 @@ local function sliceCamsOff(refs)
     return not (refs.breaker and has(refs, "cameras")) or S.security:camerasCut()
 end
 
+local function sliceDoorsOpen(refs)
+    return not has(refs, "keycardDoors") or S.security:doorsOpen()
+end
+
+-- how many vault bags goal ⑤ asks for (the mart: both safe stacks)
+local function sliceLootWant(j, c)
+    local have = c.vault or 0
+    local cap = tonumber(j.cfg.goalLoot) or 3
+    return math.min(have, cap)
+end
+
 local function sliceSteps(j, c, add)
     local refs = j.refs
     local camsOff = sliceCamsOff(refs)
     if refs.breaker and has(refs, "cameras") then
         add("cameras", camsOff and sliceWord(j, "camerasDone") or sliceWord(j, "cameras"), camsOff, false)
+    end
+    if has(refs, "keycardDoors") then
+        local doorsOpen = S.security:doorsOpen()
+        local held = keycardHeld()
+        -- ticked only while someone HOLDS the card (or the door is open): if the holder is
+        -- kicked back the card respawns and the step comes back (same rule as v1.1)
+        add("keycard", (held or doorsOpen) and sliceWord(j, "keycardHeld") or sliceWord(j, "keycard"),
+            doorsOpen or held, false)
+        add("door", doorsOpen and sliceWord(j, "doorDone") or sliceWord(j, "door"), doorsOpen, false)
     end
     if refs.vault then
         local open = run ~= nil and run.vaultOpen == true
@@ -373,7 +408,7 @@ local function sliceSteps(j, c, add)
         elseif d and d.jammed then label = sliceWord(j, "jammed")
         elseif d then label = string.format(sliceWord(j, "drilling"), math.floor((d.progress or 0) * 100)) end
         add("vault", label, open, false)
-        local want = c.vault or 0
+        local want = sliceLootWant(j, c)
         if want > 0 then
             local got = math.min(sliceSafeLoaded(refs), want)
             add("loot", string.format(sliceWord(j, "loot"), got, want), got >= want, false)
@@ -400,6 +435,17 @@ local function sliceTargets(j, t, add, carPos)
         add(refs.breaker.Position, "BREAKER", "optional")        -- WaypointHud: step "cameras" → kind "optional"
         return t
     end
+    if not sliceDoorsOpen(refs) then
+        local door = refs.keycardDoors[1]
+        if keycardHeld() and door and door.panel then
+            add(door.panel.Position, "KEYPAD", "door")
+        else
+            for _, spot in ipairs(refs.keycardSpots or {}) do
+                add(spot.Position + Vector3.new(0, 1.5, 0), "SEARCH", "search")
+            end
+        end
+        return t
+    end
     if refs.vault and refs.vault.door and not run.vaultOpen then
         local label = "DRILL"
         if run.drill then label = run.drill.jammed and "FIX DRILL" or "DRILLING" end
@@ -407,9 +453,24 @@ local function sliceTargets(j, t, add, carPos)
         return t
     end
     local kinds = sliceVaultKinds(refs)
-    local n = 0
+    -- (v3.4) point at the BEST bags first: things one kid can carry (not heavy, not a
+    -- mystery deposit box), highest value first. In the bank the first two in list order
+    -- were $1-ish deposit boxes, so the "big" heist paid the least.
+    local cands = {}
     for _, r in ipairs(S.loot:remaining()) do
-        if kinds[r.kind] and not r.locked and n < 2 then add(r.pos, "CASH", "loot") n = n + 1 end
+        if kinds[r.kind] and not r.locked and not r.target then table.insert(cands, r) end
+    end
+    table.sort(cands, function(a, b)
+        local ea = (a.heavy and 2 or 0) + (a.deposit and 1 or 0)
+        local eb = (b.heavy and 2 or 0) + (b.deposit and 1 or 0)
+        if ea ~= eb then return ea < eb end
+        return (a.value or 0) > (b.value or 0)
+    end)
+    local n = 0
+    for _, r in ipairs(cands) do
+        if n >= 2 then break end
+        add(r.pos, "CASH", "loot")
+        n = n + 1
     end
     add(carPos and carPos + Vector3.new(0, 4, 0), n > 0 and "CAR" or "GO!", "car")
     -- bonus (small extra marker only — the step is optional)
@@ -801,6 +862,11 @@ triggerAlarm = function(reason, player)
     addToCrew(player)
     run.alarm = true
     run.alarmEndsAt = now() + j.cfg.alarmTimer
+    do   -- (v3.4) say WHY in the output (a playtest couldn't tell lasers from cameras)
+        local rp = player and rootPos(player)
+        print(string.format("[JobService] ALARM (%s) by %s at %s", tostring(reason), player and player.Name or "?",
+            rp and string.format("%.1f, %.1f, %.1f", rp.X, rp.Y, rp.Z) or "?"))
+    end
     local who = player and player.DisplayName or "Someone"
     local msg = ({
         camera = "A camera saw " .. who .. " — ALARM! Get to the car!",
@@ -1904,7 +1970,12 @@ function JobService:init(deps)
 
     for _, cfg in ipairs(Constants.JOBS) do
         local refs = deps.jobs and deps.jobs[cfg.id]
-        if refs then jobs[cfg.id] = { cfg = cfg, refs = refs } end
+        if refs then
+            -- (v3.4) every heist plays the one-goal-at-a-time chain (the mart was first);
+            -- a job can opt out with Constants.JOBS[i].goalChain = false
+            if refs.goalChain == nil and cfg.goalChain ~= false then refs.goalChain = true end
+            jobs[cfg.id] = { cfg = cfg, refs = refs }
+        end
     end
 
     S.security:init({

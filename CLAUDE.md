@@ -629,6 +629,30 @@ Claude edits files in `/src/source/personal/heist-crew/` (which is **`D:\Project
   - Studio MCP note: `user_keyboard_input` keys often don't reach the game; drive prompts with client
     `prompt:InputHoldBegin()/InputHoldEnd()` and walk with server PathfindingService + `Humanoid:MoveTo`.
 
+- **2026-09-26** — **v3.4 "EVERY HEIST, SAME BAR"** (Malachi: *"finish"*: bring villa / jewelry / bank up to the
+  mart's level). Proven headless with the new **`tools/mock/drv_chain.luau`**: all three play start → payout in
+  stealth, **68/68**. E-prompt clash audit (`drv_eaudit.luau`, stand-spot based): **0 clashes on all 4 heists**.
+  - **One goal at a time everywhere**: the goal chain is generic and ON for every job (opt out with
+    `Constants.JOBS[i].goalChain = false`): ① cameras (breaker) → ② find the keycard (gold SEARCH markers) →
+    ③ open the locked door → ④ drill the vault/safe → ⑤ bag the vault money + load the car (`cfg.goalLoot`,
+    default up to 3) → GO. Words come from `cfg.goals` (mart) or `vaultNoun` / `doorLabel`. CASH markers now
+    point at the best bags one kid can carry (not heavy, not a mystery deposit box, highest value). Before:
+    bank's first two were ~$1 deposit boxes. Takes now climb: mart ~$2.4k → villa $4.5k → jewelry $5k → bank $11.7k.
+  - **Diamond Dolls + Ocean Bank start on the SIDEWALK** (`refs.arrival`, rows placed in the clear stretch the
+    mock sidewalk survey found) and you walk in as a shopper / customer. For arrival jobs, MaskUpService now treats
+    every plan room except the public front room (SHOWROOM / BANKING HALL / …) as staff-only. Villa keeps its
+    staff-room drop-in (it's a private house).
+  - **Villa lasers moved** to 3 rows at the corridor entrance (z -71.4 / -73.4 / -75.4). The old 4th row sat
+    1.3 studs in front of the vault drill: you had to drill inside the grid, and a jam fix (1.5 s) outlasted the
+    lasers' 1.1 s off-window.
+  - **Bank keycard spots**: the two teller stations holding the card have no cash drawer; the manager's-desk spot
+    is gone (watch + jewels + vent exit all within 3 studs). 4 spots remain.
+  - Briefings for villa / jewelry / bank rewritten as the same numbered steps (keywords chosen so BriefingUI shows
+    the right camera shot). `[JobService] ALARM (reason) by X at pos` is printed on every alarm.
+  - **The mock runtime now lives in the repo** (`tools/mock/`, README inside). It used to exist only in /tmp.
+  - ⏳ Not yet seen in Studio (Studio disconnected mid-session): the sidewalk walk-ins at jewelry + bank,
+    the moved villa lasers, the bank teller counter.
+
 ## 📑 Reference docs
 - **`docs/ART_DIRECTION.md`** 🆕 2026-09-22 — **read this before building anything visual.**
   The five rules that came out of the "doesn't look like a real Roblox game" screenshot

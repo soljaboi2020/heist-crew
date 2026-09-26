@@ -1,0 +1,7 @@
+runMain(function()
+	runScript(SERVER_SCRIPT, MAIN_CTX)
+	task.wait(1)
+	local p = addPlayer("Malachi")
+	task.wait(10)
+end, 120)
+report()

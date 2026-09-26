@@ -1081,8 +1081,11 @@ function LootService:remaining()
     local out = {}
     for _, p in ipairs(piles) do
         if not p.taken and p.anchor then
+            local okV, v = pcall(itemValue, p.item, 1)
             table.insert(out, { pos = p.anchor.Position, kind = p.kind, name = p.item.name, isCase = p.isCase,
-                locked = p.isVault and not vaultOpen, heavy = p.item.heavy, target = p.item.targetKind ~= nil })
+                locked = p.isVault and not vaultOpen, heavy = p.item.heavy, target = p.item.targetKind ~= nil,
+                -- (v3.4) the goal chain points at the best bags first
+                value = okV and tonumber(v) or 0, deposit = p.item.deposit == true })
         end
     end
     return out

@@ -933,8 +933,10 @@ function BankBuilder:_hall(f, props, spots, loot, hides, shadows)
             box("LampStem", x - 1.7, top + 0.12, 21.7, x - 1.6, top + 0.6, 21.8, BRASS, M.Metal, f, DECOR)
             pointLight(shade, Color3.fromRGB(255, 214, 150), 0.7, 10, true)
         end
-        -- (v3.0) every teller window has a cash drawer pulled half open (pool "tellers")
-        tellerDrawer(f, loot, x, i)
+        -- (v3.0) every teller window has a cash drawer pulled half open (pool "tellers").
+        -- (v3.4) except the two keycard stations (1 + last): with a drawer there, the
+        -- drawer's "Grab it" prompt sat 2.3 studs from the keycard and could win the E key
+        if i ~= 1 and i ~= #stations then tellerDrawer(f, loot, x, i) end
     end
     -- keycard spots on the teller worktop (station 1 + station 6)
     table.insert(spots, CFrame.new(stations[1] - 0.6, top + 0.01, 21.9))
@@ -1043,7 +1045,9 @@ function BankBuilder:_hall(f, props, spots, loot, hides, shadows)
         return dtop
     end
     local mTop = officeDesk(89, 94, 11.6, 13.4)
-    table.insert(spots, CFrame.new(92.8, mTop + 0.03, 12.5))
+    -- (v3.4) NO keycard spot here any more: this desk sits within 3 studs of the Gold Watch,
+    -- the Jewels and the office vent's exit, so any spot on it let one of those steal the E
+    -- key from "Take keycard". The bank keeps 4 spots (2 tellers, loans desk, security room).
     table.insert(props, { kit = "furniture", name = "laptop", pos = Vector3.new(90.6, mTop, 12.5), facing = Vector3.new(0, 0, -1), opts = { scale = 1.0 } })
     table.insert(props, { kit = "furniture", name = "chairDesk", pos = Vector3.new(91.5, FLOOR, 10.3), facing = Vector3.new(0, 0, 1) })
     -- (v3.0) floor lamp moved east of the new aquarium
@@ -2418,6 +2422,11 @@ function BankBuilder:build(folder)
         -- v2: the crew drops into the break room, just inside the staff door.
         -- No guard route enters it and no camera can see into it.
         sneakIn = { at = Vector3.new(128, GY, 48), face = Vector3.new(118, GY, 48), spread = Vector3.new(0, 0, 0.6) },
+        -- (v3.4) like Sunny's Mart: the crew starts on the SIDEWALK facing the front doors and
+        -- walks into the banking hall as customers (MaskUpService casing). Rows x 106.3..111.7,
+        -- z -3.4 / -5.2: the mock sidewalk survey found x 106..116 clear (barrel at 104).
+        arrival = { at = Vector3.new(109, 3.5, -3.4), face = Vector3.new(109, 3.5, 8), spread = Vector3.new(0.9, 0, 0),
+            rowGap = 1.8, line = "Walk in like a customer. Look around, then MASK UP!" },
         entrances = {
             { kind = "front", at = Vector3.new(108, 2.5, 2), label = "Front doors" },
             { kind = "side",  at = Vector3.new(136, 1.5, 48), label = "Staff door" },
